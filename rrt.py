@@ -3,9 +3,36 @@ import mujoco
 import numpy as np
 import time
 
+from dataclasses import dataclass
+
 
 def configuration_distance(q_from, q_to):
     return np.linalg.norm(q_to - q_from)
+
+def joint_names_to_qpos_addrs(joint_names, model: mujoco.MjModel):
+    return np.array([ model.joint(name).qposadr.item() for name in joint_names ])
+
+def joint_limits(joint_names, model: mujoco.MjModel):
+    lower_limits = [ model.joint(name).range[0] for name in joint_names ]
+    upper_limits = [ model.joint(name).range[1] for name in joint_names ]
+    return lower_limits, upper_limits
+
+def random_config(rng: np.random.Generator, lower_limits, upper_limits):
+    return rng.uniform(low=lower_limits, high=upper_limits)
+
+# NOTE: this will modify `data` in-place.
+def is_valid_config(q, lower_limits, upper_limits, qpos_addrs, model: mujoco.MjModel, data: mujoco.MjData) -> bool:
+    # Check joint limits.
+    if not ((q >= lower_limits) & (q <= upper_limits)).all():
+        return False
+
+    # Check for collisions.
+    # We have to run FK once data.qpos is updated before running the collision checker.
+    # TODO: enforce padding on the collision check? Not sure how to do this in MuJoCo yet
+    data.qpos[qpos_addrs] = q
+    mujoco.mj_kinematics(model, data)
+    mujoco.mj_collision(model, data)
+    return not data.ncon
 
 
 class Node:
@@ -50,8 +77,27 @@ class Tree:
         return path
 
 
+@dataclass
+class RRTOptions:
+    # The joints to plan for.
+    joint_names: list[str]
+    # Maximum planning time, in seconds.
+    # If this value is <= 0, the planner will run until a solution is found.
+    # A value <= 0 may lead to infinite run time, since sampling-based planners are probabilistically complete!
+    max_planning_time: float
+    # The RRT "growth factor".
+    # This is the maximum distance between nodes in the tree.
+    # This number should be > 0.
+    epsilon: float
+    # Random number generator that's used for sampling joint configurations.
+    rng: np.random.Generator
+    # How often to sample the goal state when building the tree.
+    # This should be a value within [0.0, 1.0].
+    goal_biasing_probability: float = 0.05
+
+
 class RRT:
-    def __init__(self, model: mujoco.MjModel, data: mujoco.MjData) -> None:
+    def __init__(self, options: RRTOptions, model: mujoco.MjModel, data: mujoco.MjData) -> None:
         # The model should be read-only, so we don't need to make a deep copy of it.
         self.model = model
 
@@ -60,59 +106,42 @@ class RRT:
         # sampled states are valid. 
         self.data = copy.deepcopy(data)
 
-        # TODO: don't hardcode this (currently assumes franka panda)
-        self.joint_names = [
-            'joint1',
-            'joint2',
-            'joint3',
-            'joint4',
-            'joint5',
-            'joint6',
-            'joint7',
-        ]
-        self.joint_qpos_addrs = np.array([ model.joint(j_name).qposadr.item() for j_name in self.joint_names ])
-        self.joint_limits_lower = [ model.joint(j_name).range[0] for j_name in self.joint_names ]
-        self.joint_limits_upper = [ model.joint(j_name).range[1] for j_name in self.joint_names ]
+        self.options = options
+        self.joint_qpos_addrs = joint_names_to_qpos_addrs(options.joint_names, self.model)
+        self.joint_limits_lower, self.joint_limits_upper = joint_limits(options.joint_names, self.model)
 
-        # Random number generator that's used for sampling joint configurations.
-        self.rng = np.random.default_rng()
-
-    def build_tree(self, q_goal):
-        print("Starting to plan...")
-
-        # Assuming that MjData's current joint configuration is valid, set it as the root of the tree.
-        q_init = [ self.data.joint(j_name).qpos.item() for j_name in self.joint_names ]
-        if not self.is_valid_config(q_init):
+    def plan(self, q_goal):
+        # Use MjData's current joint configuration as q_init.
+        q_init = self.data.qpos[self.joint_qpos_addrs]
+        if not is_valid_config(q_init, self.joint_limits_lower, self.joint_limits_upper, self.joint_qpos_addrs, self.model, self.data):
             print("q_init is not a valid configuration")
+            return []
         tree = Tree()
         tree.add_node(Node(q_init, None))
 
-        if not self.is_valid_config(q_goal):
+        if not is_valid_config(q_goal, self.joint_limits_lower, self.joint_limits_upper, self.joint_qpos_addrs, self.model, self.data):
             print("q_goal is not a valid configuration")
-
-        # TODO: remove hardcoded params
-        max_planning_time = 10
-        epsilon = 0.05
-        goal_biasing_probability = 0.1
+            return []
 
         solution_found = False
 
         # Is there a direct connection to q_goal from q_init?
-        if configuration_distance(q_init, q_goal) <= epsilon:
+        if configuration_distance(q_init, q_goal) <= self.options.epsilon:
             tree.add_node(Node(q_goal, q_init))
             solution_found = True
 
+        max_planning_time = float('inf') if self.options.max_planning_time <= 0 else self.options.max_planning_time
         start_time = time.time()
         while (not solution_found and time.time() - start_time < max_planning_time):
-            if self.rng.random() <= goal_biasing_probability:
+            if self.options.rng.random() <= self.options.goal_biasing_probability:
                 q_rand = q_goal
             else:
-                q_rand = self.random_config()
-            next_node = self.extend(q_rand, epsilon, tree)
-            if self.is_valid_config(next_node.q):
+                q_rand = random_config(self.options.rng, self.joint_limits_lower, self.joint_limits_upper)
+            next_node = self.extend(q_rand, self.options.epsilon, tree)
+            if is_valid_config(next_node.q, self.joint_limits_lower, self.joint_limits_upper, self.joint_qpos_addrs, self.model, self.data):
                 tree.add_node(next_node)
                 # check if the latest node yields a connection to q_goal
-                if configuration_distance(next_node.q, q_goal) <= epsilon:
+                if configuration_distance(next_node.q, q_goal) <= self.options.epsilon:
                     tree.add_node(Node(q_goal, next_node))
                     solution_found = True
         print(f"Solution found: {solution_found}, time taken: {time.time() - start_time}")
@@ -128,29 +157,3 @@ class RRT:
             return Node(q, node_near)
         q_increment = epsilon * ((q - q_near) / q_dist)
         return Node(q_near + q_increment, node_near)
-
-    def random_config(self):
-        return self.rng.uniform(low=self.joint_limits_lower, high=self.joint_limits_upper)
-
-    def is_valid_config(self, q) -> bool:
-        # We assume that a valid joint config is one that is collision free.
-        # Since random_config() already samples within the joint limits and extend() "clips"
-        # sampled configurations, we shouldn't have to check if new joint configurations
-        # violate joint limits or not.
-        #
-        # In order to check if q is a valid joint config for the given scene, we need to run
-        # FK on the new values before doing collision checking.
-        '''
-        # TODO: find a way to map joint names to data.qpos so that this isn't hardcoded
-        self.data.qpos[:7] = q
-        '''
-        '''
-        # TODO: improve the runtime performance here so that a for loop isn't needed.
-        # Probably need to pre-compute the idxs in data.qpos
-        for idx in range(len(self.joint_names)):
-            self.data.joint(self.joint_names[idx]).qpos = q[idx]
-        '''
-        self.data.qpos[self.joint_qpos_addrs] = q
-        mujoco.mj_kinematics(self.model, self.data)
-        mujoco.mj_collision(self.model, self.data)
-        return not self.data.ncon
