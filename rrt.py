@@ -13,8 +13,8 @@ def joint_names_to_qpos_addrs(joint_names, model: mujoco.MjModel):
     return np.array([ model.joint(name).qposadr.item() for name in joint_names ])
 
 def joint_limits(joint_names, model: mujoco.MjModel):
-    lower_limits = [ model.joint(name).range[0] for name in joint_names ]
-    upper_limits = [ model.joint(name).range[1] for name in joint_names ]
+    lower_limits = np.array([ model.joint(name).range[0] for name in joint_names ])
+    upper_limits = np.array([ model.joint(name).range[1] for name in joint_names ])
     return lower_limits, upper_limits
 
 def random_config(rng: np.random.Generator, lower_limits, upper_limits):
@@ -33,6 +33,13 @@ def is_valid_config(q, lower_limits, upper_limits, qpos_addrs, model: mujoco.MjM
     mujoco.mj_kinematics(model, data)
     mujoco.mj_collision(model, data)
     return not data.ncon
+
+# NOTE: this will modify `data` in-place, since it calls is_valid_config internally.
+def random_valid_config(rng: np.random.Generator, lower_limits, upper_limits, joint_qpos_addrs, model: mujoco.MjModel, data: mujoco.MjData):
+    q_rand = random_config(rng, lower_limits, upper_limits)
+    while not is_valid_config(q_rand, lower_limits, upper_limits, joint_qpos_addrs, model, data):
+        q_rand = random_config(rng, lower_limits, upper_limits)
+    return q_rand
 
 
 class Node:
@@ -57,14 +64,18 @@ class Tree:
     def add_node(self, node):
         self.nodes.add(node)
 
-    def nearest_neighbor(self, q):
+    def nearest_neighbor(self, q) -> Node:
         closest_node = None
         min_dist = np.inf
         for n in self.nodes:
+            if (n.q == q).all():
+                return n
             neighboring_dist = configuration_distance(n.q, q)
             if neighboring_dist < min_dist:
                 closest_node = n
                 min_dist = neighboring_dist
+        if not closest_node:
+            raise ValueError(f"No nearest neighbor found for {q}. Did you call this method before adding any nodes to the tree?")
         return closest_node
 
     def get_path(self, end_node: Node):
@@ -130,7 +141,10 @@ class RRT:
             tree.add_node(Node(q_goal, q_init))
             solution_found = True
 
-        max_planning_time = float('inf') if self.options.max_planning_time <= 0 else self.options.max_planning_time
+        max_planning_time = self.options.max_planning_time
+        if max_planning_time <= 0:
+            max_planning_time = float('inf')
+
         start_time = time.time()
         while (not solution_found and time.time() - start_time < max_planning_time):
             if self.options.rng.random() <= self.options.goal_biasing_probability:
@@ -138,22 +152,26 @@ class RRT:
             else:
                 q_rand = random_config(self.options.rng, self.joint_limits_lower, self.joint_limits_upper)
             next_node = self.extend(q_rand, self.options.epsilon, tree)
-            if is_valid_config(next_node.q, self.joint_limits_lower, self.joint_limits_upper, self.joint_qpos_addrs, self.model, self.data):
-                tree.add_node(next_node)
+            if next_node:
                 # check if the latest node yields a connection to q_goal
                 if configuration_distance(next_node.q, q_goal) <= self.options.epsilon:
                     tree.add_node(Node(q_goal, next_node))
                     solution_found = True
+
         print(f"Solution found: {solution_found}, time taken: {time.time() - start_time}")
         if solution_found:
             return tree.get_path(tree.nearest_neighbor(q_goal))
         return []
 
-    def extend(self, q, epsilon: float, tree: Tree) -> Node:
+    def extend(self, q, epsilon: float, tree: Tree) -> Node | None:
         node_near = tree.nearest_neighbor(q)
-        q_near = node_near.q
-        q_dist = configuration_distance(q_near, q)
-        if q_dist <= epsilon:
-            return Node(q, node_near)
-        q_increment = epsilon * ((q - q_near) / q_dist)
-        return Node(q_near + q_increment, node_near)
+        q_extend = q
+        q_dist = configuration_distance(node_near.q, q)
+        if q_dist > epsilon:
+            q_increment = epsilon * ((q - node_near.q) / q_dist)
+            q_extend = node_near.q + q_increment
+        if is_valid_config(q_extend, self.joint_limits_lower, self.joint_limits_upper, self.joint_qpos_addrs, self.model, self.data):
+            node_extend = Node(q_extend, node_near)
+            tree.add_node(node_extend)
+            return node_extend
+        return None
