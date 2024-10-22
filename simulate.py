@@ -66,6 +66,19 @@ if __name__ == '__main__':
         viz_time = 3
         sleep_per_viz_update = viz_time / len(path)
 
+        # Show the start and goal configurations.
+        data.qpos[joint_qpos_addrs] = q_init
+        mujoco.mj_kinematics(model, data)
+        viewer.sync()
+        time.sleep(1.5)
+        data.qpos[joint_qpos_addrs] = q_goal
+        mujoco.mj_kinematics(model, data)
+        viewer.sync()
+        time.sleep(1.25)
+        # After showing q_init and q_goal, reset simulation to q_init before vizualizing the path.
+        data.qpos[joint_qpos_addrs] = q_init
+        mujoco.mj_kinematics(model, data)
+
         next_configuration = 0
         while viewer.is_running():
             # Visualize the plan by sending control signals to the joint actuators.

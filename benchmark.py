@@ -29,8 +29,7 @@ if __name__ == '__main__':
     ]
     max_planning_time = 10
     epsilon = 0.05
-    # Seed 5 times out every time with naive unidirectional RRT.
-    # Can try to change the tree structure for faster NN lookups, or do bidirectional RRT to see if results are better.
+    #seed = 5
     seed = 42
     goal_biasing_probability = 0.1
     number_of_attempts = 15
