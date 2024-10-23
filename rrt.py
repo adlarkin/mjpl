@@ -57,11 +57,14 @@ class Node:
 class Tree:
     def __init__(self) -> None:
         # For now, the tree is represented as a set of unique nodes.
-        # TODO: use something like a kd-tree to improve nearest neighbor lookup times
-        # (this will impact how nearest_neighbor is implemented)
+        # TODO: use something like a kd-tree to improve nearest neighbor lookup times?
         self.nodes = set()
 
-    def add_node(self, node):
+        # The node that defines the root of a path in the tree.
+        # This should be set via set_path_root before calling get_path.
+        self.path_root = None
+
+    def add_node(self, node: Node):
         self.nodes.add(node)
 
     def nearest_neighbor(self, q) -> Node:
@@ -78,13 +81,17 @@ class Tree:
             raise ValueError(f"No nearest neighbor found for {q}. Did you call this method before adding any nodes to the tree?")
         return closest_node
 
-    def get_path(self, end_node: Node):
+    def set_path_root(self, node: Node):
+        self.path_root = node
+
+    def get_path(self) -> list[Node]:
+        if not self.path_root:
+            raise ValueError("The path root node has not been set. Did you forget to call set_path_root?")
         path = []
-        curr_node = end_node
+        curr_node = self.path_root
         while curr_node.parent is not None:
             path.append(curr_node.q)
             curr_node = curr_node.parent
-        path.reverse()
         return path
 
 
@@ -107,6 +114,8 @@ class RRTOptions:
     goal_biasing_probability: float = 0.05
 
 
+# Implementation of Bidirectional RRT-Connect:
+# https://www.cs.cmu.edu/afs/cs/academic/class/15494-s14/readings/kuffner_icra2000.pdf
 class RRT:
     def __init__(self, options: RRTOptions, model: mujoco.MjModel, data: mujoco.MjData) -> None:
         # The model should be read-only, so we don't need to make a deep copy of it.
@@ -127,51 +136,78 @@ class RRT:
         if not is_valid_config(q_init, self.joint_limits_lower, self.joint_limits_upper, self.joint_qpos_addrs, self.model, self.data):
             print("q_init is not a valid configuration")
             return []
-        tree = Tree()
-        tree.add_node(Node(q_init, None))
+        extend_tree = (Tree(), q_init)
+        extend_tree[0].add_node(Node(q_init, None))
 
         if not is_valid_config(q_goal, self.joint_limits_lower, self.joint_limits_upper, self.joint_qpos_addrs, self.model, self.data):
             print("q_goal is not a valid configuration")
             return []
-
-        solution_found = False
-
-        # Is there a direct connection to q_goal from q_init?
-        if configuration_distance(q_init, q_goal) <= self.options.epsilon:
-            tree.add_node(Node(q_goal, q_init))
-            solution_found = True
+        connect_tree = (Tree(), q_goal)
+        connect_tree[0].add_node(Node(q_goal, None))
 
         max_planning_time = self.options.max_planning_time
         if max_planning_time <= 0:
             max_planning_time = float('inf')
 
+        # Is there a direct connection to q_goal from q_init?
+        solution_found = False
+        if configuration_distance(q_init, q_goal) <= self.options.epsilon:
+            solution_found = True
+
         start_time = time.time()
         while (not solution_found and time.time() - start_time < max_planning_time):
             if self.options.rng.random() <= self.options.goal_biasing_probability:
-                q_rand = q_goal
+                q_rand = connect_tree[1]
             else:
                 q_rand = random_config(self.options.rng, self.joint_limits_lower, self.joint_limits_upper)
-            next_node = self.extend(q_rand, self.options.epsilon, tree)
-            if next_node:
-                # check if the latest node yields a connection to q_goal
-                if configuration_distance(next_node.q, q_goal) <= self.options.epsilon:
-                    tree.add_node(Node(q_goal, next_node))
+            extended_node = self.extend(q_rand, extend_tree[0])
+            if extended_node:
+                connected_node = self.connect(extended_node.q, connect_tree[0])
+                # If extended_node and connected_node are within epsilon, we can connect the two trees.
+                if connected_node and (configuration_distance(extended_node.q, connected_node.q) < self.options.epsilon):
+                    extend_tree[0].set_path_root(extended_node)
+                    connect_tree[0].set_path_root(connected_node)
                     solution_found = True
+
+            # Swap trees for the next iteration.
+            extend_tree, connect_tree = connect_tree, extend_tree
 
         print(f"Solution found: {solution_found}, time taken: {time.time() - start_time}")
         if solution_found:
-            return tree.get_path(tree.nearest_neighbor(q_goal))
+            # The original extend_tree and connect_tree may have been swapped, so check which ones hold q_init and q_goal.
+            if extend_tree[1] is q_goal:
+                extend_tree, connect_tree = connect_tree, extend_tree
+            return self.get_path(extend_tree[0], connect_tree[0])
         return []
 
-    def extend(self, q, epsilon: float, tree: Tree) -> Node | None:
+    def extend(self, q, tree: Tree) -> Node | None:
         node_near = tree.nearest_neighbor(q)
         q_extend = q
         q_dist = configuration_distance(node_near.q, q)
-        if q_dist > epsilon:
-            q_increment = epsilon * ((q - node_near.q) / q_dist)
+        if q_dist > self.options.epsilon:
+            q_increment = self.options.epsilon * ((q - node_near.q) / q_dist)
             q_extend = node_near.q + q_increment
         if is_valid_config(q_extend, self.joint_limits_lower, self.joint_limits_upper, self.joint_qpos_addrs, self.model, self.data):
             node_extend = Node(q_extend, node_near)
             tree.add_node(node_extend)
             return node_extend
         return None
+
+    def connect(self, q, tree: Tree) -> Node | None:
+        last_extended_node = None
+        connection_dist_remaining = float('inf')
+        while connection_dist_remaining > self.options.epsilon:
+            next_node = self.extend(q, tree)
+            if not next_node or (next_node.q == q).all():
+                break
+            last_extended_node = next_node
+            connection_dist_remaining = configuration_distance(last_extended_node.q, q)
+        return last_extended_node
+
+    def get_path(self, start_tree: Tree, goal_tree: Tree) -> list[Node]:
+        # The path generated from start_tree ends at q_init, but we want it to start at q_init. So we must reverse it.
+        # The path generated from goal_tree ends at q_goal, which is what we want.
+        path_start = start_tree.get_path()
+        path_start.reverse()
+        path_end = goal_tree.get_path()
+        return path_start + path_end
