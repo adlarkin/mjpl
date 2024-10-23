@@ -1,6 +1,8 @@
 '''
+Benchmark for testing planning time.
+
 The testing methodology is as follows:
-1. To be deterministic, choose a seed for the random number generator.
+1. To be deterministic, seed the random number generator.
 2. Create a planner and a [q_init, q_goal] pairing.
 3. Plan from q_init to q_goal N number of times.
 4. Report the following:
@@ -8,9 +10,9 @@ The testing methodology is as follows:
     b. Median planning time of successful planning attempts
 '''
 
+import mj_maniPlan.rrt as rrt
 import mujoco
 import numpy as np
-import rrt
 import time
 
 

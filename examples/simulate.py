@@ -1,8 +1,12 @@
+'''
+Example of how to generate a path and visualize the path waypoints.
+'''
+
 import mujoco
 import mujoco.viewer
 import numpy as np
 import time
-import rrt
+import mj_maniPlan.rrt as rrt
 
 
 if __name__ == '__main__':
