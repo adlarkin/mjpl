@@ -6,7 +6,7 @@ import rrt
 
 
 if __name__ == '__main__':
-    model = mujoco.MjModel.from_xml_path('models/franka_emika_panda/scene.xml')
+    model = mujoco.MjModel.from_xml_path('models/franka_emika_panda/scene_with_obstacles.xml')
     data = mujoco.MjData(model)
 
     # The joints to sample during planning.
@@ -24,6 +24,7 @@ if __name__ == '__main__':
     rng = np.random.default_rng(seed=None)
 
     # Generate valid initial and goal configurations.
+    print("Generating q_init and q_goal...")
     joint_qpos_addrs = rrt.joint_names_to_qpos_addrs(joint_names, model)
     lower_limits, upper_limits = rrt.joint_limits(joint_names, model)
     q_init = rrt.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
@@ -57,14 +58,10 @@ if __name__ == '__main__':
 
     with mujoco.viewer.launch_passive(model=model, data=data, show_left_ui=False, show_right_ui=False) as viewer:
         # Update the viewer's orientation to capture the arm movement.
-        viewer.cam.lookat = [0.45, 0, 0.3]
-        viewer.cam.distance = 1.75
+        viewer.cam.lookat = [0, 0, 0.35]
+        viewer.cam.distance = 2.5
         viewer.cam.azimuth = 145
-        viewer.cam.elevation = -10
-
-        # TODO: don't hardcode these? (used to slow down visualization)
-        viz_time = 3
-        sleep_per_viz_update = viz_time / len(path)
+        viewer.cam.elevation = -25
 
         # Show the start and goal configurations.
         data.qpos[joint_qpos_addrs] = q_init
@@ -75,20 +72,35 @@ if __name__ == '__main__':
         mujoco.mj_kinematics(model, data)
         viewer.sync()
         time.sleep(1.25)
-        # After showing q_init and q_goal, reset simulation to q_init before vizualizing the path.
+        # After showing q_init and q_goal, reset simulation to q_init before visualizing the path.
         data.qpos[joint_qpos_addrs] = q_init
         mujoco.mj_kinematics(model, data)
 
+        # Visualize kinematic updates at 60hz.
+        viz_time_per_frame = 1 / 60
+
         next_configuration = 0
         while viewer.is_running():
+            start_time = time.time()
+            # Perform a kinematic visualization of the path waypoints.
+            # The commented out code block below shows a hacky way to perform control along the waypoints.
+            data.qpos[joint_qpos_addrs] = path[next_configuration]
+            mujoco.mj_kinematics(model, data)
+            '''
             # Visualize the plan by sending control signals to the joint actuators.
             data.ctrl[joint_qpos_addrs] = path[next_configuration]
             # TODO: figure out what nstep should be (depends on controller hz)
             mujoco.mj_step(model, data, nstep=10)
+            '''
             viewer.sync()
             next_configuration += 1
             if next_configuration == len(path):
-                # reverse the path and move the robot back to its starting state
+                # Reverse the path and move the robot back to its starting state.
+                # Before working back towards the starting state, pause briefly to indicate that we have reached the end of the path.
                 next_configuration = 0
                 path.reverse()
-            time.sleep(sleep_per_viz_update)
+                time.sleep(0.25)
+            else:
+                elapsed_time = time.time() - start_time
+                if elapsed_time < viz_time_per_frame:
+                    time.sleep(viz_time_per_frame - elapsed_time)
