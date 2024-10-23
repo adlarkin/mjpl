@@ -19,5 +19,5 @@ See the [examples](./examples) folder.
 ## Other notes
 
 This project is under active development.
-APIs may change, and features are still a WIP.
+APIs may change, and features are still a work in progress.
 The [issues](https://github.com/adlarkin/mj_maniPlan/issues) labeled `enhancement` track upcoming features to be developed.

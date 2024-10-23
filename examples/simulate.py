@@ -6,7 +6,12 @@ import mujoco
 import mujoco.viewer
 import numpy as np
 import time
-import mj_maniPlan.rrt as rrt
+
+from mj_maniPlan.rrt import (
+    RRT,
+    RRTOptions,
+)
+import mj_maniPlan.utils as utils
 
 
 if __name__ == '__main__':
@@ -29,10 +34,10 @@ if __name__ == '__main__':
 
     # Generate valid initial and goal configurations.
     print("Generating q_init and q_goal...")
-    joint_qpos_addrs = rrt.joint_names_to_qpos_addrs(joint_names, model)
-    lower_limits, upper_limits = rrt.joint_limits(joint_names, model)
-    q_init = rrt.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
-    q_goal = rrt.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
+    joint_qpos_addrs = utils.joint_names_to_qpos_addrs(joint_names, model)
+    lower_limits, upper_limits = utils.joint_limits(joint_names, model)
+    q_init = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
+    q_goal = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
 
     # is_valid_config modifies MjData in-place, so we need to reset the data to q_init before planning.
     data.qpos[joint_qpos_addrs] = q_init
@@ -46,14 +51,14 @@ if __name__ == '__main__':
 
     # Set up the planner.
     # Tweak the values in planner_options to see the effect on generated plans!
-    planner_options = rrt.RRTOptions(
+    planner_options = RRTOptions(
         joint_names=joint_names,
         max_planning_time=10,
         epsilon=0.05,
         rng=rng,
         goal_biasing_probability=0.1,
     )
-    planner = rrt.RRT(planner_options, model, data)
+    planner = RRT(planner_options, model, data)
 
     print("Planning...")
     path = planner.plan(q_goal)

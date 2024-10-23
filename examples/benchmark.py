@@ -10,10 +10,15 @@ The testing methodology is as follows:
     b. Median planning time of successful planning attempts
 '''
 
-import mj_maniPlan.rrt as rrt
 import mujoco
 import numpy as np
 import time
+
+from mj_maniPlan.rrt import (
+    RRT,
+    RRTOptions,
+)
+import mj_maniPlan.utils as utils
 
 
 if __name__ == '__main__':
@@ -43,13 +48,13 @@ if __name__ == '__main__':
     rng = np.random.default_rng(seed=seed)
 
     # Generate a valid initial and goal configuration.
-    joint_qpos_addrs = rrt.joint_names_to_qpos_addrs(joint_names, model)
-    lower_limits, upper_limits = rrt.joint_limits(joint_names, model)
-    q_init = rrt.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
-    q_goal = rrt.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
+    joint_qpos_addrs = utils.joint_names_to_qpos_addrs(joint_names, model)
+    lower_limits, upper_limits = utils.joint_limits(joint_names, model)
+    q_init = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
+    q_goal = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
 
     # Define the planner options.
-    planner_options = rrt.RRTOptions(
+    planner_options = RRTOptions(
         joint_names=joint_names,
         max_planning_time=max_planning_time,
         epsilon=epsilon,
@@ -64,7 +69,7 @@ if __name__ == '__main__':
     for i in range(number_of_attempts):
         data.qpos[joint_qpos_addrs] = q_init
         mujoco.mj_kinematics(model, data)
-        planner = rrt.RRT(planner_options, model, data)
+        planner = RRT(planner_options, model, data)
 
         print(f"Attempt {i}...")
         start_time = time.time()
