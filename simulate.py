@@ -89,7 +89,7 @@ if __name__ == '__main__':
             '''
             # Visualize the plan by sending control signals to the joint actuators.
             data.ctrl[joint_qpos_addrs] = path[next_configuration]
-            # TODO: figure out what nstep should be (depends on controller hz)
+            # TODO: figure out what nstep should be (depends on controller hz and simulation dt)
             mujoco.mj_step(model, data, nstep=10)
             '''
             viewer.sync()

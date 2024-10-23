@@ -1,4 +1,4 @@
-<mujoco model="panda scene">
+<mujoco model="panda scene with obstacles">
   <include file="panda.xml"/>
 
   <statistic center="0.3 0 0.4" extent="1"/>

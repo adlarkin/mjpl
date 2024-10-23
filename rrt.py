@@ -114,6 +114,8 @@ class RRTOptions:
     goal_biasing_probability: float = 0.05
 
 
+# Implementation of Bidirectional RRT-Connect:
+# https://www.cs.cmu.edu/afs/cs/academic/class/15494-s14/readings/kuffner_icra2000.pdf
 class RRT:
     def __init__(self, options: RRTOptions, model: mujoco.MjModel, data: mujoco.MjData) -> None:
         # The model should be read-only, so we don't need to make a deep copy of it.
@@ -167,7 +169,7 @@ class RRT:
                     connect_tree[0].set_path_root(connected_node)
                     solution_found = True
 
-            # swap trees for next iteration
+            # Swap trees for the next iteration.
             extend_tree, connect_tree = connect_tree, extend_tree
 
         print(f"Solution found: {solution_found}, time taken: {time.time() - start_time}")
