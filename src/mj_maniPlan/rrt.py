@@ -5,18 +5,12 @@ import time
 
 from dataclasses import dataclass
 
-from .utils import (
-    configuration_distance,
-    joint_limits,
-    joint_names_to_qpos_addrs,
-    is_valid_config,
-    random_config,
-)
+from . import utils
 
 
 class Node:
-    def __init__(self, q, parent) -> None:
-        self.q = np.array(q)
+    def __init__(self, q: np.ndarray, parent) -> None:
+        self.q = q
         self.parent = parent
 
     def __hash__(self) -> int:
@@ -39,13 +33,13 @@ class Tree:
     def add_node(self, node: Node):
         self.nodes.add(node)
 
-    def nearest_neighbor(self, q) -> Node:
+    def nearest_neighbor(self, q: np.ndarray) -> Node:
         closest_node = None
         min_dist = np.inf
         for n in self.nodes:
             if (n.q == q).all():
                 return n
-            neighboring_dist = configuration_distance(n.q, q)
+            neighboring_dist = utils.configuration_distance(n.q, q)
             if neighboring_dist < min_dist:
                 closest_node = n
                 min_dist = neighboring_dist
@@ -56,7 +50,7 @@ class Tree:
     def set_path_root(self, node: Node):
         self.path_root = node
 
-    def get_path(self) -> list[Node]:
+    def get_path(self) -> list[np.ndarray]:
         if not self.path_root:
             raise ValueError("The path root node has not been set. Did you forget to call set_path_root?")
         path = []
@@ -99,19 +93,19 @@ class RRT:
         self.data = copy.deepcopy(data)
 
         self.options = options
-        self.joint_qpos_addrs = joint_names_to_qpos_addrs(options.joint_names, self.model)
-        self.joint_limits_lower, self.joint_limits_upper = joint_limits(options.joint_names, self.model)
+        self.joint_qpos_addrs = utils.joint_names_to_qpos_addrs(options.joint_names, self.model)
+        self.joint_limits_lower, self.joint_limits_upper = utils.joint_limits(options.joint_names, self.model)
 
-    def plan(self, q_goal):
+    def plan(self, q_goal: np.ndarray) -> list[np.ndarray]:
         # Use MjData's current joint configuration as q_init.
-        q_init = self.data.qpos[self.joint_qpos_addrs]
-        if not is_valid_config(q_init, self.joint_limits_lower, self.joint_limits_upper, self.joint_qpos_addrs, self.model, self.data):
+        q_init = self.data.qpos[self.joint_qpos_addrs].copy()
+        if not self.__is_valid_config(q_init):
             print("q_init is not a valid configuration")
             return []
         extend_tree = (Tree(), q_init)
         extend_tree[0].add_node(Node(q_init, None))
 
-        if not is_valid_config(q_goal, self.joint_limits_lower, self.joint_limits_upper, self.joint_qpos_addrs, self.model, self.data):
+        if not self.__is_valid_config(q_goal):
             print("q_goal is not a valid configuration")
             return []
         connect_tree = (Tree(), q_goal)
@@ -123,7 +117,7 @@ class RRT:
 
         # Is there a direct connection to q_goal from q_init?
         solution_found = False
-        if configuration_distance(q_init, q_goal) <= self.options.epsilon:
+        if utils.configuration_distance(q_init, q_goal) <= self.options.epsilon:
             solution_found = True
 
         start_time = time.time()
@@ -131,12 +125,12 @@ class RRT:
             if self.options.rng.random() <= self.options.goal_biasing_probability:
                 q_rand = connect_tree[1]
             else:
-                q_rand = random_config(self.options.rng, self.joint_limits_lower, self.joint_limits_upper)
+                q_rand = utils.random_config(self.options.rng, self.joint_limits_lower, self.joint_limits_upper)
             extended_node = self.extend(q_rand, extend_tree[0])
             if extended_node:
                 connected_node = self.connect(extended_node.q, connect_tree[0])
                 # If extended_node and connected_node are within epsilon, we can connect the two trees.
-                if connected_node and (configuration_distance(extended_node.q, connected_node.q) < self.options.epsilon):
+                if connected_node and (utils.configuration_distance(extended_node.q, connected_node.q) < self.options.epsilon):
                     extend_tree[0].set_path_root(extended_node)
                     connect_tree[0].set_path_root(connected_node)
                     solution_found = True
@@ -152,20 +146,20 @@ class RRT:
             return self.get_path(extend_tree[0], connect_tree[0])
         return []
 
-    def extend(self, q, tree: Tree) -> Node | None:
+    def extend(self, q: np.ndarray, tree: Tree) -> Node | None:
         node_near = tree.nearest_neighbor(q)
-        q_extend = q
-        q_dist = configuration_distance(node_near.q, q)
+        q_extend = q.copy()
+        q_dist = utils.configuration_distance(node_near.q, q)
         if q_dist > self.options.epsilon:
             q_increment = self.options.epsilon * ((q - node_near.q) / q_dist)
             q_extend = node_near.q + q_increment
-        if is_valid_config(q_extend, self.joint_limits_lower, self.joint_limits_upper, self.joint_qpos_addrs, self.model, self.data):
+        if self.__is_valid_config(q_extend):
             node_extend = Node(q_extend, node_near)
             tree.add_node(node_extend)
             return node_extend
         return None
 
-    def connect(self, q, tree: Tree) -> Node | None:
+    def connect(self, q: np.ndarray, tree: Tree) -> Node | None:
         last_extended_node = None
         connection_dist_remaining = float('inf')
         while connection_dist_remaining > self.options.epsilon:
@@ -173,13 +167,23 @@ class RRT:
             if not next_node or (next_node.q == q).all():
                 break
             last_extended_node = next_node
-            connection_dist_remaining = configuration_distance(last_extended_node.q, q)
+            connection_dist_remaining = utils.configuration_distance(last_extended_node.q, q)
         return last_extended_node
 
-    def get_path(self, start_tree: Tree, goal_tree: Tree) -> list[Node]:
+    def get_path(self, start_tree: Tree, goal_tree: Tree) -> list[np.ndarray]:
         # The path generated from start_tree ends at q_init, but we want it to start at q_init. So we must reverse it.
         # The path generated from goal_tree ends at q_goal, which is what we want.
         path_start = start_tree.get_path()
         path_start.reverse()
         path_end = goal_tree.get_path()
         return path_start + path_end
+
+    def __is_valid_config(self, q: np.ndarray) -> bool:
+        return utils.is_valid_config(
+            q,
+            self.joint_limits_lower,
+            self.joint_limits_upper,
+            self.joint_qpos_addrs,
+            self.model,
+            self.data
+        )

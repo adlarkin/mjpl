@@ -39,12 +39,16 @@ if __name__ == '__main__':
     q_init = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
     q_goal = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
 
-    # is_valid_config modifies MjData in-place, so we need to reset the data to q_init before planning.
-    data.qpos[joint_qpos_addrs] = q_init
-    mujoco.mj_kinematics(model, data)
+    def set_joint_config(q: np.ndarray):
+        data.qpos[joint_qpos_addrs] = q
+        mujoco.mj_kinematics(model, data)
 
+    # random_valid_config modifies MjData in-place, so we need to reset the data to q_init before planning.
+    set_joint_config(q_init)
+
+    # Example of how to set the joint configuration to the values specified in the keyframe with ID 0.
+    # This can be useful if the joint configuration from this keyframe is what's used for q_init.
     '''
-    # Set q_init to the "home" keyframe.
     mujoco.mj_resetDataKeyframe(model, data, 0)
     mujoco.mj_kinematics(model, data)
     '''
@@ -72,18 +76,15 @@ if __name__ == '__main__':
         viewer.cam.azimuth = 145
         viewer.cam.elevation = -25
 
+        def set_and_visualize_joint_config(q: np.ndarray):
+            set_joint_config(q)
+            viewer.sync()
+
         # Show the start and goal configurations.
-        data.qpos[joint_qpos_addrs] = q_init
-        mujoco.mj_kinematics(model, data)
-        viewer.sync()
-        time.sleep(1.5)
-        data.qpos[joint_qpos_addrs] = q_goal
-        mujoco.mj_kinematics(model, data)
-        viewer.sync()
+        set_and_visualize_joint_config(q_init)
+        time.sleep(1.3)
+        set_and_visualize_joint_config(q_goal)
         time.sleep(1.25)
-        # After showing q_init and q_goal, reset simulation to q_init before visualizing the path.
-        data.qpos[joint_qpos_addrs] = q_init
-        mujoco.mj_kinematics(model, data)
 
         # Visualize kinematic updates at 60hz.
         viz_time_per_frame = 1 / 60
@@ -92,16 +93,15 @@ if __name__ == '__main__':
         while viewer.is_running():
             start_time = time.time()
             # Perform a kinematic visualization of the path waypoints.
-            # The commented out code block below shows a hacky way to perform control along the waypoints.
-            data.qpos[joint_qpos_addrs] = path[next_configuration]
-            mujoco.mj_kinematics(model, data)
+            # The commented out code block below shows a "hacky" way to perform control along the waypoints.
+            set_and_visualize_joint_config(path[next_configuration])
             '''
             # Visualize the plan by sending control signals to the joint actuators.
             data.ctrl[joint_qpos_addrs] = path[next_configuration]
             # TODO: figure out what nstep should be (depends on controller hz and simulation dt)
             mujoco.mj_step(model, data, nstep=10)
-            '''
             viewer.sync()
+            '''
             next_configuration += 1
             if next_configuration == len(path):
                 # Reverse the path and move the robot back to its starting state.
