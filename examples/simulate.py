@@ -82,11 +82,9 @@ if __name__ == '__main__':
 
         # Show the start and goal configurations.
         set_and_visualize_joint_config(q_init)
-        time.sleep(1.5)
+        time.sleep(1.3)
         set_and_visualize_joint_config(q_goal)
         time.sleep(1.25)
-        # After showing q_init and q_goal, reset simulation to q_init before visualizing the path.
-        set_joint_config(q_init)
 
         # Visualize kinematic updates at 60hz.
         viz_time_per_frame = 1 / 60
