@@ -42,33 +42,33 @@ if __name__ == '__main__':
     number_of_attempts = 15
 
     model = mujoco.MjModel.from_xml_path(model_xml_path)
-    data = mujoco.MjData(model)
 
-    # Random number generator that's used for sampling joint configurations.
-    rng = np.random.default_rng(seed=seed)
-
-    # Generate a valid initial and goal configuration.
     joint_qpos_addrs = utils.joint_names_to_qpos_addrs(joint_names, model)
     lower_limits, upper_limits = utils.joint_limits(joint_names, model)
-    q_init = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
-    q_goal = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
-
-    # Define the planner options.
-    planner_options = RRTOptions(
-        joint_names=joint_names,
-        max_planning_time=max_planning_time,
-        epsilon=epsilon,
-        rng=rng,
-        goal_biasing_probability=goal_biasing_probability,
-    )
 
     # Plan number_of_attempts times and record benchmarks.
-    # Since the planner sets q_init to the state of mujoco.MjData that was used during planner construction,
-    # we recreate the planner with a mujoco.MjData that reflects q_init for each attempt.
     successful_planning_times = []
     for i in range(number_of_attempts):
+        data = mujoco.MjData(model)
+
+        # Random number generator that's used for sampling joint configurations.
+        rng = np.random.default_rng(seed=seed)
+
+        # Generate a valid initial and goal configuration.
+        q_init = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
+        q_goal = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
+
+        # set robot joint configuration to q_init
         data.qpos[joint_qpos_addrs] = q_init
         mujoco.mj_kinematics(model, data)
+
+        planner_options = RRTOptions(
+            joint_names=joint_names,
+            max_planning_time=max_planning_time,
+            epsilon=epsilon,
+            rng=rng,
+            goal_biasing_probability=goal_biasing_probability,
+        )
         planner = RRT(planner_options, model, data)
 
         print(f"Attempt {i}...")
