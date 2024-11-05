@@ -56,7 +56,7 @@ class Tree:
             raise ValueError("The path root node has not been set. Did you forget to call set_path_root?")
         path = []
         curr_node = self.path_root
-        while curr_node.parent is not None:
+        while curr_node is not None:
             path.append(curr_node.q)
             curr_node = curr_node.parent
         return path
