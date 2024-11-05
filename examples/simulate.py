@@ -89,27 +89,21 @@ if __name__ == '__main__':
         # Visualize kinematic updates at 60hz.
         viz_time_per_frame = 1 / 60
 
-        next_configuration = 0
         while viewer.is_running():
-            start_time = time.time()
-            # Perform a kinematic visualization of the path waypoints.
-            # The commented out code block below shows a "hacky" way to perform control along the waypoints.
-            set_and_visualize_joint_config(path[next_configuration])
-            '''
-            # Visualize the plan by sending control signals to the joint actuators.
-            data.ctrl[joint_qpos_addrs] = path[next_configuration]
-            # TODO: figure out what nstep should be (depends on controller hz and simulation dt)
-            mujoco.mj_step(model, data, nstep=10)
-            viewer.sync()
-            '''
-            next_configuration += 1
-            if next_configuration == len(path):
-                # Reverse the path and move the robot back to its starting state.
-                # Before working back towards the starting state, pause briefly to indicate that we have reached the end of the path.
-                next_configuration = 0
-                path.reverse()
-                time.sleep(0.25)
-            else:
+            # Visualization of the planner-generated waypoint path.
+            for q in path:
+                start_time = time.time()
+                # Perform a kinematic visualization of the path waypoints.
+                # The commented out code block below shows a "hacky" way to perform control along the waypoints.
+                set_and_visualize_joint_config(q)
+                '''
+                # Visualize the plan by sending control signals to the joint actuators.
+                data.ctrl[joint_qpos_addrs] = q
+                # TODO: figure out what nstep should be (depends on controller hz and simulation dt)
+                mujoco.mj_step(model, data, nstep=10)
+                viewer.sync()
+                '''
                 elapsed_time = time.time() - start_time
                 if elapsed_time < viz_time_per_frame:
                     time.sleep(viz_time_per_frame - elapsed_time)
+            time.sleep(0.25)
