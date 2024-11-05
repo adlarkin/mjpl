@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass
 
 from . import utils
+from .sampling import HaltonSampler
 
 
 class Node:
@@ -74,7 +75,7 @@ class RRTOptions:
     # This number should be > 0.
     epsilon: float
     # Random number generator that's used for sampling joint configurations.
-    rng: np.random.Generator
+    rng: HaltonSampler
     # How often to sample the goal state when building the tree.
     # This should be a value within [0.0, 1.0].
     goal_biasing_probability: float = 0.05
@@ -95,6 +96,7 @@ class RRT:
         self.options = options
         self.joint_qpos_addrs = utils.joint_names_to_qpos_addrs(options.joint_names, self.model)
         self.joint_limits_lower, self.joint_limits_upper = utils.joint_limits(options.joint_names, self.model)
+        self.goal_biasing_sampler = np.random.default_rng(seed=options.rng.get_seed())
 
     def plan(self, q_goal: np.ndarray) -> list[np.ndarray]:
         # Use MjData's current joint configuration as q_init.
@@ -122,10 +124,10 @@ class RRT:
 
         start_time = time.time()
         while (not solution_found and time.time() - start_time < max_planning_time):
-            if self.options.rng.random() <= self.options.goal_biasing_probability:
+            if self.goal_biasing_sampler.random() <= self.options.goal_biasing_probability:
                 q_rand = connect_tree[1]
             else:
-                q_rand = utils.random_config(self.options.rng, self.joint_limits_lower, self.joint_limits_upper)
+                q_rand = self.options.rng.sample(self.joint_limits_lower, self.joint_limits_upper)
             extended_node = self.extend(q_rand, extend_tree[0])
             if extended_node:
                 connected_node = self.connect(extended_node.q, connect_tree[0])

@@ -11,6 +11,7 @@ from mj_maniPlan.rrt import (
     RRT,
     RRTOptions,
 )
+from mj_maniPlan.sampling import HaltonSampler
 import mj_maniPlan.utils as utils
 
 
@@ -30,7 +31,7 @@ if __name__ == '__main__':
     ]
 
     # Random number generator that's used for sampling joint configurations.
-    rng = np.random.default_rng(seed=None)
+    rng = HaltonSampler(len(joint_names), seed=None)
 
     # Generate valid initial and goal configurations.
     print("Generating q_init and q_goal...")
