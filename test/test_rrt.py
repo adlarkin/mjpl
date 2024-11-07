@@ -31,60 +31,69 @@ class TestRRT(unittest.TestCase):
 
         self.rrt = rrt.RRT(self.options, model, data)
 
-    # TODO: test extending towards a node that is already in the tree
     def test_extend(self):
         tree = rrt.Tree()
         tree.add_node(rrt.Node(self.q_init, None))
 
         q_goal = np.array([0.5])
         self.rrt.extend(q_goal, tree)
+        self.assertEqual(len(tree.nodes), 2)
 
-        # since nodes are defined as equal only by their joint configurations and not their parents,
-        # we don't need to specify the parent of the newly extended node (the one with q = [0.0])
-        q_extended = np.array([0.0])
-        expected_nodes_in_tree = {
-            rrt.Node(self.q_init, None),
-            rrt.Node(q_extended, None),
-        }
-        self.assertSetEqual(expected_nodes_in_tree, tree.nodes)
+        expected_q_extended = np.array([0.0])
+        extended_node = tree.nearest_neighbor(expected_q_extended)
+        self.assertAlmostEqual(extended_node.q, expected_q_extended, places=9)
 
         # Check the path starting from the extended node.
         # This implicitly checks the extended node's parent.
         expected_path = [
-            np.array([0.0]),
-            np.array([-0.1]),
+            expected_q_extended,
+            self.q_init,
         ]
-        tree.set_path_root(tree.nearest_neighbor(q_extended))
-        self.assertTrue(np.array_equal(tree.get_path(), expected_path))
+        tree.set_path_root(extended_node)
+        path = tree.get_path()
+        self.assertEqual(len(path), len(expected_path))
+        for i in range(len(path)):
+            self.assertAlmostEqual(path[i][0], expected_path[i][0], places=9)
 
-    # TODO: test connecting towards a node that is already in the tree
+        # extending towards a q that is already in the tree should do nothing
+        existing_nodes = tree.nodes.copy()
+        self.rrt.extend(extended_node.q, tree)
+        self.assertSetEqual(tree.nodes, existing_nodes)
+
+        # TODO: test the nearest_node arg of the extend API
+
     def test_connect(self):
         tree = rrt.Tree()
         tree.add_node(rrt.Node(self.q_init, None))
 
-        q_goal = np.array([0.2])
+        q_goal = np.array([0.15])
         self.rrt.connect(q_goal, tree)
 
-        # since nodes are defined as equal only by their joint configurations and not their parents,
-        # we don't need to specify the parent of the connected nodes
-        expected_nodes_in_tree = {
-            rrt.Node(self.q_init, None),
-            rrt.Node(np.array([0.0]), None),
-            rrt.Node(np.array([0.1]), None),
-            rrt.Node(np.array([0.2]), None),
-        }
-        self.assertSetEqual(expected_nodes_in_tree, tree.nodes)
+        expected_qs_in_tree = [
+            self.q_init,
+            np.array([0.0]),
+            np.array([0.1]),
+            q_goal,
+        ]
+        for q_tree in expected_qs_in_tree:
+            n = tree.nearest_neighbor(q_tree)
+            self.assertAlmostEqual(n.q[0], q_tree[0], places=9)
+
+        goal_node = tree.nearest_neighbor(q_goal)
 
         # Check the path from the last connected node.
         # This implicitly checks each connected node's parent.
-        expected_path = [
-            np.array([0.2]),
-            np.array([0.1]),
-            np.array([0.0]),
-            np.array([-0.1]),
-        ]
-        tree.set_path_root(tree.nearest_neighbor(np.array([0.2])))
-        self.assertTrue(np.array_equal(tree.get_path(), expected_path))
+        expected_path = expected_qs_in_tree[::-1]
+        tree.set_path_root(goal_node)
+        path = tree.get_path()
+        self.assertEqual(len(path), len(expected_path))
+        for i in range(len(path)):
+            self.assertAlmostEqual(path[i][0], expected_path[i][0], places=9)
+
+        # connecting towards a q that is already in the tree should do nothing
+        existing_nodes = tree.nodes.copy()
+        self.rrt.connect(goal_node.q, tree)
+        self.assertSetEqual(tree.nodes, existing_nodes)
 
     def test_get_path(self):
         q_new = np.array([0.15])
@@ -111,14 +120,24 @@ class TestRRT(unittest.TestCase):
             np.array([0.5]),
         ]
         self.assertEqual(len(path), len(expected_path))
-        # TODO: implement this almostEqual check in other methods too
-        # (currently just doing np.arrayEqual checks, but different machines have different floating point accuracy)
         for i in range(len(path)):
-            # The values in path and expected_path may not be exactly the same due to floating point error.
             self.assertAlmostEqual(path[i][0], expected_path[i][0], places=9)
 
     def test_run_rrt(self):
-        pass
+        q_goal = np.array([0.35])
+        path = self.rrt.plan(q_goal)
+        self.assertIsNotNone(path)
+
+        # The path should start at q_init and end at q_goal
+        self.assertTrue(np.array_equal(path[0], self.q_init))
+        self.assertTrue(np.array_equal(path[-1], q_goal))
+
+        # The path should be strictly increasing to q_goal
+        for i in range(1, len(path)):
+            self.assertGreater(path[i][0], path[i-1][0])
+
+    # TODO: test with an obstacle?
+    # (for extend and connect - can add something like a plane to the simple model)
 
 
 if __name__ == '__main__':
