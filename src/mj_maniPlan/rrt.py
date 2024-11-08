@@ -38,7 +38,7 @@ class Tree:
         closest_node = None
         min_dist = np.inf
         for n in self.nodes:
-            if (n.q == q).all():
+            if np.array_equal(n.q, q):
                 return n
             neighboring_dist = utils.configuration_distance(n.q, q)
             if neighboring_dist < min_dist:
@@ -56,7 +56,7 @@ class Tree:
             raise ValueError("The path root node has not been set. Did you forget to call set_path_root?")
         path = []
         curr_node = self.path_root
-        while curr_node.parent is not None:
+        while curr_node is not None:
             path.append(curr_node.q)
             curr_node = curr_node.parent
         return path
@@ -120,6 +120,8 @@ class RRT:
         # Is there a direct connection to q_goal from q_init?
         solution_found = False
         if utils.configuration_distance(q_init, q_goal) <= self.options.epsilon:
+            extend_tree[0].set_path_root(extend_tree[0].nearest_neighbor(q_init))
+            connect_tree[0].set_path_root(connect_tree[0].nearest_neighbor(q_goal))
             solution_found = True
 
         start_time = time.time()
@@ -132,7 +134,7 @@ class RRT:
             if extended_node:
                 connected_node = self.connect(extended_node.q, connect_tree[0])
                 # If extended_node and connected_node are within epsilon, we can connect the two trees.
-                if connected_node and (utils.configuration_distance(extended_node.q, connected_node.q) < self.options.epsilon):
+                if utils.configuration_distance(extended_node.q, connected_node.q) < self.options.epsilon:
                     extend_tree[0].set_path_root(extended_node)
                     connect_tree[0].set_path_root(connected_node)
                     solution_found = True
@@ -148,36 +150,41 @@ class RRT:
             return self.get_path(extend_tree[0], connect_tree[0])
         return []
 
-    def extend(self, q: np.ndarray, tree: Tree) -> Node | None:
-        node_near = tree.nearest_neighbor(q)
+    def extend(self, q: np.ndarray, tree: Tree, nearest_node: Node | None = None) -> Node | None:
+        if not nearest_node:
+            nearest_node = tree.nearest_neighbor(q)
+        if np.array_equal(nearest_node.q, q):
+            return nearest_node
         q_extend = q.copy()
-        q_dist = utils.configuration_distance(node_near.q, q)
+        q_dist = utils.configuration_distance(nearest_node.q, q)
         if q_dist > self.options.epsilon:
-            q_increment = self.options.epsilon * ((q - node_near.q) / q_dist)
-            q_extend = node_near.q + q_increment
+            q_increment = self.options.epsilon * ((q - nearest_node.q) / q_dist)
+            q_extend = nearest_node.q + q_increment
         if self.__is_valid_config(q_extend):
-            node_extend = Node(q_extend, node_near)
+            node_extend = Node(q_extend, nearest_node)
             tree.add_node(node_extend)
             return node_extend
         return None
 
-    def connect(self, q: np.ndarray, tree: Tree) -> Node | None:
-        last_extended_node = None
-        connection_dist_remaining = float('inf')
-        while connection_dist_remaining > self.options.epsilon:
-            next_node = self.extend(q, tree)
-            if not next_node or (next_node.q == q).all():
+    def connect(self, q: np.ndarray, tree: Tree) -> Node:
+        nearest_node = tree.nearest_neighbor(q)
+        while not np.array_equal(q, nearest_node.q):
+            next_node = self.extend(q, tree, nearest_node)
+            if not next_node:
                 break
-            last_extended_node = next_node
-            connection_dist_remaining = utils.configuration_distance(last_extended_node.q, q)
-        return last_extended_node
+            nearest_node = next_node
+        return nearest_node
 
     def get_path(self, start_tree: Tree, goal_tree: Tree) -> list[np.ndarray]:
         # The path generated from start_tree ends at q_init, but we want it to start at q_init. So we must reverse it.
-        # The path generated from goal_tree ends at q_goal, which is what we want.
         path_start = start_tree.get_path()
         path_start.reverse()
+        # The path generated from goal_tree ends at q_goal, which is what we want.
         path_end = goal_tree.get_path()
+        # The last value in path_start might be the same as the first value in path_end.
+        # If this is the case, remove the duplicate value.
+        if np.array_equal(path_start[-1], path_end[0]):
+            path_start.pop()
         return path_start + path_end
 
     def __is_valid_config(self, q: np.ndarray) -> bool:
