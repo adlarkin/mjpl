@@ -151,6 +151,8 @@ class RRT:
     def extend(self, q: np.ndarray, tree: Tree, nearest_node: Node | None = None) -> Node | None:
         if not nearest_node:
             nearest_node = tree.nearest_neighbor(q)
+        if np.array_equal(nearest_node.q, q):
+            return nearest_node
         q_extend = q.copy()
         q_dist = utils.configuration_distance(nearest_node.q, q)
         if q_dist > self.options.epsilon:

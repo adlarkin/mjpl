@@ -13,6 +13,8 @@ class TestRRT(unittest.TestCase):
         model_file = dir + "/models/ball.xml"
         model = mujoco.MjModel.from_xml_path(model_file)
 
+        self.obstacle = model.geom('wall_obstacle')
+
         joint_names = [ "ball_slide_x" ]
         self.options = rrt.RRTOptions(
             joint_names=joint_names,
@@ -36,11 +38,10 @@ class TestRRT(unittest.TestCase):
         tree.add_node(rrt.Node(self.q_init, None))
 
         q_goal = np.array([0.5])
-        self.rrt.extend(q_goal, tree)
-        self.assertEqual(len(tree.nodes), 2)
-
         expected_q_extended = np.array([0.0])
-        extended_node = tree.nearest_neighbor(expected_q_extended)
+        extended_node = self.rrt.extend(q_goal, tree)
+        self.assertIsNotNone(extended_node)
+        self.assertEqual(len(tree.nodes), 2)
         self.assertAlmostEqual(extended_node.q, expected_q_extended, places=9)
 
         # Check the path starting from the extended node.
@@ -57,17 +58,31 @@ class TestRRT(unittest.TestCase):
 
         # extending towards a q that is already in the tree should do nothing
         existing_nodes = tree.nodes.copy()
-        self.rrt.extend(extended_node.q, tree)
+        same_extended_node = self.rrt.extend(extended_node.q, tree)
+        self.assertIsNotNone(same_extended_node)
         self.assertSetEqual(tree.nodes, existing_nodes)
+        # The assertSetEqual above runs the equality operator on all elements of the set.
+        # Since node equality is defined as having the same q, we should take the check a
+        # step further to ensure that same_extended_node and extended_node are the same object.
+        self.assertIs(same_extended_node, extended_node)
 
-        # TODO: test the nearest_node arg of the extend API
+        # Test extend where the "nearest node" is already given
+        tree = rrt.Tree()
+        root_node = rrt.Node(np.array([0.0]), None)
+        tree.add_node(root_node)
+        tree.add_node(rrt.Node(np.array([2.0]), root_node))
+        extended_node = self.rrt.extend(np.array([3.0]), tree, root_node)
+        self.assertIsNotNone(extended_node)
+        self.assertIs(extended_node.parent, root_node)
+        self.assertAlmostEqual(extended_node.q[0], 0.1, places=9)
 
     def test_connect(self):
         tree = rrt.Tree()
         tree.add_node(rrt.Node(self.q_init, None))
 
         q_goal = np.array([0.15])
-        self.rrt.connect(q_goal, tree)
+        goal_node = self.rrt.connect(q_goal, tree)
+        self.assertIsNotNone(goal_node)
 
         expected_qs_in_tree = [
             self.q_init,
@@ -78,8 +93,6 @@ class TestRRT(unittest.TestCase):
         for q_tree in expected_qs_in_tree:
             n = tree.nearest_neighbor(q_tree)
             self.assertAlmostEqual(n.q[0], q_tree[0], places=9)
-
-        goal_node = tree.nearest_neighbor(q_goal)
 
         # Check the path from the last connected node.
         # This implicitly checks each connected node's parent.
@@ -92,7 +105,32 @@ class TestRRT(unittest.TestCase):
 
         # connecting towards a q that is already in the tree should do nothing
         existing_nodes = tree.nodes.copy()
-        self.rrt.connect(goal_node.q, tree)
+        same_connected_node = self.rrt.connect(goal_node.q, tree)
+        self.assertIsNotNone(same_connected_node)
+        self.assertSetEqual(tree.nodes, existing_nodes)
+        # The assertSetEqual above runs the equality operator on all elements of the set.
+        # Since node equality is defined as having the same q, we should take the check a
+        # step further to ensure that same_extended_node and extended_node are the same object.
+        self.assertIs(same_connected_node, goal_node)
+
+    def test_extend_and_connect_into_obstacle(self):
+        tree = rrt.Tree()
+        tree.add_node(rrt.Node(self.q_init, None))
+
+        # Try to connect to the maximum joint value for the ball.
+        # There is an obstacle in the way, so the final connection should be just before
+        # where the obstacle lies.
+        q_goal = np.array([1.0])
+        connected_node = self.rrt.connect(q_goal, tree)
+        self.assertIsNotNone(connected_node)
+        obstacle_min_x = self.obstacle.pos[0] - self.obstacle.size[0]
+        self.assertLess(connected_node.q[0], obstacle_min_x)
+
+        # Try to extend towards the goal.
+        # This should not work since the extension is in collision.
+        existing_nodes = tree.nodes.copy()
+        extended_node = self.rrt.extend(q_goal, tree)
+        self.assertIsNone(extended_node)
         self.assertSetEqual(tree.nodes, existing_nodes)
 
     def test_get_path(self):
@@ -100,13 +138,15 @@ class TestRRT(unittest.TestCase):
 
         start_tree = rrt.Tree()
         start_tree.add_node(rrt.Node(self.q_init, None))
-        self.rrt.connect(q_new, start_tree)
-        start_tree.set_path_root(start_tree.nearest_neighbor(q_new))
+        connected_node_a = self.rrt.connect(q_new, start_tree)
+        self.assertIsNotNone(connected_node_a)
+        start_tree.set_path_root(connected_node_a)
 
         goal_tree = rrt.Tree()
         goal_tree.add_node(rrt.Node(np.array([0.5]), None))
-        self.rrt.connect(q_new, goal_tree)
-        goal_tree.set_path_root(goal_tree.nearest_neighbor(q_new))
+        connected_node_b = self.rrt.connect(q_new, goal_tree)
+        self.assertIsNotNone(connected_node_b)
+        goal_tree.set_path_root(connected_node_b)
 
         path = self.rrt.get_path(start_tree, goal_tree)
         expected_path = [
@@ -135,9 +175,6 @@ class TestRRT(unittest.TestCase):
         # The path should be strictly increasing to q_goal
         for i in range(1, len(path)):
             self.assertGreater(path[i][0], path[i-1][0])
-
-    # TODO: test with an obstacle?
-    # (for extend and connect - can add something like a plane to the simple model)
 
 
 if __name__ == '__main__':

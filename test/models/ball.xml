@@ -5,7 +5,10 @@
 
     <body name="ball" pos="0 0 1">
       <joint name="ball_slide_x" type="slide" axis="1 0 0" range="-1 1"/>
-      <geom type="sphere" size="0.25" rgba="1 0 0 1"/>
+      <geom type="sphere" size="0.1" rgba="0 1 0 1"/>
     </body>
+
+    <!-- Obstacle that lies from x = 0.8 .. 1 -->
+    <geom name="wall_obstacle" type="box" pos="0.9 0 1" size="0.1 0.5 0.5" rgba="1 0 0 1"/>
   </worldbody>
 </mujoco>
