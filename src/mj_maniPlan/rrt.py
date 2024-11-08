@@ -164,7 +164,7 @@ class RRT:
             return node_extend
         return None
 
-    def connect(self, q: np.ndarray, tree: Tree) -> Node | None:
+    def connect(self, q: np.ndarray, tree: Tree) -> Node:
         nearest_node = tree.nearest_neighbor(q)
         while not np.array_equal(q, nearest_node.q):
             next_node = self.extend(q, tree, nearest_node)
