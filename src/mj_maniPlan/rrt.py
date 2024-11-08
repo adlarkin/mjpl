@@ -4,6 +4,7 @@ import numpy as np
 import time
 
 from dataclasses import dataclass
+from scipy.stats import qmc
 
 from . import utils
 from .sampling import HaltonSampler
@@ -184,6 +185,23 @@ class RRT:
         if np.array_equal(path_start[-1], path_end[0]):
             path_start.pop()
         return path_start + path_end
+
+    def shortcut(self, path: list[np.ndarray], num_attempts: int) -> list[np.ndarray]:
+        shortened_path = path.copy()
+        sampler = qmc.Halton(1, seed=self.options.rng.get_seed())
+        for _ in range(num_attempts):
+            # randomly pick 2 waypoints
+            waypoint_start, waypoint_end = sampler.integers(len(shortened_path), n=2).flatten()
+            q_start = shortened_path[waypoint_start]
+            q_end = shortened_path[waypoint_end]
+            # see if these 2 waypoints can make a valid path
+            tree = Tree()
+            tree.add_node(Node(q_start, None))
+            connected_node = self.connect(q_end, tree)
+            if connected_node and np.array_equal(connected_node.q, q_end):
+                # TODO: shortcut here!
+                pass
+        return shortened_path
 
     def __is_valid_config(self, q: np.ndarray) -> bool:
         return utils.is_valid_config(
