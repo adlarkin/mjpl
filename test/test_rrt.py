@@ -82,7 +82,6 @@ class TestRRT(unittest.TestCase):
 
         q_goal = np.array([0.15])
         goal_node = self.rrt.connect(q_goal, tree)
-        self.assertIsNotNone(goal_node)
 
         expected_qs_in_tree = [
             self.q_init,
@@ -106,7 +105,6 @@ class TestRRT(unittest.TestCase):
         # connecting towards a q that is already in the tree should do nothing
         existing_nodes = tree.nodes.copy()
         same_connected_node = self.rrt.connect(goal_node.q, tree)
-        self.assertIsNotNone(same_connected_node)
         self.assertSetEqual(tree.nodes, existing_nodes)
         # The assertSetEqual above runs the equality operator on all elements of the set.
         # Since node equality is defined as having the same q, we should take the check a
@@ -122,7 +120,6 @@ class TestRRT(unittest.TestCase):
         # where the obstacle lies.
         q_goal = np.array([1.0])
         connected_node = self.rrt.connect(q_goal, tree)
-        self.assertIsNotNone(connected_node)
         obstacle_min_x = self.obstacle.pos[0] - self.obstacle.size[0]
         self.assertLess(connected_node.q[0], obstacle_min_x)
 
@@ -139,13 +136,11 @@ class TestRRT(unittest.TestCase):
         start_tree = rrt.Tree()
         start_tree.add_node(rrt.Node(self.q_init, None))
         connected_node_a = self.rrt.connect(q_new, start_tree)
-        self.assertIsNotNone(connected_node_a)
         start_tree.set_path_root(connected_node_a)
 
         goal_tree = rrt.Tree()
         goal_tree.add_node(rrt.Node(np.array([0.5]), None))
         connected_node_b = self.rrt.connect(q_new, goal_tree)
-        self.assertIsNotNone(connected_node_b)
         goal_tree.set_path_root(connected_node_b)
 
         path = self.rrt.get_path(start_tree, goal_tree)

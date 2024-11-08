@@ -132,7 +132,7 @@ class RRT:
             if extended_node:
                 connected_node = self.connect(extended_node.q, connect_tree[0])
                 # If extended_node and connected_node are within epsilon, we can connect the two trees.
-                if connected_node and (utils.configuration_distance(extended_node.q, connected_node.q) < self.options.epsilon):
+                if utils.configuration_distance(extended_node.q, connected_node.q) < self.options.epsilon:
                     extend_tree[0].set_path_root(extended_node)
                     connect_tree[0].set_path_root(connected_node)
                     solution_found = True
@@ -164,7 +164,7 @@ class RRT:
             return node_extend
         return None
 
-    def connect(self, q: np.ndarray, tree: Tree) -> Node | None:
+    def connect(self, q: np.ndarray, tree: Tree) -> Node:
         nearest_node = tree.nearest_neighbor(q)
         while not np.array_equal(q, nearest_node.q):
             next_node = self.extend(q, tree, nearest_node)
