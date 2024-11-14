@@ -123,8 +123,8 @@ class RRT:
         # Is there a direct connection to q_goal from q_init?
         solution_found = False
         if utils.configuration_distance(q_init, q_goal) <= self.options.epsilon:
-            extend_tree[0].set_path_root(extend_tree[0].nearest_neighbor(q_init))
-            connect_tree[0].set_path_root(connect_tree[0].nearest_neighbor(q_goal))
+            start_tree.set_path_root(start_tree.nearest_neighbor(q_init))
+            goal_tree.set_path_root(goal_tree.nearest_neighbor(q_goal))
             solution_found = True
 
         start_time = time.time()
