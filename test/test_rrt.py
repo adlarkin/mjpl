@@ -171,6 +171,14 @@ class TestRRT(unittest.TestCase):
         for i in range(1, len(path)):
             self.assertGreater(path[i][0], path[i-1][0])
 
+    def test_trivial_rrt(self):
+        # If we plan to a goal that is directly reachable, the planner should make the direct connection and exit
+        q_goal = np.array([-0.05])
+        path = self.rrt.plan(q_goal)
+        self.assertEqual(len(path), 2)
+        self.assertTrue(np.array_equal(path[0], self.q_init))
+        self.assertTrue(np.array_equal(path[1], q_goal))
+
 
 if __name__ == '__main__':
     unittest.main()
