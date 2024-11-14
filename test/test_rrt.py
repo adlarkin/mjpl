@@ -176,6 +176,72 @@ class TestRRT(unittest.TestCase):
         for i in range(1, len(path)):
             self.assertGreater(path[i][0], path[i-1][0])
 
+    def test_shortcut(self):
+        # TODO: clean up this test case, setUp does a lot of similar things
+        # but for the 1 DOF ball model with an obstacle
+        dir = os.path.dirname(os.path.realpath(__file__))
+        model_file = dir + "/models/ball_xy_plane.xml"
+        model = mujoco.MjModel.from_xml_path(model_file)
+
+        joint_names = [
+            "ball_slide_x",
+            "ball_slide_y",
+        ]
+        options = rrt.RRTOptions(
+            joint_names=joint_names,
+            max_planning_time=5.0,
+            epsilon=0.1,
+            rng=HaltonSampler(len(joint_names), seed=42)
+        )
+
+        # Set the initial joint configuration.
+        q_init = np.array([-0.1, 0.0])
+        data = mujoco.MjData(model)
+        data.qpos = q_init.copy()
+        mujoco.mj_kinematics(model, data)
+
+        my_rrt = rrt.RRT(options, model, data)
+
+        '''
+        Suboptimal path that can benefit from shortcutting
+
+                          n_3 -> n_4 -> n_5
+                           ^             |
+                           |             v
+            n_0 -> n_1 -> n_2           n_6 -> n_7
+        '''
+        tree = rrt.Tree()
+        n_0 = rrt.Node(q_init, None)
+        n_1 = rrt.Node(np.array([0.0, 0.0]), n_0)
+        n_2 = rrt.Node(np.array([0.5, 0.0]), n_1)
+        n_3 = rrt.Node(np.array([0.5, 0.5]), n_2)
+        n_4 = rrt.Node(np.array([1.0, 0.5]), n_3)
+        n_5 = rrt.Node(np.array([1.5, 0.5]), n_4)
+        n_6 = rrt.Node(np.array([1.5, 0.0]), n_5)
+        n_7 = rrt.Node(np.array([2.0, 0.0]), n_6)
+        nodes = [ n_0, n_1, n_2, n_3, n_4, n_5, n_6, n_7 ]
+        for n in nodes:
+            tree.add_node(n)
+
+        tree.set_path_root(n_7)
+        path = tree.get_path()
+        path.reverse()
+        self.assertEqual(len(path), len(nodes))
+        for i in range(len(path)):
+            self.assertTrue(np.array_equal(path[i], nodes[i].q))
+
+        expected_shorcut_path = [
+            n_0.q,
+            n_1.q,
+            n_2.q,
+            np.array([1.0, 0.0]),
+            n_6.q,
+            n_7.q,
+        ]
+        shortcut_path = my_rrt.shortcut(path, 2, 6)
+        print(shortcut_path)
+        self.assertEqual(len(shortcut_path), len(expected_shorcut_path))
+
 
 if __name__ == '__main__':
     unittest.main()

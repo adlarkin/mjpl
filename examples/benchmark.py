@@ -23,6 +23,9 @@ import mj_maniPlan.utils as utils
 
 
 if __name__ == '__main__':
+    # TODO: follow what I did in tests to make this path relative to the directory where this script lives
+    # (probably means I want to move the models into the examples/ directory)
+    # I should probably make a helper function for getting the path to the directory of a file
     # NOTE: modify these parameters as needed for your benchmarking needs.
     model_xml_path = 'models/franka_emika_panda/scene.xml'
     # The joints to sample during planning.
