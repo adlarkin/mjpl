@@ -83,6 +83,9 @@ class RRTOptions:
 
 # Implementation of Bidirectional RRT-Connect:
 # https://www.cs.cmu.edu/afs/cs/academic/class/15494-s14/readings/kuffner_icra2000.pdf
+#
+# The reference above runs EXTEND on one tree and CONNECT on the other, swapping trees every iteration.
+# This implementation runs CONNECT on both trees, removing the need for tree swapping.
 class RRT:
     def __init__(self, options: RRTOptions, model: mujoco.MjModel, data: mujoco.MjData) -> None:
         # The model should be read-only, so we don't need to make a deep copy of it.
@@ -104,14 +107,14 @@ class RRT:
         if not self.__is_valid_config(q_init):
             print("q_init is not a valid configuration")
             return []
-        extend_tree = (Tree(), q_init)
-        extend_tree[0].add_node(Node(q_init, None))
+        start_tree = Tree()
+        start_tree.add_node(Node(q_init, None))
 
         if not self.__is_valid_config(q_goal):
             print("q_goal is not a valid configuration")
             return []
-        connect_tree = (Tree(), q_goal)
-        connect_tree[0].add_node(Node(q_goal, None))
+        goal_tree = Tree()
+        goal_tree.add_node(Node(q_goal, None))
 
         max_planning_time = self.options.max_planning_time
         if max_planning_time <= 0:
@@ -120,34 +123,27 @@ class RRT:
         # Is there a direct connection to q_goal from q_init?
         solution_found = False
         if utils.configuration_distance(q_init, q_goal) <= self.options.epsilon:
-            extend_tree[0].set_path_root(extend_tree[0].nearest_neighbor(q_init))
-            connect_tree[0].set_path_root(connect_tree[0].nearest_neighbor(q_goal))
+            start_tree.set_path_root(start_tree.nearest_neighbor(q_init))
+            goal_tree.set_path_root(goal_tree.nearest_neighbor(q_goal))
             solution_found = True
 
         start_time = time.time()
         while (not solution_found and time.time() - start_time < max_planning_time):
             if self.goal_biasing_sampler.random() <= self.options.goal_biasing_probability:
-                q_rand = connect_tree[1]
+                q_rand = q_goal
             else:
                 q_rand = self.options.rng.sample(self.joint_limits_lower, self.joint_limits_upper)
-            extended_node = self.extend(q_rand, extend_tree[0])
-            if extended_node:
-                connected_node = self.connect(extended_node.q, connect_tree[0])
-                # If extended_node and connected_node are within epsilon, we can connect the two trees.
-                if utils.configuration_distance(extended_node.q, connected_node.q) < self.options.epsilon:
-                    extend_tree[0].set_path_root(extended_node)
-                    connect_tree[0].set_path_root(connected_node)
+            new_start_tree_node = self.connect(q_rand, start_tree)
+            if new_start_tree_node:
+                new_goal_tree_node = self.connect(new_start_tree_node.q, goal_tree)
+                if new_goal_tree_node and utils.configuration_distance(new_start_tree_node.q, new_goal_tree_node.q) < self.options.epsilon:
+                    start_tree.set_path_root(new_start_tree_node)
+                    goal_tree.set_path_root(new_goal_tree_node)
                     solution_found = True
-
-            # Swap trees for the next iteration.
-            extend_tree, connect_tree = connect_tree, extend_tree
 
         print(f"Solution found: {solution_found}, time taken: {time.time() - start_time}")
         if solution_found:
-            # The original extend_tree and connect_tree may have been swapped, so check which ones hold q_init and q_goal.
-            if extend_tree[1] is q_goal:
-                extend_tree, connect_tree = connect_tree, extend_tree
-            return self.get_path(extend_tree[0], connect_tree[0])
+            return self.get_path(start_tree, goal_tree)
         return []
 
     def extend(self, q: np.ndarray, tree: Tree, nearest_node: Node | None = None) -> Node | None:
