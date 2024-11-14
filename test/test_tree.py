@@ -46,7 +46,6 @@ class TestTree(unittest.TestCase):
         q = np.array([2,1])
 
         # error should occur if nearest_neighbor is called before any nodes have been added to the tree
-        #with self.assertRaises(ValueError)
         with self.assertRaisesRegex(ValueError, "call this method before adding"):
             self.tree.nearest_neighbor(q)
 
