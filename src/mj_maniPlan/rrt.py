@@ -184,29 +184,19 @@ class RRT:
             path_start.pop()
         return path_start + path_end
 
-    def shortcut(self, path: list[np.ndarray], num_attempts: int) -> list[np.ndarray]:
+    # TODO: remove this and use args/kwargs for a shortcut method that can take two
+    # diff signatures
+    def shortcut_temp(self, path: list[np.ndarray], num_attempts: int) -> list[np.ndarray]:
         shortened_path = path.copy()
         # TODO: don't use halton sampling here?
-        sampler = qmc.Halton(1, seed=self.options.rng.get_seed())
-        for _ in range(num_attempts):
+        sampler = qmc.Halton(2, seed=self.options.rng.get_seed())
+        for iter in range(num_attempts):
             # randomly pick 2 waypoints
-            waypoint_start, waypoint_end = sampler.integers(len(shortened_path), n=2).flatten()
-            print(waypoint_start, waypoint_end)
-            q_start = shortened_path[waypoint_start]
-            q_end = shortened_path[waypoint_end]
-            # see if these 2 waypoints can make a valid path
-            tree = Tree()
-            tree.add_node(Node(q_start, None))
-            connected_node = self.connect(q_end, tree)
-            if np.array_equal(connected_node.q, q_end):
-                original_start = shortened_path[:waypoint_start]
-                original_end = shortened_path[waypoint_end:]
-
-                tree.set_path_root(connected_node)
-                shorcut_middle = tree.get_path()
-                shorcut_middle.reverse()
-
-                shortened_path = original_start + shorcut_middle + original_end
+            waypoint_start, waypoint_end = sampler.integers(len(shortened_path)).flatten()
+            if waypoint_start > waypoint_end:
+                waypoint_start, waypoint_end = waypoint_end, waypoint_start
+            print(f"attempt {iter}, initial path length {len(shortened_path)}, start/end {waypoint_start}/{waypoint_end}")
+            shortened_path = self.shortcut(shortened_path, waypoint_start, waypoint_end)
         return shortened_path
 
     def shortcut(self, path: list[np.ndarray], start_idx: int, end_idx: int) -> list[np.ndarray]:
@@ -217,14 +207,9 @@ class RRT:
         tree.add_node(Node(q_start, None))
         connected_node = self.connect(q_end, tree)
         if np.array_equal(connected_node.q, q_end):
-            original_start = path[:start_idx]
+            original_start = path[:start_idx+1]
             original_end = path[end_idx:]
-
-            tree.set_path_root(connected_node)
-            shorcut_middle = tree.get_path()
-            shorcut_middle.reverse()
-
-            return original_start + shorcut_middle + original_end
+            return original_start + original_end
         return path
 
     def __is_valid_config(self, q: np.ndarray) -> bool:

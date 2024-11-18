@@ -233,17 +233,32 @@ class TestRRT(unittest.TestCase):
         for i in range(len(path)):
             self.assertTrue(np.array_equal(path[i], nodes[i].q))
 
-        expected_shorcut_path = [
+        expected_shortcut_path = [
             n_0.q,
             n_1.q,
             n_2.q,
-            np.array([1.0, 0.0]),
             n_6.q,
             n_7.q,
         ]
         shortcut_path = my_rrt.shortcut(path, 2, 6)
-        print(shortcut_path)
-        self.assertEqual(len(shortcut_path), len(expected_shorcut_path))
+        self.assertEqual(len(shortcut_path), len(expected_shortcut_path))
+        for i in range(len(shortcut_path)):
+            self.assertTrue(np.array_equal(shortcut_path[i], expected_shortcut_path[i]))
+
+        expected_shortcut_path = [
+            n_0.q,
+            n_7.q,
+        ]
+        shortcut_path = my_rrt.shortcut(path, 0, 7)
+        self.assertEqual(len(shortcut_path), len(expected_shortcut_path))
+        for i in range(len(shortcut_path)):
+            self.assertTrue(np.array_equal(shortcut_path[i], expected_shortcut_path[i]))
+
+        # shortcutting two adjacent waypoints shouldn't modify the original path
+        unmodified_path = my_rrt.shortcut(path, 6, 7)
+        self.assertEqual(len(unmodified_path), len(path))
+        for i in range(len(unmodified_path)):
+            self.assertTrue(np.array_equal(unmodified_path[i], path[i]))
 
 
 if __name__ == '__main__':

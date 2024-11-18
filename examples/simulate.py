@@ -75,7 +75,7 @@ if __name__ == '__main__':
 
     print("Shortcutting...")
     s_start = time.time()
-    shortcut_path = planner.shortcut(path, int(.75 * len(path)))
+    shortcut_path = planner.shortcut_temp(path, min(50, int(0.75 * len(path))))
     s_duration = time.time() - s_start
     print(f"Shortcutting took {s_duration}s")
     print(f"Original path length: {len(path)}")
