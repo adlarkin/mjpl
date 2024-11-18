@@ -12,6 +12,7 @@ The testing methodology is as follows:
 
 import mujoco
 import numpy as np
+import os
 import time
 
 from mj_maniPlan.rrt import (
@@ -24,7 +25,8 @@ import mj_maniPlan.utils as utils
 
 if __name__ == '__main__':
     # NOTE: modify these parameters as needed for your benchmarking needs.
-    model_xml_path = 'models/franka_emika_panda/scene.xml'
+    dir = os.path.dirname(os.path.realpath(__file__))
+    model_xml_path = dir + "/../models/franka_emika_panda/scene.xml"
     # The joints to sample during planning.
     joint_names = [
         'joint1',

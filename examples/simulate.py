@@ -5,6 +5,7 @@ Example of how to generate a path and visualize the path waypoints.
 import mujoco
 import mujoco.viewer
 import numpy as np
+import os
 import time
 
 from mj_maniPlan.rrt import (
@@ -16,7 +17,9 @@ import mj_maniPlan.utils as utils
 
 
 if __name__ == '__main__':
-    model = mujoco.MjModel.from_xml_path('models/franka_emika_panda/scene_with_obstacles.xml')
+    dir = os.path.dirname(os.path.realpath(__file__))
+    model_xml_path = dir + "/../models/franka_emika_panda/scene_with_obstacles.xml"
+    model = mujoco.MjModel.from_xml_path(model_xml_path)
     data = mujoco.MjData(model)
 
     # The joints to sample during planning.
