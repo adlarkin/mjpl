@@ -4,7 +4,6 @@ import numpy as np
 import time
 
 from dataclasses import dataclass
-from scipy.stats import qmc
 
 from . import utils
 from .sampling import HaltonSampler
@@ -184,33 +183,40 @@ class RRT:
             path_start.pop()
         return path_start + path_end
 
-    # TODO: remove this and use args/kwargs for a shortcut method that can take two
-    # diff signatures
-    def shortcut_temp(self, path: list[np.ndarray], num_attempts: int) -> list[np.ndarray]:
-        shortened_path = path.copy()
-        # TODO: don't use halton sampling here?
-        sampler = qmc.Halton(2, seed=self.options.rng.get_seed())
-        for iter in range(num_attempts):
-            # randomly pick 2 waypoints
-            waypoint_start, waypoint_end = sampler.integers(len(shortened_path)).flatten()
-            if waypoint_start > waypoint_end:
-                waypoint_start, waypoint_end = waypoint_end, waypoint_start
-            print(f"attempt {iter}, initial path length {len(shortened_path)}, start/end {waypoint_start}/{waypoint_end}")
-            shortened_path = self.shortcut(shortened_path, waypoint_start, waypoint_end)
-        return shortened_path
+    # This method can be called the following ways:
+    #   shortcut(path, num_tries=)
+    #       - This will randomly pick a set of points within `path` and try to shortcut them `num_tries` times
+    #   shortcut(path, start_idx=, end_idx=)
+    #       - This will try to shortcut `path` between points at indices `start_idx` and `end_idx`, assuming start_idx < end_idx
+    def shortcut(self, path: list[np.ndarray], **kwargs) -> list[np.ndarray]:
+        # helper function for performing the actual shortcutting
+        def _shortcut(_path: list[np.ndarray], _start: int, _end: int) -> list[np.ndarray]:
+            q_start = _path[_start]
+            q_end = _path[_end]
+            # see if these 2 waypoints can make a valid path
+            tree = Tree()
+            tree.add_node(Node(q_start, None))
+            connected_node = self.connect(q_end, tree)
+            if np.array_equal(connected_node.q, q_end):
+                original_start = _path[:_start+1]
+                original_end = _path[_end:]
+                return original_start + original_end
+            return _path
 
-    def shortcut(self, path: list[np.ndarray], start_idx: int, end_idx: int) -> list[np.ndarray]:
-        q_start = path[start_idx]
-        q_end = path[end_idx]
-        # see if these 2 waypoints can make a valid path
-        tree = Tree()
-        tree.add_node(Node(q_start, None))
-        connected_node = self.connect(q_end, tree)
-        if np.array_equal(connected_node.q, q_end):
-            original_start = path[:start_idx+1]
-            original_end = path[end_idx:]
-            return original_start + original_end
-        return path
+        if len(kwargs) == 1 and 'num_attempts' in kwargs:
+            shortened_path = path.copy()
+            rng = np.random.default_rng(seed=self.options.rng.get_seed())
+            for _ in range(kwargs['num_attempts']):
+                # randomly pick 2 waypoints
+                start, end = rng.integers(len(shortened_path), size=2)
+                if start > end:
+                    start, end = end, start
+                shortened_path = _shortcut(shortened_path, start, end)
+            return shortened_path
+        elif len(kwargs) == 2 and ('start_idx' in kwargs and 'end_idx' in kwargs):
+            return _shortcut(path, kwargs['start_idx'], kwargs['end_idx'])
+        else:
+            raise ValueError(f"Invalid kwargs combination. Expected ['num_attempts'] or ['start_idx', 'end_idx'], but received {list(kwargs.keys())}")
 
     def __is_valid_config(self, q: np.ndarray) -> bool:
         return utils.is_valid_config(

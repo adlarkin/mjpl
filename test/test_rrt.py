@@ -240,7 +240,7 @@ class TestRRT(unittest.TestCase):
             n_6.q,
             n_7.q,
         ]
-        shortcut_path = my_rrt.shortcut(path, 2, 6)
+        shortcut_path = my_rrt.shortcut(path, start_idx=2, end_idx=6)
         self.assertEqual(len(shortcut_path), len(expected_shortcut_path))
         for i in range(len(shortcut_path)):
             self.assertTrue(np.array_equal(shortcut_path[i], expected_shortcut_path[i]))
@@ -249,16 +249,24 @@ class TestRRT(unittest.TestCase):
             n_0.q,
             n_7.q,
         ]
-        shortcut_path = my_rrt.shortcut(path, 0, 7)
+        shortcut_path = my_rrt.shortcut(path, start_idx=0, end_idx=7)
         self.assertEqual(len(shortcut_path), len(expected_shortcut_path))
         for i in range(len(shortcut_path)):
             self.assertTrue(np.array_equal(shortcut_path[i], expected_shortcut_path[i]))
 
         # shortcutting two adjacent waypoints shouldn't modify the original path
-        unmodified_path = my_rrt.shortcut(path, 6, 7)
+        unmodified_path = my_rrt.shortcut(path, start_idx=6, end_idx=7)
         self.assertEqual(len(unmodified_path), len(path))
         for i in range(len(unmodified_path)):
             self.assertTrue(np.array_equal(unmodified_path[i], path[i]))
+
+        with self.assertRaisesRegex(ValueError, 'Invalid kwargs'):
+            my_rrt.shortcut(path)
+            my_rrt.shortcut(path, num_attempts=1, start_idx=5, end_idx=6)
+            my_rrt.shortcut(path, num_attempts=1, start_idx=5)
+            my_rrt.shortcut(path, num_attempts=1, end_idx=5)
+            my_rrt.shortcut(path, start_idx=5)
+            my_rrt.shortcut(path, end_idx=5)
 
 
 if __name__ == '__main__':
