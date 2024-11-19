@@ -5,6 +5,7 @@ Example of how to generate a path and visualize the path waypoints.
 import mujoco
 import mujoco.viewer
 import numpy as np
+import os
 import time
 from scipy.interpolate import make_interp_spline
 
@@ -12,11 +13,14 @@ from mj_maniPlan.rrt import (
     RRT,
     RRTOptions,
 )
+from mj_maniPlan.sampling import HaltonSampler
 import mj_maniPlan.utils as utils
 
 
 if __name__ == '__main__':
-    model = mujoco.MjModel.from_xml_path('models/franka_emika_panda/scene_with_obstacles.xml')
+    dir = os.path.dirname(os.path.realpath(__file__))
+    model_xml_path = dir + "/../models/franka_emika_panda/scene_with_obstacles.xml"
+    model = mujoco.MjModel.from_xml_path(model_xml_path)
     data = mujoco.MjData(model)
 
     # The joints to sample during planning.
@@ -31,7 +35,7 @@ if __name__ == '__main__':
     ]
 
     # Random number generator that's used for sampling joint configurations.
-    rng = np.random.default_rng(seed=None)
+    rng = HaltonSampler(len(joint_names), seed=None)
 
     # Generate valid initial and goal configurations.
     print("Generating q_init and q_goal...")
@@ -74,6 +78,14 @@ if __name__ == '__main__':
     # Note that this may result in waypoints that are in collision.
     splx = np.linspace(0.0, 1.0, num=len(path))
     spl = make_interp_spline(splx, path)
+
+    print("Shortcutting...")
+    s_start = time.time()
+    shortcut_path = planner.shortcut(path, num_attempts=int(0.75 * len(path)))
+    s_duration = time.time() - s_start
+    print(f"Shortcutting took {s_duration}s")
+    print(f"Original path length: {len(path)}")
+    print(f"Shortcut path length: {len(shortcut_path)}")
 
     with mujoco.viewer.launch_passive(model=model, data=data, show_left_ui=False, show_right_ui=False) as viewer:
         # Update the viewer's orientation to capture the arm movement.
@@ -118,6 +130,15 @@ if __name__ == '__main__':
             for t in np.linspace(0.0, 1.0, num=2*len(path)):
                 start_time = time.time()
                 set_and_visualize_joint_config(spl(t))
+                elapsed_time = time.time() - start_time
+                if elapsed_time < viz_time_per_frame:
+                    time.sleep(viz_time_per_frame - elapsed_time)
+            time.sleep(0.25)
+
+            # Visualization of the path shortcutting
+            for q in shortcut_path:
+                start_time = time.time()
+                set_and_visualize_joint_config(q)
                 elapsed_time = time.time() - start_time
                 if elapsed_time < viz_time_per_frame:
                     time.sleep(viz_time_per_frame - elapsed_time)

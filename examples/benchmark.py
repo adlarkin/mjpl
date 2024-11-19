@@ -12,18 +12,21 @@ The testing methodology is as follows:
 
 import mujoco
 import numpy as np
+import os
 import time
 
 from mj_maniPlan.rrt import (
     RRT,
     RRTOptions,
 )
+from mj_maniPlan.sampling import HaltonSampler
 import mj_maniPlan.utils as utils
 
 
 if __name__ == '__main__':
     # NOTE: modify these parameters as needed for your benchmarking needs.
-    model_xml_path = 'models/franka_emika_panda/scene.xml'
+    dir = os.path.dirname(os.path.realpath(__file__))
+    model_xml_path = dir + "/../models/franka_emika_panda/scene.xml"
     # The joints to sample during planning.
     joint_names = [
         'joint1',
@@ -52,7 +55,7 @@ if __name__ == '__main__':
         data = mujoco.MjData(model)
 
         # Random number generator that's used for sampling joint configurations.
-        rng = np.random.default_rng(seed=seed)
+        rng = HaltonSampler(len(joint_names), seed=seed)
 
         # Generate a valid initial and goal configuration.
         q_init = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)

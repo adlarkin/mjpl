@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass
 
 from . import utils
+from .sampling import HaltonSampler
 
 
 class Node:
@@ -37,7 +38,7 @@ class Tree:
         closest_node = None
         min_dist = np.inf
         for n in self.nodes:
-            if (n.q == q).all():
+            if np.array_equal(n.q, q):
                 return n
             neighboring_dist = utils.configuration_distance(n.q, q)
             if neighboring_dist < min_dist:
@@ -55,7 +56,7 @@ class Tree:
             raise ValueError("The path root node has not been set. Did you forget to call set_path_root?")
         path = []
         curr_node = self.path_root
-        while curr_node.parent is not None:
+        while curr_node is not None:
             path.append(curr_node.q)
             curr_node = curr_node.parent
         return path
@@ -74,7 +75,7 @@ class RRTOptions:
     # This number should be > 0.
     epsilon: float
     # Random number generator that's used for sampling joint configurations.
-    rng: np.random.Generator
+    rng: HaltonSampler
     # How often to sample the goal state when building the tree.
     # This should be a value within [0.0, 1.0].
     goal_biasing_probability: float = 0.05
@@ -82,6 +83,9 @@ class RRTOptions:
 
 # Implementation of Bidirectional RRT-Connect:
 # https://www.cs.cmu.edu/afs/cs/academic/class/15494-s14/readings/kuffner_icra2000.pdf
+#
+# The reference above runs EXTEND on one tree and CONNECT on the other, swapping trees every iteration.
+# This implementation runs CONNECT on both trees, removing the need for tree swapping.
 class RRT:
     def __init__(self, options: RRTOptions, model: mujoco.MjModel, data: mujoco.MjData) -> None:
         # The model should be read-only, so we don't need to make a deep copy of it.
@@ -95,6 +99,7 @@ class RRT:
         self.options = options
         self.joint_qpos_addrs = utils.joint_names_to_qpos_addrs(options.joint_names, self.model)
         self.joint_limits_lower, self.joint_limits_upper = utils.joint_limits(options.joint_names, self.model)
+        self.goal_biasing_sampler = np.random.default_rng(seed=options.rng.get_seed())
 
     def plan(self, q_goal: np.ndarray) -> list[np.ndarray]:
         # Use MjData's current joint configuration as q_init.
@@ -102,14 +107,14 @@ class RRT:
         if not self.__is_valid_config(q_init):
             print("q_init is not a valid configuration")
             return []
-        extend_tree = (Tree(), q_init)
-        extend_tree[0].add_node(Node(q_init, None))
+        start_tree = Tree()
+        start_tree.add_node(Node(q_init, None))
 
         if not self.__is_valid_config(q_goal):
             print("q_goal is not a valid configuration")
             return []
-        connect_tree = (Tree(), q_goal)
-        connect_tree[0].add_node(Node(q_goal, None))
+        goal_tree = Tree()
+        goal_tree.add_node(Node(q_goal, None))
 
         max_planning_time = self.options.max_planning_time
         if max_planning_time <= 0:
@@ -118,65 +123,101 @@ class RRT:
         # Is there a direct connection to q_goal from q_init?
         solution_found = False
         if utils.configuration_distance(q_init, q_goal) <= self.options.epsilon:
+            start_tree.set_path_root(start_tree.nearest_neighbor(q_init))
+            goal_tree.set_path_root(goal_tree.nearest_neighbor(q_goal))
             solution_found = True
 
         start_time = time.time()
         while (not solution_found and time.time() - start_time < max_planning_time):
-            if self.options.rng.random() <= self.options.goal_biasing_probability:
-                q_rand = connect_tree[1]
+            if self.goal_biasing_sampler.random() <= self.options.goal_biasing_probability:
+                q_rand = q_goal
             else:
-                q_rand = utils.random_config(self.options.rng, self.joint_limits_lower, self.joint_limits_upper)
-            extended_node = self.extend(q_rand, extend_tree[0])
-            if extended_node:
-                connected_node = self.connect(extended_node.q, connect_tree[0])
-                # If extended_node and connected_node are within epsilon, we can connect the two trees.
-                if connected_node and (utils.configuration_distance(extended_node.q, connected_node.q) < self.options.epsilon):
-                    extend_tree[0].set_path_root(extended_node)
-                    connect_tree[0].set_path_root(connected_node)
+                q_rand = self.options.rng.sample(self.joint_limits_lower, self.joint_limits_upper)
+            new_start_tree_node = self.connect(q_rand, start_tree)
+            if new_start_tree_node:
+                new_goal_tree_node = self.connect(new_start_tree_node.q, goal_tree)
+                if new_goal_tree_node and utils.configuration_distance(new_start_tree_node.q, new_goal_tree_node.q) < self.options.epsilon:
+                    start_tree.set_path_root(new_start_tree_node)
+                    goal_tree.set_path_root(new_goal_tree_node)
                     solution_found = True
-
-            # Swap trees for the next iteration.
-            extend_tree, connect_tree = connect_tree, extend_tree
 
         print(f"Solution found: {solution_found}, time taken: {time.time() - start_time}")
         if solution_found:
-            # The original extend_tree and connect_tree may have been swapped, so check which ones hold q_init and q_goal.
-            if extend_tree[1] is q_goal:
-                extend_tree, connect_tree = connect_tree, extend_tree
-            return self.get_path(extend_tree[0], connect_tree[0])
+            return self.get_path(start_tree, goal_tree)
         return []
 
-    def extend(self, q: np.ndarray, tree: Tree) -> Node | None:
-        node_near = tree.nearest_neighbor(q)
+    def extend(self, q: np.ndarray, tree: Tree, nearest_node: Node | None = None) -> Node | None:
+        if not nearest_node:
+            nearest_node = tree.nearest_neighbor(q)
+        if np.array_equal(nearest_node.q, q):
+            return nearest_node
         q_extend = q.copy()
-        q_dist = utils.configuration_distance(node_near.q, q)
+        q_dist = utils.configuration_distance(nearest_node.q, q)
         if q_dist > self.options.epsilon:
-            q_increment = self.options.epsilon * ((q - node_near.q) / q_dist)
-            q_extend = node_near.q + q_increment
+            q_increment = self.options.epsilon * ((q - nearest_node.q) / q_dist)
+            q_extend = nearest_node.q + q_increment
         if self.__is_valid_config(q_extend):
-            node_extend = Node(q_extend, node_near)
+            node_extend = Node(q_extend, nearest_node)
             tree.add_node(node_extend)
             return node_extend
         return None
 
-    def connect(self, q: np.ndarray, tree: Tree) -> Node | None:
-        last_extended_node = None
-        connection_dist_remaining = float('inf')
-        while connection_dist_remaining > self.options.epsilon:
-            next_node = self.extend(q, tree)
-            if not next_node or (next_node.q == q).all():
+    def connect(self, q: np.ndarray, tree: Tree) -> Node:
+        nearest_node = tree.nearest_neighbor(q)
+        while not np.array_equal(q, nearest_node.q):
+            next_node = self.extend(q, tree, nearest_node)
+            if not next_node:
                 break
-            last_extended_node = next_node
-            connection_dist_remaining = utils.configuration_distance(last_extended_node.q, q)
-        return last_extended_node
+            nearest_node = next_node
+        return nearest_node
 
     def get_path(self, start_tree: Tree, goal_tree: Tree) -> list[np.ndarray]:
         # The path generated from start_tree ends at q_init, but we want it to start at q_init. So we must reverse it.
-        # The path generated from goal_tree ends at q_goal, which is what we want.
         path_start = start_tree.get_path()
         path_start.reverse()
+        # The path generated from goal_tree ends at q_goal, which is what we want.
         path_end = goal_tree.get_path()
+        # The last value in path_start might be the same as the first value in path_end.
+        # If this is the case, remove the duplicate value.
+        if np.array_equal(path_start[-1], path_end[0]):
+            path_start.pop()
         return path_start + path_end
+
+    # This method can be called the following ways:
+    #   shortcut(path, num_tries=)
+    #       - This will randomly pick a set of points within `path` and try to shortcut them.
+    #         This process repeats `num_tries` times
+    #   shortcut(path, start_idx=, end_idx=)
+    #       - This will try to shortcut `path` between points at indices `start_idx` and `end_idx`, assuming start_idx < end_idx
+    def shortcut(self, path: list[np.ndarray], **kwargs) -> list[np.ndarray]:
+        if len(kwargs) == 1 and 'num_attempts' in kwargs:
+            shortened_path = path.copy()
+            rng = np.random.default_rng(seed=self.options.rng.get_seed())
+            for _ in range(kwargs['num_attempts']):
+                # randomly pick 2 waypoints
+                start, end = rng.integers(len(shortened_path), size=2)
+                if start > end:
+                    start, end = end, start
+                shortened_path = self.__shortcut(shortened_path, start, end)
+            return shortened_path
+        elif len(kwargs) == 2 and ('start_idx' in kwargs and 'end_idx' in kwargs):
+            return self.__shortcut(path, kwargs['start_idx'], kwargs['end_idx'])
+        else:
+            raise ValueError(f"Invalid kwargs combination. Expected ['num_attempts'] or ['start_idx', 'end_idx'], but received {list(kwargs.keys())}")
+
+    # Helper function for performing the actual shortcutting - see the `shortcut` method
+    def __shortcut(self, path: list[np.ndarray], start: int, end: int) -> list[np.ndarray]:
+        q_start = path[start]
+        q_end = path[end]
+        # see if these 2 waypoints can make a valid path
+        tree = Tree()
+        tree.add_node(Node(q_start, None))
+        connected_node = self.connect(q_end, tree)
+        if np.array_equal(connected_node.q, q_end):
+            original_start = path[:start+1]
+            original_end = path[end:]
+            return original_start + original_end
+        return path
 
     def __is_valid_config(self, q: np.ndarray) -> bool:
         return utils.is_valid_config(

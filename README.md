@@ -16,6 +16,12 @@ pip3 install -e .
 
 See the [examples](./examples) folder.
 
+## Run tests
+
+```
+python3 -m unittest -v
+```
+
 ## Other notes
 
 This project is under active development.
