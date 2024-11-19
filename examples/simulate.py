@@ -70,6 +70,14 @@ if __name__ == '__main__':
     if not path:
         exit()
 
+    print("Shortcutting...")
+    s_start = time.time()
+    shortcut_path = planner.shortcut(path, num_attempts=int(0.75 * len(path)))
+    s_duration = time.time() - s_start
+    print(f"Shortcutting took {s_duration}s")
+    print(f"Original path length: {len(path)}")
+    print(f"Shortcut path length: {len(shortcut_path)}")
+
     with mujoco.viewer.launch_passive(model=model, data=data, show_left_ui=False, show_right_ui=False) as viewer:
         # Update the viewer's orientation to capture the arm movement.
         viewer.cam.lookat = [0, 0, 0.35]
@@ -104,6 +112,15 @@ if __name__ == '__main__':
                 mujoco.mj_step(model, data, nstep=10)
                 viewer.sync()
                 '''
+                elapsed_time = time.time() - start_time
+                if elapsed_time < viz_time_per_frame:
+                    time.sleep(viz_time_per_frame - elapsed_time)
+            time.sleep(0.25)
+
+            # Visualization of the path shortcutting
+            for q in shortcut_path:
+                start_time = time.time()
+                set_and_visualize_joint_config(q)
                 elapsed_time = time.time() - start_time
                 if elapsed_time < viz_time_per_frame:
                     time.sleep(viz_time_per_frame - elapsed_time)
