@@ -195,7 +195,9 @@ class RRT:
             rng = np.random.default_rng(seed=self.options.rng.get_seed())
             for _ in range(kwargs['num_attempts']):
                 # randomly pick 2 waypoints
-                start, end = rng.integers(len(shortened_path), size=2)
+                start, end = 0, 0
+                while start == end:
+                    start, end = rng.integers(len(shortened_path), size=2)
                 if start > end:
                     start, end = end, start
                 shortened_path = self.__shortcut(shortened_path, start, end)
@@ -214,9 +216,7 @@ class RRT:
         tree.add_node(Node(q_start, None))
         connected_node = self.connect(q_end, tree)
         if np.array_equal(connected_node.q, q_end):
-            original_start = path[:start+1]
-            original_end = path[end:]
-            return original_start + original_end
+            return path[:start+1] + path[end:]
         return path
 
     def __is_valid_config(self, q: np.ndarray) -> bool:

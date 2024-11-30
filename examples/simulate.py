@@ -7,6 +7,7 @@ import mujoco.viewer
 import numpy as np
 import os
 import time
+from scipy.interpolate import make_interp_spline
 
 from mj_maniPlan.rrt import (
     RRT,
@@ -14,6 +15,17 @@ from mj_maniPlan.rrt import (
 )
 from mj_maniPlan.sampling import HaltonSampler
 import mj_maniPlan.utils as utils
+
+
+# Naive timing generation for a path, which can be used for something like B-spline interpolation.
+# Configuration distance between two adjacent path waypoints - q_curr, q_next - is used as a notion
+# for the time it takes to move from q_curr to q_next.
+def generate_path_timing(path):
+    timing = [0.0]
+    for i in range(1, len(path)):
+        timing.append(timing[-1] + utils.configuration_distance(path[i-1], path[i]))
+    # scale to [0..1]
+    return np.interp(timing, (timing[0], timing[-1]), (0, 1))
 
 
 if __name__ == '__main__':
@@ -81,6 +93,13 @@ if __name__ == '__main__':
     print(f"Original path length: {len(path)}")
     print(f"Shortcut path length: {len(shortcut_path)}")
 
+    # Smooth the path by performing naive joint-space B-spline interpolation.
+    # Note that this may result in waypoints that are in collision.
+    timing = generate_path_timing(path)
+    spline = make_interp_spline(timing, path)
+    shortcut_timing = generate_path_timing(shortcut_path)
+    spline_shortcut = make_interp_spline(shortcut_timing, shortcut_path)
+
     with mujoco.viewer.launch_passive(model=model, data=data, show_left_ui=False, show_right_ui=False) as viewer:
         # Update the viewer's orientation to capture the arm movement.
         viewer.cam.lookat = [0, 0, 0.35]
@@ -101,30 +120,17 @@ if __name__ == '__main__':
         # Visualize kinematic updates at 60hz.
         viz_time_per_frame = 1 / 60
 
+        # Show the original path and the shortcut path (alternate between the two until the user exits).
+        # The horizon is assuming that the B-spline interpolations were completed with x data ranging from [0..1]
+        horizon = np.linspace(0, 1, 200)
+        path_to_visualize = spline
+        next_path = spline_shortcut
         while viewer.is_running():
-            # Visualization of the planner-generated waypoint path.
-            for q in path:
+            for t in horizon:
                 start_time = time.time()
-                # Perform a kinematic visualization of the path waypoints.
-                # The commented out code block below shows a "hacky" way to perform control along the waypoints.
-                set_and_visualize_joint_config(q)
-                '''
-                # Visualize the plan by sending control signals to the joint actuators.
-                data.ctrl[joint_qpos_addrs] = q
-                # TODO: figure out what nstep should be (depends on controller hz and simulation dt)
-                mujoco.mj_step(model, data, nstep=10)
-                viewer.sync()
-                '''
+                set_and_visualize_joint_config(path_to_visualize(t))
                 elapsed_time = time.time() - start_time
                 if elapsed_time < viz_time_per_frame:
                     time.sleep(viz_time_per_frame - elapsed_time)
-            time.sleep(0.25)
-
-            # Visualization of the path shortcutting
-            for q in shortcut_path:
-                start_time = time.time()
-                set_and_visualize_joint_config(q)
-                elapsed_time = time.time() - start_time
-                if elapsed_time < viz_time_per_frame:
-                    time.sleep(viz_time_per_frame - elapsed_time)
+            path_to_visualize, next_path = next_path, path_to_visualize
             time.sleep(0.25)
