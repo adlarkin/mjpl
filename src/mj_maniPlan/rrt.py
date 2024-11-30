@@ -189,10 +189,7 @@ class RRT:
     #         This process repeats `num_tries` times
     #   shortcut(path, start_idx=, end_idx=)
     #       - This will try to shortcut `path` between points at indices `start_idx` and `end_idx`, assuming start_idx < end_idx
-    #
-    # Returns a tuple of lists: (shortcut_path, path_timing)
-    def shortcut(self, path: list[np.ndarray], **kwargs) -> tuple[list[np.ndarray], np.ndarray]:
-        timing = np.linspace(0, 1, len(path))
+    def shortcut(self, path: list[np.ndarray], **kwargs) -> list[np.ndarray]:
         if len(kwargs) == 1 and 'num_attempts' in kwargs:
             shortened_path = path.copy()
             rng = np.random.default_rng(seed=self.options.rng.get_seed())
@@ -203,15 +200,15 @@ class RRT:
                     start, end = rng.integers(len(shortened_path), size=2)
                 if start > end:
                     start, end = end, start
-                shortened_path, timing = self.__shortcut(shortened_path, timing, start, end)
-            return shortened_path, timing
+                shortened_path = self.__shortcut(shortened_path, start, end)
+            return shortened_path
         elif len(kwargs) == 2 and ('start_idx' in kwargs and 'end_idx' in kwargs):
-            return self.__shortcut(path, timing, kwargs['start_idx'], kwargs['end_idx'])
+            return self.__shortcut(path, kwargs['start_idx'], kwargs['end_idx'])
         else:
             raise ValueError(f"Invalid kwargs combination. Expected ['num_attempts'] or ['start_idx', 'end_idx'], but received {list(kwargs.keys())}")
 
     # Helper function for performing the actual shortcutting - see the `shortcut` method
-    def __shortcut(self, path: list[np.ndarray], timing: np.ndarray, start: int, end: int) -> tuple[list[np.ndarray], np.ndarray]:
+    def __shortcut(self, path: list[np.ndarray], start: int, end: int) -> list[np.ndarray]:
         q_start = path[start]
         q_end = path[end]
         # see if these 2 waypoints can make a valid path
@@ -219,10 +216,8 @@ class RRT:
         tree.add_node(Node(q_start, None))
         connected_node = self.connect(q_end, tree)
         if np.array_equal(connected_node.q, q_end):
-            shortened_path = path[:start+1] + path[end:]
-            new_timing = np.concatenate((timing[:start+1], timing[end:]))
-            return shortened_path, new_timing
-        return path, timing
+            return path[:start+1] + path[end:]
+        return path
 
     def __is_valid_config(self, q: np.ndarray) -> bool:
         return utils.is_valid_config(

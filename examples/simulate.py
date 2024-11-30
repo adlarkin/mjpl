@@ -17,6 +17,17 @@ from mj_maniPlan.sampling import HaltonSampler
 import mj_maniPlan.utils as utils
 
 
+# Naive timing generation for a path, which can be used for something like B-spline interpolation.
+# Configuration distance between two adjacent path waypoints - q_curr, q_next - is used as a notion
+# for the time it takes to move from q_curr to q_next.
+def generate_path_timing(path):
+    timing = [0.0]
+    for i in range(1, len(path)):
+        timing.append(timing[-1] + utils.configuration_distance(path[i-1], path[i]))
+    # scale to [0..1]
+    return np.interp(timing, (timing[0], timing[-1]), (0, 1))
+
+
 if __name__ == '__main__':
     dir = os.path.dirname(os.path.realpath(__file__))
     model_xml_path = dir + "/../models/franka_emika_panda/scene_with_obstacles.xml"
@@ -76,7 +87,7 @@ if __name__ == '__main__':
 
     print("Shortcutting...")
     s_start = time.time()
-    shortcut_path, shortcut_timing = planner.shortcut(path, num_attempts=int(0.75 * len(path)))
+    shortcut_path = planner.shortcut(path, num_attempts=int(0.75 * len(path)))
     s_duration = time.time() - s_start
     print(f"Shortcutting took {s_duration}s")
     print(f"Original path length: {len(path)}")
@@ -84,15 +95,9 @@ if __name__ == '__main__':
 
     # Smooth the path by performing naive joint-space B-spline interpolation.
     # Note that this may result in waypoints that are in collision.
-    # 
-    # To ensure the spline interpolation preserves "smoothness",
-    # assume that the original path is over a time horizon of [0..1] and the
-    # shortcut path is also over that same horizon. The dt of two adjacent
-    # waypoints in the shortcut path is not guaranteed to be the same as the
-    # dt of two adjacent points in the original path (configuration distance
-    # for these two pairs of adjacent points is probably different).
-    timing = np.linspace(0.0, 1.0, num=len(path))
+    timing = generate_path_timing(path)
     spline = make_interp_spline(timing, path)
+    shortcut_timing = generate_path_timing(shortcut_path)
     spline_shortcut = make_interp_spline(shortcut_timing, shortcut_path)
 
     with mujoco.viewer.launch_passive(model=model, data=data, show_left_ui=False, show_right_ui=False) as viewer:
@@ -115,8 +120,11 @@ if __name__ == '__main__':
         # Visualize kinematic updates at 60hz.
         viz_time_per_frame = 1 / 60
 
-        path_to_visualize, next_path = spline, spline_shortcut
+        # Show the original path and the shortcut path (alternate between the two until the user exits).
+        # The horizon is assuming that the B-spline interpolations were completed with x data ranging from [0..1]
         horizon = np.linspace(0, 1, 200)
+        path_to_visualize = spline
+        next_path = spline_shortcut
         while viewer.is_running():
             for t in horizon:
                 start_time = time.time()
