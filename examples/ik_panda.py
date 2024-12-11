@@ -8,6 +8,56 @@ import time
 from mj_maniPlan.sampling import HaltonSampler
 import mj_maniPlan.utils as utils
 
+
+# Utility function to convert quaternion to rotation matrix
+def quat_to_mat(quat):
+    mat = np.zeros((9, 1))
+    mujoco.mju_quat2Mat(mat, quat)
+    return np.reshape(mat, (3, 3))
+
+# Function to add a coordinate frame to the scene
+def add_frame(scene: mujoco.MjvScene, position, orientation, axis_radius=0.0075, axis_half_length=.0525):
+    # Axis colors (RGBA): X (red), Y (green), Z (blue)
+    colors = {
+        'x': [1.0, 0.0, 0.0, 1.0],
+        'y': [0.0, 1.0, 0.0, 1.0],
+        'z': [0.0, 0.0, 1.0, 1.0]
+    }
+    # Define axis directions
+    axes = {
+        'x': np.array([1.0, 0.0, 0.0]),
+        'y': np.array([0.0, 1.0, 0.0]),
+        'z': np.array([0.0, 0.0, 1.0])
+    }
+    # Convert orientation to rotation matrix
+    rot_mat = quat_to_mat(orientation)
+    for axis, color in colors.items():
+        # Rotate axis direction by the orientation
+        direction = rot_mat @ axes[axis]
+        # Set the end point of the axis marker
+        end_point = position + axis_half_length * direction
+
+        print(f"direction: {direction}, end_point: {end_point}")
+        if scene.ngeom >= scene.maxgeom:
+            print(f"Maximum number of geoms in the scene has been reached ({scene.maxgeom}), so the frame won't be added to the scene.")
+        scene.ngeom += 1
+        mujoco.mjv_initGeom(
+            scene.geoms[scene.ngeom - 1],
+            mujoco.mjtGeom.mjGEOM_CYLINDER,
+            np.zeros(3),
+            np.zeros(3),
+            np.eye(3).flatten(),
+            np.array(color),
+        )
+        mujoco.mjv_connector(
+            scene.geoms[scene.ngeom - 1],
+            mujoco.mjtGeom.mjGEOM_CYLINDER,
+            axis_radius,
+            position,
+            end_point,
+        )
+
+
 if __name__ == "__main__":
     dir = os.path.dirname(os.path.realpath(__file__))
     model_xml_path = dir + "/../models/franka_emika_panda/scene.xml"
@@ -29,6 +79,7 @@ if __name__ == "__main__":
     # TODO: load scene_with_obstacles above and then add obstacle avoidance here
     hand_geoms = mink.get_body_geom_ids(model, model.body("hand").id)
     collision_pairs = [
+        # TODO: add collision avoidance between the hand and rest of the robot?
         (hand_geoms, ["floor"]),
     ]
     limits = [
@@ -78,6 +129,11 @@ if __name__ == "__main__":
         # Visualize kinematic updates at 60hz.
         viz_time_per_frame = 1 / 60
 
+        # Display the target EE frame
+        frame_position = ee_target_pose.parameters()[-3:]
+        frame_quat = ee_target_pose.parameters()[:4]
+        add_frame(viewer.user_scn, frame_position, frame_quat)
+
         while viewer.is_running():
             # Show the start configuration.
             set_and_visualize_joint_config(q_init)
@@ -107,4 +163,4 @@ if __name__ == "__main__":
                 if elapsed_time < viz_time_per_frame:
                     time.sleep(viz_time_per_frame - elapsed_time)
 
-            time.sleep(0.25)
+            time.sleep(0.5)
