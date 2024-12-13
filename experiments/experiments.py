@@ -53,6 +53,17 @@ if __name__ == "__main__":
         'RRT_shortcutting_valid_solution_times': [],
         'RRT_shortcutting_valid_solution_lengths': [],
         # num_of_failed attempts isn't needed for shortcutting b/c we don't shortcut if RRT fails
+
+        # a list of dictionaries:
+        # {
+        #   'seed': int
+        #   'q_init': np array
+        #   'EE_goal_pose': mink.lie.SE3
+        #   'IK_path': list of EE positions
+        #   'RRT_path': list of EE positions
+        #   'RRT_shortcut_path': list of EE positions
+        # }
+        'valid_paths': [],
     }
 
     dir = os.path.dirname(os.path.realpath(__file__))
@@ -110,6 +121,7 @@ if __name__ == "__main__":
     # Timeout for a planning attempt, in seconds.
     timeout = 5
 
+    interp_len = 1000
     num_runs = 100
     for s in range(num_runs):
         configuration = mink.Configuration(model)
@@ -120,6 +132,7 @@ if __name__ == "__main__":
         # Randomly sample a valid joint config for the goal.
         lower_limits, upper_limits = utils.joint_limits(joint_names, model)
         q_goal = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
+
 
         '''
         Start of IK experiments
@@ -137,6 +150,15 @@ if __name__ == "__main__":
         data.qpos[joint_qpos_addrs] = q_init
         configuration.update(data.qpos)
 
+        valid_path_dict = {
+            'seed': s,
+            'q_init': data.qpos.copy(),
+            'EE_goal_pose': ee_target_pose,
+            'IK_path': [],
+            'RRT_path': [],
+            'RRT_shortcut_path': [],
+        }
+
         # move the robot from q_init to q_goal by solving IK
         end_effector_task.set_target(ee_target_pose)
         prev_EE_position = get_EE_world_position(configuration)
@@ -148,6 +170,7 @@ if __name__ == "__main__":
             )
             configuration.integrate_inplace(vel, model.opt.timestep)
             next_EE_position = get_EE_world_position(configuration)
+            valid_path_dict['IK_path'].append(next_EE_position)
             solution_len += cartesian_distance(prev_EE_position, next_EE_position)
             prev_EE_position = next_EE_position
             err = end_effector_task.compute_error(configuration)
@@ -159,7 +182,9 @@ if __name__ == "__main__":
                 break
             if (time.time() - start_time) > timeout:
                 plot_data['IK_success_rate'] += 1
+                valid_path_dict['IK_path'] = []
                 break
+
         '''
         End of IK experiemnts
         '''
@@ -188,29 +213,40 @@ if __name__ == "__main__":
             shortened_path = planner.shortcut(path, num_attempts=len(path))
             plot_data['RRT_shortcutting_valid_solution_times'].append(time.time() - start_time)
 
-            def compute_path_len(p):
+            # returns a list of EE positions along a path and the path length
+            def interpolate_path(p):
                 timing = generate_path_timing(p)
                 spline = make_interp_spline(timing, p)
                 data.qpos[joint_qpos_addrs] = q_init
                 configuration.update(data.qpos)
                 prev_EE_position = get_EE_world_position(configuration)
-                solution_len = 0
-                horizon = np.linspace(0, 1, int(1 / model.opt.timestep))
+                path_len = 0
+                horizon = np.linspace(0, 1, interp_len)
+                ee_positions = []
                 for t in horizon:
                     data.qpos[joint_qpos_addrs] = spline(t)
                     configuration.update(data.qpos)
                     next_EE_position = get_EE_world_position(configuration)
-                    solution_len += cartesian_distance(prev_EE_position, next_EE_position)
+                    ee_positions.append(next_EE_position)
+                    path_len += cartesian_distance(prev_EE_position, next_EE_position)
                     prev_EE_position = next_EE_position
-                return solution_len
+                return ee_positions, path_len
 
-            plot_data['RRT_valid_solution_lengths'].append(compute_path_len(path))
-            plot_data['RRT_shortcutting_valid_solution_lengths'].append(compute_path_len(shortened_path))
+            ee_positions, path_len = interpolate_path(path)
+            valid_path_dict['RRT_path'] = ee_positions
+            plot_data['RRT_valid_solution_lengths'].append(path_len)
+
+            ee_positions, path_len = interpolate_path(shortened_path)
+            valid_path_dict['RRT_shortcut_path'] = ee_positions
+            plot_data['RRT_shortcutting_valid_solution_lengths'].append(path_len)
         else:
             plot_data['RRT_success_rate'] += 1
         '''
         End of RRT experiments
         '''
+
+        if valid_path_dict['IK_path'] and valid_path_dict['RRT_path'] and valid_path_dict['RRT_shortcut_path']:
+            plot_data['valid_paths'].append(valid_path_dict)
 
     # at the moment, plot_data's success_rate fields have the # of failed runs.
     # convert this to the actual success rate
