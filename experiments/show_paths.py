@@ -1,3 +1,4 @@
+import loop_rate_limiters
 import mujoco
 import mujoco.viewer
 import numpy as np
@@ -69,40 +70,63 @@ if __name__ == "__main__":
         path_data = pickle.load(f)
     path_data = path_data['valid_paths']
 
-    with mujoco.viewer.launch_passive(model=model, data=data, show_left_ui=False, show_right_ui=False) as viewer:
+    go_to_next = False
+    go_to_prev = False
+    def key_cb(keycode):
+        if chr(keycode) == 'N':
+            global go_to_next
+            go_to_next = True
+        if chr(keycode) == 'P':
+            global go_to_prev
+            go_to_prev = True
+
+    with mujoco.viewer.launch_passive(model=model, data=data, show_left_ui=False, show_right_ui=False, key_callback=key_cb) as viewer:
         # Update the viewer's orientation to capture the arm movement.
         viewer.cam.lookat = [0, 0, 0.35]
         viewer.cam.distance = 2.5
         viewer.cam.azimuth = 145
         viewer.cam.elevation = -25
 
+        # disable shadows so it's easier to see the paths
+        viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 0
+
+        path_marker_radius = 0.005
+        curr_path_idx = 0
         while viewer.is_running():
-            # disable shadows so it's easier to see the paths
-            viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 0
+            valid_path = path_data[curr_path_idx]
+            print(f"visualizing path from seed {valid_path['seed']}")
 
-            path_marker_radius = 0.005
-            for valid_path in path_data:
-                print(f"visualizing path from seed {valid_path['seed']}")
+            # "Reset" the scene before rendering any paths.
+            # This is done by making all current scene geometries transparent.
+            for i in range(viewer.user_scn.maxgeom):
+                viewer.user_scn.geoms[i].rgba = np.zeros(4)
+            viewer.user_scn.ngeom = 0
 
-                # "Reset" the scene before rendering any paths.
-                # This is done by making all current scene geometries transparent.
-                for i in range(viewer.user_scn.maxgeom):
-                    viewer.user_scn.geoms[i].rgba = np.zeros(4)
-                viewer.user_scn.ngeom = 0
+            data.qpos = valid_path['q_init']
+            mujoco.mj_kinematics(model, data)
 
-                data.qpos = valid_path['q_init']
-                mujoco.mj_kinematics(model, data)
+            target_pose = valid_path['EE_goal_pose']
+            target_position = target_pose.translation()
+            target_rotation = target_pose.rotation().as_matrix()
+            add_frame(viewer.user_scn, target_position, target_rotation, 0.015, .105)
 
-                target_pose = valid_path['EE_goal_pose']
-                target_position = target_pose.translation()
-                target_rotation = target_pose.rotation().as_matrix()
-                add_frame(viewer.user_scn, target_position, target_rotation, 0.015, .105)
+            visualize_path(viewer.user_scn, valid_path['IK_path'], path_marker_radius, [1, 0, 0, 1])
+            visualize_path(viewer.user_scn, valid_path['RRT_path'], path_marker_radius, [0, 1, 0, 1])
+            visualize_path(viewer.user_scn, valid_path['RRT_shortcut_path'], path_marker_radius, [0, 0, 1, 1])
 
-                visualize_path(viewer.user_scn, valid_path['IK_path'], path_marker_radius, [1, 0, 0, 1])
-                visualize_path(viewer.user_scn, valid_path['RRT_path'], path_marker_radius, [0, 1, 0, 1])
-                visualize_path(viewer.user_scn, valid_path['RRT_shortcut_path'], path_marker_radius, [0, 0, 1, 1])
+            viewer.sync()
 
-                viewer.sync()
+            # listen for a keypress to cycle through the paths.
+            # (TODO: add thread safety?)
+            rate = loop_rate_limiters.RateLimiter(frequency=10, warn=False)
+            stay_on_current_path = True
+            while stay_on_current_path:
+                stay_on_current_path = (not go_to_next) and (not go_to_prev)
+                if go_to_next:
+                    curr_path_idx = (curr_path_idx + 1) % len(path_data)
+                    go_to_next = False
+                elif go_to_prev:
+                    curr_path_idx = (curr_path_idx - 1) % len(path_data)
+                    go_to_prev = False
+                rate.sleep()
 
-                # TODO: replace this with a key_callback so that I can step through each run manually (maybe n for next and p for prev)
-                time.sleep(2)
