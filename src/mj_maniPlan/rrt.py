@@ -200,7 +200,11 @@ class RRT:
                     start, end = rng.integers(len(shortened_path), size=2)
                 if start > end:
                     start, end = end, start
-                shortened_path = self.__shortcut(shortened_path, start, end)
+                path_candidate = self.__shortcut(shortened_path, start, end)
+                # TODO: remove. temporarily added for experiments so that
+                # I can fit a spline without any crazy overfitting
+                if len(path_candidate) >= 10:
+                    shortened_path = path_candidate
             return shortened_path
         elif len(kwargs) == 2 and ('start_idx' in kwargs and 'end_idx' in kwargs):
             return self.__shortcut(path, kwargs['start_idx'], kwargs['end_idx'])
