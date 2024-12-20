@@ -5,8 +5,8 @@ Example of how to generate a path and visualize the path waypoints.
 import mujoco
 import mujoco.viewer
 import numpy as np
-import os
 import time
+from pathlib import Path
 from scipy.interpolate import make_interp_spline
 
 from mj_maniPlan.rrt import (
@@ -15,6 +15,13 @@ from mj_maniPlan.rrt import (
 )
 from mj_maniPlan.sampling import HaltonSampler
 import mj_maniPlan.utils as utils
+import mj_maniPlan.visualization as viz
+
+
+_HERE = Path(__file__).parent
+_PANDA_XML = _HERE.parent / "models" / "franka_emika_panda" / "scene.xml"
+
+_EE_SITE = 'ee_site'
 
 
 # Naive timing generation for a path, which can be used for something like B-spline interpolation.
@@ -27,14 +34,18 @@ def generate_path_timing(path):
     # scale to [0..1]
     return np.interp(timing, (timing[0], timing[-1]), (0, 1))
 
+def update_joint_config(q: np.ndarray, qpos_addrs, model: mujoco.MjModel, data: mujoco.MjData):
+    data.qpos[qpos_addrs] = q
+    mujoco.mj_kinematics(model, data)
+
 
 if __name__ == '__main__':
-    dir = os.path.dirname(os.path.realpath(__file__))
-    model_xml_path = dir + "/../models/franka_emika_panda/scene_with_obstacles.xml"
-    model = mujoco.MjModel.from_xml_path(model_xml_path)
+    model = mujoco.MjModel.from_xml_path(_PANDA_XML.as_posix())
     data = mujoco.MjData(model)
 
     # The joints to sample during planning.
+    # The finger joints of the gripper are not included here, since those values
+    # can stay constant during arm planning.
     joint_names = [
         'joint1',
         'joint2',
@@ -48,26 +59,18 @@ if __name__ == '__main__':
     # Random number generator that's used for sampling joint configurations.
     rng = HaltonSampler(len(joint_names), seed=None)
 
-    # Generate valid initial and goal configurations.
-    print("Generating q_init and q_goal...")
+    # Generate a valid goal configuration.
+    print("Generating q_goal...")
     joint_qpos_addrs = utils.joint_names_to_qpos_addrs(joint_names, model)
     lower_limits, upper_limits = utils.joint_limits(joint_names, model)
-    q_init = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
     q_goal = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
 
-    def set_joint_config(q: np.ndarray):
-        data.qpos[joint_qpos_addrs] = q
-        mujoco.mj_kinematics(model, data)
-
-    # random_valid_config modifies MjData in-place, so we need to reset the data to q_init before planning.
-    set_joint_config(q_init)
-
-    # Example of how to set the joint configuration to the values specified in the keyframe with ID 0.
-    # This can be useful if the joint configuration from this keyframe is what's used for q_init.
-    '''
+    # Use the keyframe with ID 0 ("home" in the panda.xml MJCF) as q_init.
+    # This also sets MjData.qpos to q_init, which is what we want (the state of MjData that's passed
+    # to the RRT object is what's used as the planner's initial state).
     mujoco.mj_resetDataKeyframe(model, data, 0)
     mujoco.mj_kinematics(model, data)
-    '''
+    q_init = data.qpos[joint_qpos_addrs]
 
     # Set up the planner.
     # Tweak the values in planner_options to see the effect on generated plans!
@@ -86,19 +89,16 @@ if __name__ == '__main__':
         exit()
 
     print("Shortcutting...")
-    s_start = time.time()
+    start = time.time()
     shortcut_path = planner.shortcut(path, num_attempts=int(0.75 * len(path)))
-    s_duration = time.time() - s_start
-    print(f"Shortcutting took {s_duration}s")
+    print(f"Shortcutting took {time.time() - start}s")
     print(f"Original path length: {len(path)}")
     print(f"Shortcut path length: {len(shortcut_path)}")
 
     # Smooth the path by performing naive joint-space B-spline interpolation.
     # Note that this may result in waypoints that are in collision.
-    timing = generate_path_timing(path)
-    spline = make_interp_spline(timing, path)
-    shortcut_timing = generate_path_timing(shortcut_path)
-    spline_shortcut = make_interp_spline(shortcut_timing, shortcut_path)
+    spline = make_interp_spline(generate_path_timing(path), path)
+    spline_shortcut = make_interp_spline(generate_path_timing(shortcut_path), shortcut_path)
 
     with mujoco.viewer.launch_passive(model=model, data=data, show_left_ui=False, show_right_ui=False) as viewer:
         # Update the viewer's orientation to capture the arm movement.
@@ -107,30 +107,32 @@ if __name__ == '__main__':
         viewer.cam.azimuth = 145
         viewer.cam.elevation = -25
 
-        def set_and_visualize_joint_config(q: np.ndarray):
-            set_joint_config(q)
-            viewer.sync()
+        # Show the target EE pose (derived from q_goal)
+        update_joint_config(q_goal, joint_qpos_addrs, model, data)
+        target_pos = data.site(_EE_SITE).xpos
+        target_rot = data.site(_EE_SITE).xmat.reshape(3,3)
+        viz.add_frame(viewer.user_scn, target_pos, target_rot)
 
-        # Show the start and goal configurations.
-        set_and_visualize_joint_config(q_init)
-        time.sleep(1.3)
-        set_and_visualize_joint_config(q_goal)
-        time.sleep(1.25)
-
-        # Visualize kinematic updates at 60hz.
-        viz_time_per_frame = 1 / 60
-
-        # Show the original path and the shortcut path (alternate between the two until the user exits).
-        # The horizon is assuming that the B-spline interpolations were completed with x data ranging from [0..1]
-        horizon = np.linspace(0, 1, 200)
-        path_to_visualize = spline
-        next_path = spline_shortcut
-        while viewer.is_running():
+        # Show the initial and shortcut paths.
+        path_to_color = {
+            spline:          [1.0, 0.0, 0.0, 1.0],
+            spline_shortcut: [0.0, 1.0, 0.0, 1.0],
+        }
+        horizon = np.linspace(0, 1, 1000)
+        for p, rgba in path_to_color.items():
             for t in horizon:
-                start_time = time.time()
-                set_and_visualize_joint_config(path_to_visualize(t))
-                elapsed_time = time.time() - start_time
-                if elapsed_time < viz_time_per_frame:
-                    time.sleep(viz_time_per_frame - elapsed_time)
-            path_to_visualize, next_path = next_path, path_to_visualize
-            time.sleep(0.25)
+                q_t = p(t)
+                update_joint_config(q_t, joint_qpos_addrs, model, data)
+                ee_world_pos = data.site(_EE_SITE).xpos
+                viz.add_sphere(viewer.user_scn, ee_world_pos, 0.004, rgba)
+
+        # Ensure the robot is at q_init and then update the viewer to show
+        # the target frame, paths, and initial state.
+        update_joint_config(q_init, joint_qpos_addrs, model, data)
+        viewer.sync()
+
+        # Keep the visualizer open until the user closes it.
+        # This loop does not need to run at a high rate (doing 10hz here).
+        time_between_checks = 1 / 10
+        while viewer.is_running():
+            time.sleep(time_between_checks)

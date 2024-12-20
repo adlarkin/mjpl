@@ -1,17 +1,21 @@
 import mujoco
 import numpy as np
-import os
 import unittest
+from pathlib import Path
 
 from mj_maniPlan.sampling import HaltonSampler
 import mj_maniPlan.rrt as rrt
 
 
+_HERE = Path(__file__).parent
+_MODEL_DIR = _HERE / "models"
+_BALL_XML = _MODEL_DIR / "ball.xml"
+_BALL_XY_PLANE_XML = _MODEL_DIR / "ball_xy_plane.xml"
+
+
 class TestRRT(unittest.TestCase):
     def load_ball_with_obstacle_model(self):
-        dir = os.path.dirname(os.path.realpath(__file__))
-        model_xml_path = dir + "/models/ball.xml"
-        model = mujoco.MjModel.from_xml_path(model_xml_path)
+        model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
 
         self.obstacle = model.geom('wall_obstacle')
 
@@ -34,9 +38,7 @@ class TestRRT(unittest.TestCase):
         self.planner = rrt.RRT(options, model, data)
 
     def load_ball_sliding_along_xy_model(self):
-        dir = os.path.dirname(os.path.realpath(__file__))
-        model_xml_path = dir + "/models/ball_xy_plane.xml"
-        model = mujoco.MjModel.from_xml_path(model_xml_path)
+        model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
 
         joint_names = [
             "ball_slide_x",

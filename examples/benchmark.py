@@ -12,8 +12,8 @@ The testing methodology is as follows:
 
 import mujoco
 import numpy as np
-import os
 import time
+from pathlib import Path
 
 from mj_maniPlan.rrt import (
     RRT,
@@ -23,10 +23,12 @@ from mj_maniPlan.sampling import HaltonSampler
 import mj_maniPlan.utils as utils
 
 
+_HERE = Path(__file__).parent
+_PANDA_XML = _HERE.parent / "models" / "franka_emika_panda" / "scene.xml"
+
+
 if __name__ == '__main__':
     # NOTE: modify these parameters as needed for your benchmarking needs.
-    dir = os.path.dirname(os.path.realpath(__file__))
-    model_xml_path = dir + "/../models/franka_emika_panda/scene.xml"
     # The joints to sample during planning.
     joint_names = [
         'joint1',
@@ -44,7 +46,7 @@ if __name__ == '__main__':
     goal_biasing_probability = 0.1
     number_of_attempts = 15
 
-    model = mujoco.MjModel.from_xml_path(model_xml_path)
+    model = mujoco.MjModel.from_xml_path(_PANDA_XML.as_posix())
 
     joint_qpos_addrs = utils.joint_names_to_qpos_addrs(joint_names, model)
     lower_limits, upper_limits = utils.joint_limits(joint_names, model)

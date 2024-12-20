@@ -141,7 +141,6 @@ class RRT:
                     goal_tree.set_path_root(new_goal_tree_node)
                     solution_found = True
 
-        print(f"Solution found: {solution_found}, time taken: {time.time() - start_time}")
         if solution_found:
             return self.get_path(start_tree, goal_tree)
         return []
