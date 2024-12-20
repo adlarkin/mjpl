@@ -84,14 +84,24 @@ if __name__ == '__main__':
     planner = RRT(planner_options, model, data)
 
     print("Planning...")
+    start = time.time()
     path = planner.plan(q_goal)
     if not path:
         exit()
+    print(f"Planning took {time.time() - start}s")
 
     print("Shortcutting...")
     start = time.time()
+    # TODO: use something like
+    # https://github.com/adlarkin/mj_maniPlan/pull/20/commits/c99f2dececd8a6228bd5c6b7fdc704d168b08b12
+    # to make sure shortcut_path has enough waypoints for spline fitting?
+    # ...
+    # OR, after shortcutting, run CONNECT as needed for adjacent waypoints that have a config distance
+    # that's greater than RRTOptions.epsilon
     shortcut_path = planner.shortcut(path, num_attempts=int(0.75 * len(path)))
     print(f"Shortcutting took {time.time() - start}s")
+    # TODO: remove these print statements once I address the TODO above?
+    # The length of the list is no longer a useful metric if I do intermediate CONNECT on the shortcut path
     print(f"Original path length: {len(path)}")
     print(f"Shortcut path length: {len(shortcut_path)}")
 
