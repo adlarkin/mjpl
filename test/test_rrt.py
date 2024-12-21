@@ -47,7 +47,7 @@ class TestRRT(unittest.TestCase):
         options = rrt.RRTOptions(
             joint_names=joint_names,
             max_planning_time=5.0,
-            epsilon=0.1,
+            epsilon=0.2,
             rng=HaltonSampler(len(joint_names), seed=42)
         )
 
@@ -231,12 +231,12 @@ class TestRRT(unittest.TestCase):
         tree = rrt.Tree()
         n_0 = rrt.Node(self.q_init, None)
         n_1 = rrt.Node(np.array([0.0, 0.0]), n_0)
-        n_2 = rrt.Node(np.array([0.5, 0.0]), n_1)
-        n_3 = rrt.Node(np.array([0.5, 0.5]), n_2)
-        n_4 = rrt.Node(np.array([1.0, 0.5]), n_3)
-        n_5 = rrt.Node(np.array([1.5, 0.5]), n_4)
-        n_6 = rrt.Node(np.array([1.5, 0.0]), n_5)
-        n_7 = rrt.Node(np.array([2.0, 0.0]), n_6)
+        n_2 = rrt.Node(np.array([0.1, 0.0]), n_1)
+        n_3 = rrt.Node(np.array([0.1, 0.1]), n_2)
+        n_4 = rrt.Node(np.array([0.15, 0.1]), n_3)
+        n_5 = rrt.Node(np.array([0.2, 0.1]), n_4)
+        n_6 = rrt.Node(np.array([0.2, 0.0]), n_5)
+        n_7 = rrt.Node(np.array([0.3, 0.0]), n_6)
         nodes = [ n_0, n_1, n_2, n_3, n_4, n_5, n_6, n_7 ]
         for n in nodes:
             tree.add_node(n)
@@ -262,14 +262,15 @@ class TestRRT(unittest.TestCase):
         for i in range(len(shortcut_path)):
             self.assertTrue(np.array_equal(shortcut_path[i], expected_shortcut_path[i]))
 
-        expected_shortcut_path = [
-            n_0.q,
-            n_7.q,
-        ]
         shortcut_path = self.planner.shortcut(path, start_idx=0, end_idx=7)
-        self.assertEqual(len(shortcut_path), len(expected_shortcut_path))
-        for i in range(len(shortcut_path)):
-            self.assertTrue(np.array_equal(shortcut_path[i], expected_shortcut_path[i]))
+        self.assertEqual(len(shortcut_path), 3)
+        # The first and last points of the shortcut path should match the first
+        # and last points of the original path
+        self.assertTrue(np.array_equal(shortcut_path[0], path[0]))
+        self.assertTrue(np.array_equal(shortcut_path[-1], path[-1]))
+        # start_idx can be directly connected to end_idx, so interpolated waypoints are
+        # added at a distance of rrt.RRTOptions.epsilon w.r.t. start_idx
+        self.assertTrue((abs(shortcut_path[1] - np.array([0.1, 0])) <= 1e-9).all())
 
         # shortcutting two adjacent waypoints shouldn't modify the original path
         unmodified_path = self.planner.shortcut(path, start_idx=6, end_idx=7)

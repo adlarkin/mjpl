@@ -199,15 +199,18 @@ class RRT:
                     start, end = rng.integers(len(shortened_path), size=2)
                 if start > end:
                     start, end = end, start
-                shortened_path = self.__shortcut(shortened_path, start, end)
-            return shortened_path
+                shortened_path = self.__shortcut(shortened_path, start, end, False)
+                if len(shortened_path) == 2:
+                    # we can go directly from start to goal, so no more shortcutting can be done
+                    break
+            return self.__make_dense_path(shortened_path)
         elif len(kwargs) == 2 and ('start_idx' in kwargs and 'end_idx' in kwargs):
-            return self.__shortcut(path, kwargs['start_idx'], kwargs['end_idx'])
+            return self.__shortcut(path, kwargs['start_idx'], kwargs['end_idx'], True)
         else:
             raise ValueError(f"Invalid kwargs combination. Expected ['num_attempts'] or ['start_idx', 'end_idx'], but received {list(kwargs.keys())}")
 
     # Helper function for performing the actual shortcutting - see the `shortcut` method
-    def __shortcut(self, path: list[np.ndarray], start: int, end: int) -> list[np.ndarray]:
+    def __shortcut(self, path: list[np.ndarray], start: int, end: int, make_dense) -> list[np.ndarray]:
         q_start = path[start]
         q_end = path[end]
         # see if these 2 waypoints can make a valid path
@@ -215,8 +218,33 @@ class RRT:
         tree.add_node(Node(q_start, None))
         connected_node = self.connect(q_end, tree)
         if np.array_equal(connected_node.q, q_end):
-            return path[:start+1] + path[end:]
+            shortened_path = path[:start+1] + path[end:]
+            if make_dense:
+                shortened_path = self.__make_dense_path(shortened_path)
+            return shortened_path
         return path
+
+    # Make a "sparse" path "dense" by adding intermediate waypoints between
+    # adjacent waypoints that have a configuration distance > epsilon.
+    # Adding filler waypoints to the "sparse" path helps maintain path structure.
+    def __make_dense_path(self, path: list[np.ndarray]) -> list[np.ndarray]:
+        dense_path = []
+        for i in range(len(path) - 1):
+            q_curr = path[i]
+            q_next = path[i+1]
+            dense_path.append(q_curr)
+            if utils.configuration_distance(q_curr, q_next) > self.options.epsilon:
+                tree = Tree()
+                tree.add_node(Node(q_curr, None))
+                connected_node = self.connect(q_next, tree)
+                tree.set_path_root(connected_node)
+                intermediate_configs = tree.get_path()
+                intermediate_configs.reverse()
+                # don't add the first (q_curr) or last (q_next) elements since that
+                # is already being done in the for loop
+                dense_path += intermediate_configs[1:-1]
+        dense_path.append(path[-1])
+        return dense_path
 
     def __is_valid_config(self, q: np.ndarray) -> bool:
         return utils.is_valid_config(

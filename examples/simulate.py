@@ -19,7 +19,7 @@ import mj_maniPlan.visualization as viz
 
 
 _HERE = Path(__file__).parent
-_PANDA_XML = _HERE.parent / "models" / "franka_emika_panda" / "scene.xml"
+_PANDA_XML = _HERE.parent / "models" / "franka_emika_panda" / "scene_with_obstacles.xml"
 
 _EE_SITE = 'ee_site'
 
@@ -87,23 +87,16 @@ if __name__ == '__main__':
     start = time.time()
     path = planner.plan(q_goal)
     if not path:
+        print("Planning failed")
         exit()
     print(f"Planning took {time.time() - start}s")
 
     print("Shortcutting...")
     start = time.time()
-    # TODO: use something like
-    # https://github.com/adlarkin/mj_maniPlan/pull/20/commits/c99f2dececd8a6228bd5c6b7fdc704d168b08b12
-    # to make sure shortcut_path has enough waypoints for spline fitting?
-    # ...
-    # OR, after shortcutting, run CONNECT as needed for adjacent waypoints that have a config distance
-    # that's greater than RRTOptions.epsilon
-    shortcut_path = planner.shortcut(path, num_attempts=int(0.75 * len(path)))
+    shortcut_path = planner.shortcut(path, num_attempts=len(path))
     print(f"Shortcutting took {time.time() - start}s")
-    # TODO: remove these print statements once I address the TODO above?
-    # The length of the list is no longer a useful metric if I do intermediate CONNECT on the shortcut path
-    print(f"Original path length: {len(path)}")
-    print(f"Shortcut path length: {len(shortcut_path)}")
+    print(f"Original path size: {len(path)}")
+    print(f"Shortcut path size: {len(shortcut_path)}")
 
     # Smooth the path by performing naive joint-space B-spline interpolation.
     # Note that this may result in waypoints that are in collision.
