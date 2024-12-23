@@ -71,6 +71,7 @@ if __name__ == '__main__':
             joint_names=joint_names,
             max_planning_time=max_planning_time,
             epsilon=epsilon,
+            shortcut_filler_epsilon=epsilon,
             rng=rng,
             goal_biasing_probability=goal_biasing_probability,
         )

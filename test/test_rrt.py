@@ -24,6 +24,7 @@ class TestRRT(unittest.TestCase):
             joint_names=joint_names,
             max_planning_time=5.0,
             epsilon=0.1,
+            shortcut_filler_epsilon=0.1,
             rng=HaltonSampler(len(joint_names), seed=42)
         )
 
@@ -48,6 +49,8 @@ class TestRRT(unittest.TestCase):
             joint_names=joint_names,
             max_planning_time=5.0,
             epsilon=0.2,
+            # TODO: make this a different value then epsilon to capture it in tests?
+            shortcut_filler_epsilon=0.2,
             rng=HaltonSampler(len(joint_names), seed=42)
         )
 

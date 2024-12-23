@@ -74,6 +74,13 @@ class RRTOptions:
     # This is the maximum distance between nodes in the tree.
     # This number should be > 0.
     epsilon: float
+    # After shortcutting, the path may have adjacent waypoints that have a configuration distance > epsilon
+    # (i.e., the original shortcut path is a "sparse" path).
+    # To maintain path structure, intermediate configurations are added between pairs of distant adjacent waypoints
+    # (i.e., the "sparse" path is turned into a "dense" path).
+    # These intermediate configurations will have a configuration distance of shortfut_filler_epsilon.
+    # This value should be >=  epsilon since adjacent waypoints in the "sparse" path can be connected directly.
+    shortcut_filler_epsilon: float
     # Random number generator that's used for sampling joint configurations.
     rng: HaltonSampler
     # How often to sample the goal state when building the tree.
@@ -122,8 +129,9 @@ class RRT:
 
         # Is there a direct connection to q_goal from q_init?
         solution_found = False
-        if utils.configuration_distance(q_init, q_goal) <= self.options.epsilon:
-            start_tree.set_path_root(start_tree.nearest_neighbor(q_init))
+        potential_goal_node = self.connect(q_goal, start_tree)
+        if np.array_equal(potential_goal_node.q, q_goal):
+            start_tree.set_path_root(potential_goal_node)
             goal_tree.set_path_root(goal_tree.nearest_neighbor(q_goal))
             solution_found = True
 
@@ -145,15 +153,23 @@ class RRT:
             return self.get_path(start_tree, goal_tree)
         return []
 
-    def extend(self, q: np.ndarray, tree: Tree, nearest_node: Node | None = None) -> Node | None:
+    def extend(
+        self,
+        q: np.ndarray,
+        tree: Tree,
+        nearest_node: Node | None = None,
+        eps: float | None = None,
+    ) -> Node | None:
+        if not eps:
+            eps = self.options.epsilon
         if not nearest_node:
             nearest_node = tree.nearest_neighbor(q)
         if np.array_equal(nearest_node.q, q):
             return nearest_node
         q_extend = q.copy()
         q_dist = utils.configuration_distance(nearest_node.q, q)
-        if q_dist > self.options.epsilon:
-            q_increment = self.options.epsilon * ((q - nearest_node.q) / q_dist)
+        if q_dist > eps:
+            q_increment = eps * ((q - nearest_node.q) / q_dist)
             q_extend = nearest_node.q + q_increment
         if self.__is_valid_config(q_extend):
             node_extend = Node(q_extend, nearest_node)
@@ -161,10 +177,10 @@ class RRT:
             return node_extend
         return None
 
-    def connect(self, q: np.ndarray, tree: Tree) -> Node:
+    def connect(self, q: np.ndarray, tree: Tree, eps: float | None = None) -> Node:
         nearest_node = tree.nearest_neighbor(q)
         while not np.array_equal(q, nearest_node.q):
-            next_node = self.extend(q, tree, nearest_node)
+            next_node = self.extend(q, tree, nearest_node=nearest_node, eps=eps)
             if not next_node:
                 break
             nearest_node = next_node
@@ -236,7 +252,7 @@ class RRT:
             if utils.configuration_distance(q_curr, q_next) > self.options.epsilon:
                 tree = Tree()
                 tree.add_node(Node(q_curr, None))
-                connected_node = self.connect(q_next, tree)
+                connected_node = self.connect(q_next, tree, eps=self.options.shortcut_filler_epsilon)
                 tree.set_path_root(connected_node)
                 intermediate_configs = tree.get_path()
                 intermediate_configs.reverse()

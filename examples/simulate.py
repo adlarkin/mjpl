@@ -44,8 +44,8 @@ if __name__ == '__main__':
     data = mujoco.MjData(model)
 
     # The joints to sample during planning.
-    # The finger joints of the gripper are not included here, since those values
-    # can stay constant during arm planning.
+    # Since this example executes planning for the arm,
+    # the finger joints of the gripper are excluded.
     joint_names = [
         'joint1',
         'joint2',
@@ -59,28 +59,27 @@ if __name__ == '__main__':
     # Random number generator that's used for sampling joint configurations.
     rng = HaltonSampler(len(joint_names), seed=None)
 
-    # Generate a valid goal configuration.
-    print("Generating q_goal...")
+    # Generate valid initial/goal configurations.
     joint_qpos_addrs = utils.joint_names_to_qpos_addrs(joint_names, model)
     lower_limits, upper_limits = utils.joint_limits(joint_names, model)
+    q_init = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
     q_goal = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
-
-    # Use the keyframe with ID 0 ("home" in the panda.xml MJCF) as q_init.
-    # This also sets MjData.qpos to q_init, which is what we want (the state of MjData that's passed
-    # to the RRT object is what's used as the planner's initial state).
-    mujoco.mj_resetDataKeyframe(model, data, 0)
-    mujoco.mj_kinematics(model, data)
-    q_init = data.qpos[joint_qpos_addrs]
 
     # Set up the planner.
     # Tweak the values in planner_options to see the effect on generated plans!
+    epsilon = 0.05
     planner_options = RRTOptions(
         joint_names=joint_names,
         max_planning_time=10,
-        epsilon=0.05,
+        epsilon=epsilon,
+        shortcut_filler_epsilon=10*epsilon,
         rng=rng,
         goal_biasing_probability=0.1,
     )
+    # The state of MjData passed to the RRT object is used as the initial planning state.
+    # random_valid_config modifies MjData in place, so we reset MjData to match q_init before
+    # constructing the RRT object.
+    update_joint_config(q_init, joint_qpos_addrs, model, data)
     planner = RRT(planner_options, model, data)
 
     print("Planning...")
@@ -109,6 +108,8 @@ if __name__ == '__main__':
         viewer.cam.distance = 2.5
         viewer.cam.azimuth = 145
         viewer.cam.elevation = -25
+
+        # TODO: show the initial EE site pose? Need to figure out how
 
         # Show the target EE pose (derived from q_goal)
         update_joint_config(q_goal, joint_qpos_addrs, model, data)
