@@ -48,9 +48,8 @@ class TestRRT(unittest.TestCase):
         options = rrt.RRTOptions(
             joint_names=joint_names,
             max_planning_time=5.0,
-            epsilon=0.2,
-            # TODO: make this a different value then epsilon to capture it in tests?
-            shortcut_filler_epsilon=0.2,
+            epsilon=0.1,
+            shortcut_filler_epsilon=0.25,
             rng=HaltonSampler(len(joint_names), seed=42)
         )
 
@@ -225,6 +224,7 @@ class TestRRT(unittest.TestCase):
 
         '''
         Suboptimal path that can benefit from shortcutting
+        (waypoints in this path have a distance of the corresponding RRTOptions.epsilon)
 
                           n_3 -> n_4 -> n_5
                            ^             |
@@ -253,6 +253,7 @@ class TestRRT(unittest.TestCase):
 
         original_path = path.copy()
 
+        # Test case where waypoints are removed but filler waypoints are not added.
         expected_shortcut_path = [
             n_0.q,
             n_1.q,
@@ -265,17 +266,24 @@ class TestRRT(unittest.TestCase):
         for i in range(len(shortcut_path)):
             self.assertTrue(np.array_equal(shortcut_path[i], expected_shortcut_path[i]))
 
+        # Test case where waypoints are removed and filler waypoints are added.
+        expected_shortcut_path = [
+            n_0.q,
+            np.array([0.15, 0.0]),
+            n_7.q,
+        ]
         shortcut_path = self.planner.shortcut(path, start_idx=0, end_idx=7)
-        self.assertEqual(len(shortcut_path), 3)
-        # The first and last points of the shortcut path should match the first
-        # and last points of the original path
-        self.assertTrue(np.array_equal(shortcut_path[0], path[0]))
-        self.assertTrue(np.array_equal(shortcut_path[-1], path[-1]))
-        # start_idx can be directly connected to end_idx, so interpolated waypoints are
-        # added at a distance of rrt.RRTOptions.epsilon w.r.t. start_idx
-        self.assertTrue((abs(shortcut_path[1] - np.array([0.1, 0])) <= 1e-9).all())
+        self.assertEqual(len(shortcut_path), len(expected_shortcut_path))
+        # First and last waypoints of the shortcut path should match the first and last
+        # waypoints of the original path
+        self.assertTrue(np.array_equal(shortcut_path[0], expected_shortcut_path[0]))
+        self.assertTrue(np.array_equal(shortcut_path[-1], expected_shortcut_path[-1]))
+        # Filler waypoint was added since the distance between the first and last waypoint in the
+        # shortcut path is greater than RRTOptions.shortcut_filler_epsilon
+        self.assertTrue((abs(shortcut_path[1] - expected_shortcut_path[1]) <= 1e-9).all())
 
-        # shortcutting two adjacent waypoints shouldn't modify the original path
+        # Shortcutting two adjacent waypoints should keep all of the original path waypoints
+        # since the filler epsilon is greater than the epsilon used for the original path.
         unmodified_path = self.planner.shortcut(path, start_idx=6, end_idx=7)
         self.assertEqual(len(unmodified_path), len(path))
         for i in range(len(unmodified_path)):

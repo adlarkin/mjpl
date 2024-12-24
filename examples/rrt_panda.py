@@ -1,5 +1,6 @@
 '''
-Example of how to generate a path and visualize the path waypoints.
+Example of how to run RRT on a franka panda and visualize the paths
+(with and without shortcutting).
 '''
 
 import mujoco
@@ -94,8 +95,6 @@ if __name__ == '__main__':
     start = time.time()
     shortcut_path = planner.shortcut(path, num_attempts=len(path))
     print(f"Shortcutting took {time.time() - start}s")
-    print(f"Original path size: {len(path)}")
-    print(f"Shortcut path size: {len(shortcut_path)}")
 
     # Smooth the path by performing naive joint-space B-spline interpolation.
     # Note that this may result in waypoints that are in collision.
@@ -109,7 +108,11 @@ if __name__ == '__main__':
         viewer.cam.azimuth = 145
         viewer.cam.elevation = -25
 
-        # TODO: show the initial EE site pose? Need to figure out how
+        # Show the initial EE pose
+        update_joint_config(q_init, joint_qpos_addrs, model, data)
+        init_pos = data.site(_EE_SITE).xpos
+        init_rot = data.site(_EE_SITE).xmat.reshape(3,3)
+        viz.add_frame(viewer.user_scn, init_pos, init_rot)
 
         # Show the target EE pose (derived from q_goal)
         update_joint_config(q_goal, joint_qpos_addrs, model, data)
