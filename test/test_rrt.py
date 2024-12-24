@@ -1,17 +1,21 @@
 import mujoco
 import numpy as np
-import os
 import unittest
+from pathlib import Path
 
 from mj_maniPlan.sampling import HaltonSampler
 import mj_maniPlan.rrt as rrt
 
 
+_HERE = Path(__file__).parent
+_MODEL_DIR = _HERE / "models"
+_BALL_XML = _MODEL_DIR / "ball.xml"
+_BALL_XY_PLANE_XML = _MODEL_DIR / "ball_xy_plane.xml"
+
+
 class TestRRT(unittest.TestCase):
     def load_ball_with_obstacle_model(self):
-        dir = os.path.dirname(os.path.realpath(__file__))
-        model_xml_path = dir + "/models/ball.xml"
-        model = mujoco.MjModel.from_xml_path(model_xml_path)
+        model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
 
         self.obstacle = model.geom('wall_obstacle')
 
@@ -20,6 +24,7 @@ class TestRRT(unittest.TestCase):
             joint_names=joint_names,
             max_planning_time=5.0,
             epsilon=0.1,
+            shortcut_filler_epsilon=0.1,
             rng=HaltonSampler(len(joint_names), seed=42)
         )
 
@@ -33,10 +38,8 @@ class TestRRT(unittest.TestCase):
 
         self.planner = rrt.RRT(options, model, data)
 
-    def load_ball_sliding_along_xy_model(self):
-        dir = os.path.dirname(os.path.realpath(__file__))
-        model_xml_path = dir + "/models/ball_xy_plane.xml"
-        model = mujoco.MjModel.from_xml_path(model_xml_path)
+    def load_ball_sliding_along_xy_model(self, epsilon, shortcut_filler_epsilon):
+        model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
 
         joint_names = [
             "ball_slide_x",
@@ -45,7 +48,8 @@ class TestRRT(unittest.TestCase):
         options = rrt.RRTOptions(
             joint_names=joint_names,
             max_planning_time=5.0,
-            epsilon=0.1,
+            epsilon=epsilon,
+            shortcut_filler_epsilon=shortcut_filler_epsilon,
             rng=HaltonSampler(len(joint_names), seed=42)
         )
 
@@ -216,10 +220,11 @@ class TestRRT(unittest.TestCase):
         self.assertTrue(np.array_equal(path[1], q_goal))
 
     def test_shortcut(self):
-        self.load_ball_sliding_along_xy_model()
+        self.load_ball_sliding_along_xy_model(0.1, 0.3)
 
         '''
         Suboptimal path that can benefit from shortcutting
+        (waypoints in this path have a distance of the corresponding RRTOptions.epsilon)
 
                           n_3 -> n_4 -> n_5
                            ^             |
@@ -229,12 +234,12 @@ class TestRRT(unittest.TestCase):
         tree = rrt.Tree()
         n_0 = rrt.Node(self.q_init, None)
         n_1 = rrt.Node(np.array([0.0, 0.0]), n_0)
-        n_2 = rrt.Node(np.array([0.5, 0.0]), n_1)
-        n_3 = rrt.Node(np.array([0.5, 0.5]), n_2)
-        n_4 = rrt.Node(np.array([1.0, 0.5]), n_3)
-        n_5 = rrt.Node(np.array([1.5, 0.5]), n_4)
-        n_6 = rrt.Node(np.array([1.5, 0.0]), n_5)
-        n_7 = rrt.Node(np.array([2.0, 0.0]), n_6)
+        n_2 = rrt.Node(np.array([0.1, 0.0]), n_1)
+        n_3 = rrt.Node(np.array([0.1, 0.1]), n_2)
+        n_4 = rrt.Node(np.array([0.2, 0.1]), n_3)
+        n_5 = rrt.Node(np.array([0.3, 0.1]), n_4)
+        n_6 = rrt.Node(np.array([0.3, 0.0]), n_5)
+        n_7 = rrt.Node(np.array([0.4, 0.0]), n_6)
         nodes = [ n_0, n_1, n_2, n_3, n_4, n_5, n_6, n_7 ]
         for n in nodes:
             tree.add_node(n)
@@ -248,6 +253,7 @@ class TestRRT(unittest.TestCase):
 
         original_path = path.copy()
 
+        # Test case where waypoints are removed but filler waypoints are not added.
         expected_shortcut_path = [
             n_0.q,
             n_1.q,
@@ -260,20 +266,38 @@ class TestRRT(unittest.TestCase):
         for i in range(len(shortcut_path)):
             self.assertTrue(np.array_equal(shortcut_path[i], expected_shortcut_path[i]))
 
+        # Test case where waypoints are removed and filler waypoints are added.
         expected_shortcut_path = [
             n_0.q,
+            np.array([0.2, 0.0]),
             n_7.q,
         ]
         shortcut_path = self.planner.shortcut(path, start_idx=0, end_idx=7)
         self.assertEqual(len(shortcut_path), len(expected_shortcut_path))
-        for i in range(len(shortcut_path)):
-            self.assertTrue(np.array_equal(shortcut_path[i], expected_shortcut_path[i]))
+        # First and last waypoints of the shortcut path should match the first and last
+        # waypoints of the original path.
+        self.assertTrue(np.array_equal(shortcut_path[0], expected_shortcut_path[0]))
+        self.assertTrue(np.array_equal(shortcut_path[-1], expected_shortcut_path[-1]))
+        # Filler waypoint was added since the configuration distance between the first and
+        # last waypoint in the shortcut path is greater than RRTOptions.epsilon.
+        self.assertTrue((abs(shortcut_path[1] - expected_shortcut_path[1]) <= 1e-9).all())
 
-        # shortcutting two adjacent waypoints shouldn't modify the original path
+        # Shortcutting two adjacent waypoints should keep all of the original path waypoints
+        # since the filler epsilon is greater than the epsilon used for the original path.
         unmodified_path = self.planner.shortcut(path, start_idx=6, end_idx=7)
         self.assertEqual(len(unmodified_path), len(path))
         for i in range(len(unmodified_path)):
             self.assertTrue(np.array_equal(unmodified_path[i], path[i]))
+
+        # Test shortcutting with a filler epsilon of infinity.
+        # This has the effect of performing no waypoint filling on the initial shortcut path.
+        self.load_ball_sliding_along_xy_model(0.1, float('inf'))
+        shortcut_path = self.planner.shortcut(path, start_idx=0, end_idx=7)
+        # Since no filling is performed, the shortcut path is just the initial and final waypoint
+        # from the original path.
+        self.assertEqual(len(shortcut_path), 2)
+        self.assertTrue(np.array_equal(shortcut_path[0], path[0]))
+        self.assertTrue(np.array_equal(shortcut_path[-1], path[-1]))
 
         # make sure invalid kwargs are caught
         with self.assertRaisesRegex(ValueError, 'Invalid kwargs'):
