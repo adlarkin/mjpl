@@ -97,12 +97,11 @@ if __name__ == '__main__':
     print(f"Shortcutting took {time.time() - start}s")
 
     # Smooth the path by performing naive joint-space B-spline interpolation.
-    # Note that this may result in waypoints that are in collision.
     spline = make_interp_spline(generate_path_timing(path), path)
     spline_shortcut = make_interp_spline(generate_path_timing(shortcut_path), shortcut_path)
 
     with mujoco.viewer.launch_passive(model=model, data=data, show_left_ui=False, show_right_ui=False) as viewer:
-        # Update the viewer's orientation to capture the arm movement.
+        # Update the viewer's orientation to capture the scene.
         viewer.cam.lookat = [0, 0, 0.35]
         viewer.cam.distance = 2.5
         viewer.cam.azimuth = 145
@@ -114,7 +113,7 @@ if __name__ == '__main__':
         init_rot = data.site(_EE_SITE).xmat.reshape(3,3)
         viz.add_frame(viewer.user_scn, init_pos, init_rot)
 
-        # Show the target EE pose (derived from q_goal)
+        # Show the target EE pose
         update_joint_config(q_goal, joint_qpos_addrs, model, data)
         target_pos = data.site(_EE_SITE).xpos
         target_rot = data.site(_EE_SITE).xmat.reshape(3,3)
@@ -134,7 +133,7 @@ if __name__ == '__main__':
                 viz.add_sphere(viewer.user_scn, ee_world_pos, 0.004, rgba)
 
         # Ensure the robot is at q_init and then update the viewer to show
-        # the target frame, paths, and initial state.
+        # the frames, paths, and initial state.
         update_joint_config(q_init, joint_qpos_addrs, model, data)
         viewer.sync()
 

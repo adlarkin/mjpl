@@ -78,8 +78,13 @@ class RRTOptions:
     # (i.e., the original shortcut path is a "sparse" path).
     # To maintain path structure, intermediate configurations are added between pairs of distant adjacent waypoints
     # (i.e., the "sparse" path is turned into a "dense" path).
-    # These intermediate configurations will have a configuration distance of shortfut_filler_epsilon.
-    # This value should be >=  epsilon since adjacent waypoints in the "sparse" path can be connected directly.
+    # These intermediate configurations are added between adjacent waypoints in the "sparse" path that have
+    # a configuration distance > shortcut_filler_epsilon.
+    #
+    # shortcut_filler_epsilon should be >= epsilon since adjacent waypoints in the "sparse" path can be connected directly.
+    #
+    # If the user does not want waypoint filling after the initial path shortcutting is performed, this value should be
+    # set to infinity.
     shortcut_filler_epsilon: float
     # Random number generator that's used for sampling joint configurations.
     rng: HaltonSampler
