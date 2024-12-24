@@ -78,8 +78,10 @@ class RRTOptions:
     # (i.e., the original shortcut path is a "sparse" path).
     # To maintain path structure, intermediate configurations are added between pairs of distant adjacent waypoints
     # (i.e., the "sparse" path is turned into a "dense" path).
-    # These intermediate configurations are added between adjacent waypoints in the "sparse" path that have
-    # a configuration distance > shortcut_filler_epsilon.
+    #
+    # For two adjacent waypoints in the "sparse" path, q_1 and q_2, if configuration_distance(q_1, q_2) > epsilon,
+    # then filler waypoints are added between q_1 and q_2, spaced at a configuration distance of shortcut_filler_epsilon,
+    # starting from q_1.
     #
     # shortcut_filler_epsilon should be >= epsilon since adjacent waypoints in the "sparse" path can be connected directly.
     #
