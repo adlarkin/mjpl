@@ -79,7 +79,7 @@ class RRTOptions:
     # To maintain path structure, intermediate configurations are added between pairs of distant adjacent waypoints
     # (i.e., the "sparse" path is turned into a "dense" path).
     #
-    # For two adjacent waypoints in the "sparse" path, q_1 and q_2, if configuration_distance(q_1, q_2) > epsilon,
+    # For two adjacent waypoints in the "sparse" path, q_1 and q_2, if configuration_distance(q_1, q_2) > shortcut_filler_epsilon,
     # then filler waypoints are added between q_1 and q_2, spaced at a configuration distance of shortcut_filler_epsilon,
     # starting from q_1.
     #
@@ -248,7 +248,7 @@ class RRT:
         return path
 
     # Make a "sparse" path "dense" by adding intermediate waypoints between
-    # adjacent waypoints that have a configuration distance > epsilon.
+    # adjacent waypoints that have a configuration distance > shortcut_filler_epsilon.
     # Adding filler waypoints to the "sparse" path helps maintain path structure.
     def __make_dense_path(self, path: list[np.ndarray]) -> list[np.ndarray]:
         dense_path = []
@@ -256,7 +256,7 @@ class RRT:
             q_curr = path[i]
             q_next = path[i+1]
             dense_path.append(q_curr)
-            if utils.configuration_distance(q_curr, q_next) > self.options.epsilon:
+            if utils.configuration_distance(q_curr, q_next) > self.options.shortcut_filler_epsilon:
                 tree = Tree()
                 tree.add_node(Node(q_curr, None))
                 connected_node = self.connect(q_next, tree, eps=self.options.shortcut_filler_epsilon)
