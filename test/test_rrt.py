@@ -80,8 +80,7 @@ class TestRRT(unittest.TestCase):
             expected_q_extended,
             self.q_init,
         ]
-        tree.set_path_root(extended_node)
-        path = tree.get_path()
+        path = tree.get_path(extended_node)
         self.assertEqual(len(path), len(expected_path))
         for i in range(len(path)):
             self.assertAlmostEqual(path[i][0], expected_path[i][0], places=9)
@@ -128,8 +127,7 @@ class TestRRT(unittest.TestCase):
         # Check the path from the last connected node.
         # This implicitly checks each connected node's parent.
         expected_path = expected_qs_in_tree[::-1]
-        tree.set_path_root(goal_node)
-        path = tree.get_path()
+        path = tree.get_path(goal_node)
         self.assertEqual(len(path), len(expected_path))
         for i in range(len(path)):
             self.assertAlmostEqual(path[i][0], expected_path[i][0], places=9)
@@ -172,14 +170,12 @@ class TestRRT(unittest.TestCase):
         start_tree = rrt.Tree()
         start_tree.add_node(rrt.Node(self.q_init, None))
         connected_node_a = self.planner.connect(q_new, start_tree)
-        start_tree.set_path_root(connected_node_a)
 
         goal_tree = rrt.Tree()
         goal_tree.add_node(rrt.Node(np.array([0.5]), None))
         connected_node_b = self.planner.connect(q_new, goal_tree)
-        goal_tree.set_path_root(connected_node_b)
 
-        path = self.planner.get_path(start_tree, goal_tree)
+        path = self.planner.get_path(start_tree, connected_node_a, goal_tree, connected_node_b)
         expected_path = [
             self.q_init,
             np.array([0.0]),
@@ -244,8 +240,7 @@ class TestRRT(unittest.TestCase):
         for n in nodes:
             tree.add_node(n)
 
-        tree.set_path_root(n_7)
-        path = tree.get_path()
+        path = tree.get_path(n_7)
         path.reverse()
         self.assertEqual(len(path), len(nodes))
         for i in range(len(path)):
