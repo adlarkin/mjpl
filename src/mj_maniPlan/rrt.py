@@ -17,6 +17,10 @@ class Node:
     def __hash__(self) -> int:
         return hash(self.q.tobytes())
 
+    # Define node equality as having the same jont config value.
+    # TODO: update this? Might want to check for the same parent.
+    # There is also the chance that two nodes can have the same config value,
+    # but belong to different trees (maybe enforcing a parent check will help resolve this).
     def __eq__(self, other) -> bool:
         return np.array_equal(self.q, other.q)
 
@@ -26,10 +30,6 @@ class Tree:
         # For now, the tree is represented as a set of unique nodes.
         # TODO: use something like a kd-tree to improve nearest neighbor lookup times?
         self.nodes = set()
-
-        # The node that defines the root of a path in the tree.
-        # This should be set via set_path_root before calling get_path.
-        self.path_root = None
 
     def add_node(self, node: Node):
         self.nodes.add(node)
@@ -48,14 +48,11 @@ class Tree:
             raise ValueError(f"No nearest neighbor found for {q}. Did you call this method before adding any nodes to the tree?")
         return closest_node
 
-    def set_path_root(self, node: Node):
-        self.path_root = node
-
-    def get_path(self) -> list[np.ndarray]:
-        if not self.path_root:
-            raise ValueError("The path root node has not been set. Did you forget to call set_path_root?")
+    def get_path(self, node: Node) -> list[np.ndarray]:
+        if node not in self.nodes:
+            raise ValueError("Called get_path starting from a node that is not in the tree.")
         path = []
-        curr_node = self.path_root
+        curr_node = node
         while curr_node is not None:
             path.append(curr_node.q)
             curr_node = curr_node.parent
@@ -135,15 +132,12 @@ class RRT:
             max_planning_time = float('inf')
 
         # Is there a direct connection to q_goal from q_init?
-        solution_found = False
         potential_goal_node = self.connect(q_goal, start_tree)
         if np.array_equal(potential_goal_node.q, q_goal):
-            start_tree.set_path_root(potential_goal_node)
-            goal_tree.set_path_root(goal_tree.nearest_neighbor(q_goal))
-            solution_found = True
+            return self.get_path(start_tree, potential_goal_node, goal_tree, goal_tree.nearest_neighbor(q_goal))
 
         start_time = time.time()
-        while (not solution_found and time.time() - start_time < max_planning_time):
+        while time.time() - start_time < max_planning_time:
             if self.goal_biasing_sampler.random() <= self.options.goal_biasing_probability:
                 q_rand = q_goal
             else:
@@ -152,12 +146,7 @@ class RRT:
             if new_start_tree_node:
                 new_goal_tree_node = self.connect(new_start_tree_node.q, goal_tree)
                 if new_goal_tree_node and utils.configuration_distance(new_start_tree_node.q, new_goal_tree_node.q) < self.options.epsilon:
-                    start_tree.set_path_root(new_start_tree_node)
-                    goal_tree.set_path_root(new_goal_tree_node)
-                    solution_found = True
-
-        if solution_found:
-            return self.get_path(start_tree, goal_tree)
+                    return self.get_path(start_tree, new_start_tree_node, goal_tree, new_goal_tree_node)
         return []
 
     def extend(
@@ -193,12 +182,17 @@ class RRT:
             nearest_node = next_node
         return nearest_node
 
-    def get_path(self, start_tree: Tree, goal_tree: Tree) -> list[np.ndarray]:
+    def get_path(
+        self, start_tree: Tree,
+        start_tree_node: Node,
+        goal_tree: Tree,
+        goal_tree_node: Node
+    ) -> list[np.ndarray]:
         # The path generated from start_tree ends at q_init, but we want it to start at q_init. So we must reverse it.
-        path_start = start_tree.get_path()
+        path_start = start_tree.get_path(start_tree_node)
         path_start.reverse()
         # The path generated from goal_tree ends at q_goal, which is what we want.
-        path_end = goal_tree.get_path()
+        path_end = goal_tree.get_path(goal_tree_node)
         # The last value in path_start might be the same as the first value in path_end.
         # If this is the case, remove the duplicate value.
         if np.array_equal(path_start[-1], path_end[0]):
@@ -260,8 +254,7 @@ class RRT:
                 tree = Tree()
                 tree.add_node(Node(q_curr, None))
                 connected_node = self.connect(q_next, tree, eps=self.options.shortcut_filler_epsilon)
-                tree.set_path_root(connected_node)
-                intermediate_configs = tree.get_path()
+                intermediate_configs = tree.get_path(connected_node)
                 intermediate_configs.reverse()
                 # don't add the first (q_curr) or last (q_next) elements since that
                 # is already being done in the for loop

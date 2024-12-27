@@ -63,16 +63,15 @@ class TestTree(unittest.TestCase):
     def test_get_path(self):
         self.build_tree()
 
-        # error should occur if the path root node has not been set
-        with self.assertRaisesRegex(ValueError, "path root node has not been set"):
-            self.tree.get_path()
+        # error should occur if the path root node is not a part of the Tree
+        orphan_node = Node(np.array([5, 5]), None)
+        with self.assertRaisesRegex(ValueError, "Called get_path starting from a node that is not in the tree"):
+            self.tree.get_path(orphan_node)
 
-        self.tree.set_path_root(self.n_3)
-        path = self.tree.get_path()
+        path = self.tree.get_path(self.n_3)
         self.assertTrue(np.array_equal(path, [self.n_3.q, self.n_1.q, self.n_0.q]))
 
-        self.tree.set_path_root(self.n_0)
-        path = self.tree.get_path()
+        path = self.tree.get_path(self.n_0)
         self.assertTrue(np.array_equal(path, [self.n_0.q]))
 
 
