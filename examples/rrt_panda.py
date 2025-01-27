@@ -14,7 +14,6 @@ from mj_maniPlan.rrt import (
     RRT,
     RRTOptions,
 )
-from mj_maniPlan.sampling import HaltonSampler
 import mj_maniPlan.utils as utils
 import mj_maniPlan.visualization as viz
 
@@ -58,7 +57,7 @@ if __name__ == '__main__':
     ]
 
     # Random number generator that's used for sampling joint configurations.
-    rng = HaltonSampler(len(joint_names), seed=None)
+    rng = np.random.default_rng(seed=None)
 
     # Generate valid initial/goal configurations.
     joint_qpos_addrs = utils.joint_names_to_qpos_addrs(joint_names, model)
