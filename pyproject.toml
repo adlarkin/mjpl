@@ -8,7 +8,6 @@ version = "0.0.1"
 dependencies = [
   "mujoco >= 3",
   "numpy",
-  "scipy",
 ]
 requires-python = ">=3.9"
 authors = [
@@ -20,11 +19,18 @@ maintainers = [
 description = "Manipulator motion planning in MuJoCo"
 readme = "README.md"
 license = {file = "LICENSE"}
-keywords = ["robotics", "motion planning", "manipulation", "MuJoCo"]
+keywords = ["robotics", "motion", "planning", "manipulation", "mujoco"]
 classifiers = [
+    "Framework :: Robot Framework :: Library",
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+]
+
+[project.optional-dependencies]
+examples = [
+  # needed for make_interp_spline in examples/rrt_panda.py
+  "scipy",
 ]
 
 [project.urls]

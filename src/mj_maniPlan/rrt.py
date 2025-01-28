@@ -6,7 +6,6 @@ import time
 from dataclasses import dataclass
 
 from . import utils
-from .sampling import HaltonSampler
 
 
 class Node:
@@ -86,7 +85,7 @@ class RRTOptions:
     # set to infinity.
     shortcut_filler_epsilon: float
     # Random number generator that's used for sampling joint configurations.
-    rng: HaltonSampler
+    rng: np.random.Generator
     # How often to sample the goal state when building the tree.
     # This should be a value within [0.0, 1.0].
     goal_biasing_probability: float = 0.05
@@ -104,13 +103,12 @@ class RRT:
 
         # We need the current state of the scene for collision checking, but we
         # also need to check joint configurations via FK to ensure that newly
-        # sampled states are valid. 
+        # sampled states are valid.
         self.data = copy.deepcopy(data)
 
         self.options = options
         self.joint_qpos_addrs = utils.joint_names_to_qpos_addrs(options.joint_names, self.model)
         self.joint_limits_lower, self.joint_limits_upper = utils.joint_limits(options.joint_names, self.model)
-        self.goal_biasing_sampler = np.random.default_rng(seed=options.rng.get_seed())
 
     def plan(self, q_goal: np.ndarray) -> list[np.ndarray]:
         # Use MjData's current joint configuration as q_init.
@@ -138,10 +136,10 @@ class RRT:
 
         start_time = time.time()
         while time.time() - start_time < max_planning_time:
-            if self.goal_biasing_sampler.random() <= self.options.goal_biasing_probability:
+            if self.options.rng.random() <= self.options.goal_biasing_probability:
                 q_rand = q_goal
             else:
-                q_rand = self.options.rng.sample(self.joint_limits_lower, self.joint_limits_upper)
+                q_rand = utils.random_config(self.options.rng, self.joint_limits_lower, self.joint_limits_upper)
             new_start_tree_node = self.connect(q_rand, start_tree)
             if new_start_tree_node:
                 new_goal_tree_node = self.connect(new_start_tree_node.q, goal_tree)
@@ -208,12 +206,11 @@ class RRT:
     def shortcut(self, path: list[np.ndarray], **kwargs) -> list[np.ndarray]:
         if len(kwargs) == 1 and 'num_attempts' in kwargs:
             shortened_path = path.copy()
-            rng = np.random.default_rng(seed=self.options.rng.get_seed())
             for _ in range(kwargs['num_attempts']):
                 # randomly pick 2 waypoints
                 start, end = 0, 0
                 while start == end:
-                    start, end = rng.integers(len(shortened_path), size=2)
+                    start, end = self.options.rng.integers(len(shortened_path), size=2)
                 if start > end:
                     start, end = end, start
                 shortened_path = self.__shortcut(shortened_path, start, end, False)

@@ -3,7 +3,6 @@ import numpy as np
 import unittest
 from pathlib import Path
 
-from mj_maniPlan.sampling import HaltonSampler
 import mj_maniPlan.rrt as rrt
 
 
@@ -25,7 +24,7 @@ class TestRRT(unittest.TestCase):
             max_planning_time=5.0,
             epsilon=0.1,
             shortcut_filler_epsilon=0.1,
-            rng=HaltonSampler(len(joint_names), seed=42)
+            rng=np.random.default_rng(seed=42)
         )
 
         # Set the initial joint configuration.
@@ -50,7 +49,7 @@ class TestRRT(unittest.TestCase):
             max_planning_time=5.0,
             epsilon=epsilon,
             shortcut_filler_epsilon=shortcut_filler_epsilon,
-            rng=HaltonSampler(len(joint_names), seed=42)
+            rng=np.random.default_rng(seed=42)
         )
 
         # Set the initial joint configuration.

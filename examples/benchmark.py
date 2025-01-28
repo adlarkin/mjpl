@@ -19,7 +19,6 @@ from mj_maniPlan.rrt import (
     RRT,
     RRTOptions,
 )
-from mj_maniPlan.sampling import HaltonSampler
 import mj_maniPlan.utils as utils
 
 
@@ -57,7 +56,7 @@ if __name__ == '__main__':
         data = mujoco.MjData(model)
 
         # Random number generator that's used for sampling joint configurations.
-        rng = HaltonSampler(len(joint_names), seed=seed)
+        rng = np.random.default_rng(seed=seed)
 
         # Generate a valid initial and goal configuration.
         q_init = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)

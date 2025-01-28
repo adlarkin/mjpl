@@ -1,8 +1,6 @@
 import numpy as np
 import mujoco
 
-from .sampling import HaltonSampler
-
 
 def configuration_distance(q_from: np.ndarray, q_to: np.ndarray):
     return np.linalg.norm(q_to - q_from)
@@ -14,6 +12,9 @@ def joint_limits(joint_names: list[str], model: mujoco.MjModel) -> tuple[np.ndar
     lower_limits = np.array([ model.joint(name).range[0] for name in joint_names ])
     upper_limits = np.array([ model.joint(name).range[1] for name in joint_names ])
     return lower_limits, upper_limits
+
+def random_config(rng: np.random.Generator, lower_limits: np.ndarray, upper_limits: np.ndarray) -> np.ndarray:
+    return rng.uniform(low=lower_limits, high=upper_limits)
 
 # NOTE: this will modify `data` in-place.
 def is_valid_config(
@@ -38,14 +39,14 @@ def is_valid_config(
 
 # NOTE: this will modify `data` in-place, since it calls is_valid_config internally.
 def random_valid_config(
-    rng: HaltonSampler,
+    rng: np.random.Generator,
     lower_limits: np.ndarray,
-    upper_limits: np.ndarray, 
-    joint_qpos_addrs: np.ndarray, 
+    upper_limits: np.ndarray,
+    joint_qpos_addrs: np.ndarray,
     model: mujoco.MjModel,
     data: mujoco.MjData
 ) -> np.ndarray:
-    q_rand = rng.sample(lower_limits, upper_limits)
+    q_rand = random_config(rng, lower_limits, upper_limits)
     while not is_valid_config(q_rand, lower_limits, upper_limits, joint_qpos_addrs, model, data):
-        q_rand = rng.sample(lower_limits, upper_limits)
+        q_rand = random_config(rng, lower_limits, upper_limits)
     return q_rand
