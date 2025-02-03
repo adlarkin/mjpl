@@ -13,6 +13,11 @@ pip3 install -e .
 ## Getting started
 
 See the [examples](./examples) folder.
+To run examples locally, install the example dependencies:
+
+```
+pip3 install ".[examples]"
+```
 
 ## Run tests
 
