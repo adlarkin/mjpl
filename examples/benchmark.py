@@ -27,11 +27,11 @@ if __name__ == '__main__':
     joint_names = ex_utils.panda_arm_joints()
     max_planning_time = 10
     epsilon = 0.05
-    seed = 5
+    seed = 42 #5
     goal_biasing_probability = 0.1
     number_of_attempts = 15
 
-    model = ex_utils.load_panda_model()
+    model = ex_utils.load_panda_model(include_obstacles=False)
 
     joint_qpos_addrs = utils.joint_names_to_qpos_addrs(joint_names, model)
     lower_limits, upper_limits = utils.joint_limits(joint_names, model)
@@ -66,5 +66,5 @@ if __name__ == '__main__':
     successful_attempts = len(successful_planning_times)
     success_rate = successful_attempts / number_of_attempts
     median_planning_time = np.median(successful_planning_times)
-    print(f"Attempted {number_of_attempts} plans, succeeded on {successful_attempts} attempts (success rate of {success_rate})")
-    print(f"Median planning time of successful plans: {median_planning_time} seconds")
+    print(f"Attempted {number_of_attempts} plans, succeeded on {successful_attempts} attempts (success rate of {success_rate:.2f})")
+    print(f"Median planning time of successful plans: {median_planning_time:.4f} seconds")

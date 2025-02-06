@@ -8,11 +8,14 @@ import mj_maniPlan.utils as utils
 
 _HERE = Path(__file__).parent
 
-_PANDA_XML = _HERE.parent / "models" / "franka_emika_panda" / "scene_with_obstacles.xml"
+_PANDA_XML = _HERE.parent / "models" / "franka_emika_panda" / "scene.xml"
+_PANDA_OBSTACLES_XML = _HERE.parent / "models" / "franka_emika_panda" / "scene_with_obstacles.xml"
 _PANDA_EE_SITE = 'ee_site'
 
 
-def load_panda_model() -> mujoco.MjModel:
+def load_panda_model(include_obstacles: bool) -> mujoco.MjModel:
+    if include_obstacles:
+        return mujoco.MjModel.from_xml_path(_PANDA_OBSTACLES_XML.as_posix())
     return mujoco.MjModel.from_xml_path(_PANDA_XML.as_posix())
 
 def panda_arm_joints() -> list[str]:
