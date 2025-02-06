@@ -84,8 +84,8 @@ class RRTOptions:
     # If the user does not want waypoint filling after the initial path shortcutting is performed, this value should be
     # set to infinity.
     shortcut_filler_epsilon: float
-    # Random number generator that's used for sampling joint configurations.
-    rng: np.random.Generator
+    # Seed used for the underlying sampler in the planner.
+    seed: int | None
     # How often to sample the goal state when building the tree.
     # This should be a value within [0.0, 1.0].
     goal_biasing_probability: float = 0.05
@@ -97,49 +97,50 @@ class RRTOptions:
 # The reference above runs EXTEND on one tree and CONNECT on the other, swapping trees every iteration.
 # This implementation runs CONNECT on both trees, removing the need for tree swapping.
 class RRT:
-    def __init__(self, options: RRTOptions, model: mujoco.MjModel, data: mujoco.MjData) -> None:
+    def __init__(self, options: RRTOptions, model: mujoco.MjModel) -> None:
         # The model should be read-only, so we don't need to make a deep copy of it.
         self.model = model
 
-        # We need the current state of the scene for collision checking, but we
-        # also need to check joint configurations via FK to ensure that newly
-        # sampled states are valid.
-        self.data = copy.deepcopy(data)
+        # During planning, we need to use MjData for things like forward kinematics
+        # to confirm that sampled configurations are valid.
+        self.data = mujoco.MjData(model)
 
         self.options = options
+        self.rng = np.random.default_rng(seed=options.seed)
         self.joint_qpos_addrs = utils.joint_names_to_qpos_addrs(options.joint_names, self.model)
         self.joint_limits_lower, self.joint_limits_upper = utils.joint_limits(options.joint_names, self.model)
 
-    def plan(self, q_goal: np.ndarray) -> list[np.ndarray]:
-        # Use MjData's current joint configuration as q_init.
-        q_init = self.data.qpos[self.joint_qpos_addrs].copy()
+    def plan(self, q_init: np.ndarray, q_goal: np.ndarray) -> list[np.ndarray]:
         if not self.__is_valid_config(q_init):
             print("q_init is not a valid configuration")
             return []
-        start_tree = Tree()
-        start_tree.add_node(Node(q_init, None))
-
         if not self.__is_valid_config(q_goal):
             print("q_goal is not a valid configuration")
             return []
+
+        # Initialize MjData to q_init.
+        utils.fk(q_init, self.joint_qpos_addrs, self.model, self.data)
+
+        start_tree = Tree()
+        start_tree.add_node(Node(q_init, None))
         goal_tree = Tree()
         goal_tree.add_node(Node(q_goal, None))
-
-        max_planning_time = self.options.max_planning_time
-        if max_planning_time <= 0:
-            max_planning_time = float('inf')
 
         # Is there a direct connection to q_goal from q_init?
         potential_goal_node = self.connect(q_goal, start_tree)
         if np.array_equal(potential_goal_node.q, q_goal):
             return self.get_path(start_tree, potential_goal_node, goal_tree, goal_tree.nearest_neighbor(q_goal))
 
+        max_planning_time = self.options.max_planning_time
+        if max_planning_time <= 0:
+            max_planning_time = float('inf')
+
         start_time = time.time()
         while time.time() - start_time < max_planning_time:
-            if self.options.rng.random() <= self.options.goal_biasing_probability:
+            if self.rng.random() <= self.options.goal_biasing_probability:
                 q_rand = q_goal
             else:
-                q_rand = utils.random_config(self.options.rng, self.joint_limits_lower, self.joint_limits_upper)
+                q_rand = utils.random_config(self.rng, self.joint_limits_lower, self.joint_limits_upper)
             new_start_tree_node = self.connect(q_rand, start_tree)
             if new_start_tree_node:
                 new_goal_tree_node = self.connect(new_start_tree_node.q, goal_tree)
@@ -210,7 +211,7 @@ class RRT:
                 # randomly pick 2 waypoints
                 start, end = 0, 0
                 while start == end:
-                    start, end = self.options.rng.integers(len(shortened_path), size=2)
+                    start, end = self.rng.integers(len(shortened_path), size=2)
                 if start > end:
                     start, end = end, start
                 shortened_path = self.__shortcut(shortened_path, start, end, False)

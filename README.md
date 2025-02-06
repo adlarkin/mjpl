@@ -16,7 +16,7 @@ See the [examples](./examples) folder.
 To run examples locally, install the example dependencies:
 
 ```
-pip3 install ".[examples]"
+pip3 install -e ".[examples]"
 ```
 
 ## Run tests

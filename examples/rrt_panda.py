@@ -3,102 +3,61 @@ Example of how to run RRT on a franka panda and visualize the paths
 (with and without shortcutting).
 '''
 
+import argparse
 import mujoco
 import mujoco.viewer
 import numpy as np
 import time
-from pathlib import Path
-from scipy.interpolate import make_interp_spline
 
 from mj_maniPlan.rrt import (
     RRT,
     RRTOptions,
 )
+import example_utils as ex_utils
 import mj_maniPlan.utils as utils
 import mj_maniPlan.visualization as viz
 
 
-_HERE = Path(__file__).parent
-_PANDA_XML = _HERE.parent / "models" / "franka_emika_panda" / "scene_with_obstacles.xml"
-
-_EE_SITE = 'ee_site'
-
-
-# Naive timing generation for a path, which can be used for something like B-spline interpolation.
-# Configuration distance between two adjacent path waypoints - q_curr, q_next - is used as a notion
-# for the time it takes to move from q_curr to q_next.
-def generate_path_timing(path):
-    timing = [0.0]
-    for i in range(1, len(path)):
-        timing.append(timing[-1] + utils.configuration_distance(path[i-1], path[i]))
-    # scale to [0..1]
-    return np.interp(timing, (timing[0], timing[-1]), (0, 1))
-
-def update_joint_config(q: np.ndarray, qpos_addrs, model: mujoco.MjModel, data: mujoco.MjData):
-    data.qpos[qpos_addrs] = q
-    mujoco.mj_kinematics(model, data)
-
-
-if __name__ == '__main__':
-    model = mujoco.MjModel.from_xml_path(_PANDA_XML.as_posix())
-    data = mujoco.MjData(model)
-
-    # The joints to sample during planning.
-    # Since this example executes planning for the arm,
-    # the finger joints of the gripper are excluded.
-    joint_names = [
-        'joint1',
-        'joint2',
-        'joint3',
-        'joint4',
-        'joint5',
-        'joint6',
-        'joint7',
-    ]
-
-    # Random number generator that's used for sampling joint configurations.
-    rng = np.random.default_rng(seed=None)
-
-    # Generate valid initial/goal configurations.
-    joint_qpos_addrs = utils.joint_names_to_qpos_addrs(joint_names, model)
-    lower_limits, upper_limits = utils.joint_limits(joint_names, model)
-    q_init = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
-    q_goal = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
-
-    # Set up the planner.
-    # Tweak the values in planner_options to see the effect on generated plans!
-    epsilon = 0.05
-    planner_options = RRTOptions(
-        joint_names=joint_names,
-        max_planning_time=10,
-        epsilon=epsilon,
-        shortcut_filler_epsilon=10*epsilon,
-        rng=rng,
-        goal_biasing_probability=0.1,
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Run RRT on a franka panda model and visualize the resulting paths."
     )
-    # The state of MjData passed to the RRT object is used as the initial planning state.
-    # random_valid_config modifies MjData in place, so we reset MjData to match q_init before
-    # constructing the RRT object.
-    update_joint_config(q_init, joint_qpos_addrs, model, data)
-    planner = RRT(planner_options, model, data)
+    parser.add_argument(
+        "-viz",
+        "--visualize",
+        action="store_true",    # set to True if flag is provided
+        default=False,          # default value if flag is not provided
+        help="Visualize paths via the mujoco viewer"
+    )
+    parser.add_argument(
+        "-obs",
+        "--obstacles",
+        action="store_true",    # set to True if flag is provided
+        default=False,          # default value if flag is not provided
+        help="Use obstacles in the environment"
+    )
+    parser.add_argument(
+        "-s",
+        "--seed",
+        type=int,
+        default=-1,
+        help="Seed for random sampling. Must be >= 0. If not set, a random seed will be used"
+    )
+    args = parser.parse_args()
+    seed = args.seed
+    if seed < 0:
+        seed = None
+    return args.visualize, args.obstacles, seed
 
-    print("Planning...")
-    start = time.time()
-    path = planner.plan(q_goal)
-    if not path:
-        print("Planning failed")
-        exit()
-    print(f"Planning took {time.time() - start}s")
-
-    print("Shortcutting...")
-    start = time.time()
-    shortcut_path = planner.shortcut(path, num_attempts=len(path))
-    print(f"Shortcutting took {time.time() - start}s")
+def visualize_paths(model, path, shortcut_path, joint_qpos_addrs):
+    q_init = path[0]
+    q_goal = path[-1]
 
     # Smooth the path by performing naive joint-space B-spline interpolation.
-    spline = make_interp_spline(generate_path_timing(path), path)
-    spline_shortcut = make_interp_spline(generate_path_timing(shortcut_path), shortcut_path)
+    spline = ex_utils.fit_path_to_spline(path)
+    spline_shortcut = ex_utils.fit_path_to_spline(shortcut_path)
 
+    data = mujoco.MjData(model)
     with mujoco.viewer.launch_passive(model=model, data=data, show_left_ui=False, show_right_ui=False) as viewer:
         # Update the viewer's orientation to capture the scene.
         viewer.cam.lookat = [0, 0, 0.35]
@@ -107,18 +66,17 @@ if __name__ == '__main__':
         viewer.cam.elevation = -25
 
         # Show the initial EE pose
-        update_joint_config(q_init, joint_qpos_addrs, model, data)
-        init_pos = data.site(_EE_SITE).xpos
-        init_rot = data.site(_EE_SITE).xmat.reshape(3,3)
+        utils.fk(q_init, joint_qpos_addrs, model, data)
+        init_pos, init_rot, = utils.site_pose(ex_utils._PANDA_EE_SITE, data)
         viz.add_frame(viewer.user_scn, init_pos, init_rot)
 
         # Show the target EE pose
-        update_joint_config(q_goal, joint_qpos_addrs, model, data)
-        target_pos = data.site(_EE_SITE).xpos
-        target_rot = data.site(_EE_SITE).xmat.reshape(3,3)
+        utils.fk(q_goal, joint_qpos_addrs, model, data)
+        target_pos, target_rot = utils.site_pose(ex_utils._PANDA_EE_SITE, data)
         viz.add_frame(viewer.user_scn, target_pos, target_rot)
 
         # Show the initial and shortcut paths.
+        print("Regular path is in red, shortcut path is in green")
         path_to_color = {
             spline:          [1.0, 0.0, 0.0, 1.0],
             spline_shortcut: [0.0, 1.0, 0.0, 1.0],
@@ -127,13 +85,13 @@ if __name__ == '__main__':
         for p, rgba in path_to_color.items():
             for t in horizon:
                 q_t = p(t)
-                update_joint_config(q_t, joint_qpos_addrs, model, data)
-                ee_world_pos = data.site(_EE_SITE).xpos
+                utils.fk(q_t, joint_qpos_addrs, model, data)
+                ee_world_pos = data.site(ex_utils._PANDA_EE_SITE).xpos
                 viz.add_sphere(viewer.user_scn, ee_world_pos, 0.004, rgba)
 
         # Ensure the robot is at q_init and then update the viewer to show
         # the frames, paths, and initial state.
-        update_joint_config(q_init, joint_qpos_addrs, model, data)
+        utils.fk(q_init, joint_qpos_addrs, model, data)
         viewer.sync()
 
         # Keep the visualizer open until the user closes it.
@@ -141,3 +99,54 @@ if __name__ == '__main__':
         time_between_checks = 1 / 10
         while viewer.is_running():
             time.sleep(time_between_checks)
+
+def main():
+    visualize, use_obstacles, seed = parse_args()
+
+    model = ex_utils.load_panda_model(include_obstacles=use_obstacles)
+    data = mujoco.MjData(model)
+
+    # The joints to sample during planning.
+    # Since this example executes planning for the arm,
+    # the finger joints of the gripper are excluded.
+    joint_names = ex_utils.panda_arm_joints()
+
+    # Use the "home" configuration as q_init.
+    joint_qpos_addrs = utils.joint_names_to_qpos_addrs(joint_names, model)
+    q_init = model.key('home').qpos[joint_qpos_addrs]
+    # Generate valid goal configuration.
+    lower_limits, upper_limits = utils.joint_limits(joint_names, model)
+    rng = np.random.default_rng(seed=seed)
+    q_goal = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
+
+    # Set up the planner.
+    epsilon = 0.05
+    planner_options = RRTOptions(
+        joint_names=joint_names,
+        max_planning_time=10,
+        epsilon=epsilon,
+        shortcut_filler_epsilon=10*epsilon,
+        seed=seed,
+        goal_biasing_probability=0.1,
+    )
+    planner = RRT(planner_options, model)
+
+    print("Planning...")
+    start = time.time()
+    path = planner.plan(q_init, q_goal)
+    if not path:
+        print("Planning failed")
+        return
+    print(f"Planning took {(time.time() - start):.4f}s")
+
+    print("Shortcutting...")
+    start = time.time()
+    shortcut_path = planner.shortcut(path, num_attempts=len(path))
+    print(f"Shortcutting took {(time.time() - start):.4f}s")
+
+    if visualize:
+        visualize_paths(model, path, shortcut_path, joint_qpos_addrs)
+
+
+if __name__ == '__main__':
+    main()

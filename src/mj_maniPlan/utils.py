@@ -16,6 +16,10 @@ def joint_limits(joint_names: list[str], model: mujoco.MjModel) -> tuple[np.ndar
 def random_config(rng: np.random.Generator, lower_limits: np.ndarray, upper_limits: np.ndarray) -> np.ndarray:
     return rng.uniform(low=lower_limits, high=upper_limits)
 
+def fk(q: np.ndarray, qpos_addrs: np.ndarray, model: mujoco.MjModel, data: mujoco.MjData):
+    data.qpos[qpos_addrs] = q
+    mujoco.mj_kinematics(model, data)
+
 # NOTE: this will modify `data` in-place.
 def is_valid_config(
     q: np.ndarray,
@@ -31,9 +35,7 @@ def is_valid_config(
 
     # Check for collisions.
     # We have to run FK once data.qpos is updated before running the collision checker.
-    # TODO: enforce padding on the collision check? Not sure how to do this in MuJoCo yet
-    data.qpos[qpos_addrs] = q
-    mujoco.mj_kinematics(model, data)
+    fk(q, qpos_addrs, model, data)
     mujoco.mj_collision(model, data)
     return not data.ncon
 
@@ -50,3 +52,8 @@ def random_valid_config(
     while not is_valid_config(q_rand, lower_limits, upper_limits, joint_qpos_addrs, model, data):
         q_rand = random_config(rng, lower_limits, upper_limits)
     return q_rand
+
+def site_pose(site_name: str, data: mujoco.MjData):
+    pos = data.site(site_name).xpos
+    rot_mat = data.site(site_name).xmat.reshape(3,3)
+    return pos, rot_mat
