@@ -24,18 +24,15 @@ class TestRRT(unittest.TestCase):
             max_planning_time=5.0,
             epsilon=0.1,
             shortcut_filler_epsilon=0.1,
-            rng=np.random.default_rng(seed=42)
+            seed=42,
         )
 
-        # Set the initial joint configuration.
+        # Initial joint configuration.
         # We're testing with a simple model: a ball that can slide along the x-axis.
         # So there's only one value in data.qpos (the ball's x position)
         self.q_init = np.array([-0.1])
-        data = mujoco.MjData(model)
-        data.qpos[0] = self.q_init[0]
-        mujoco.mj_kinematics(model, data)
 
-        self.planner = rrt.RRT(options, model, data)
+        self.planner = rrt.RRT(options, model)
 
     def load_ball_sliding_along_xy_model(self, epsilon, shortcut_filler_epsilon):
         model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
@@ -49,16 +46,13 @@ class TestRRT(unittest.TestCase):
             max_planning_time=5.0,
             epsilon=epsilon,
             shortcut_filler_epsilon=shortcut_filler_epsilon,
-            rng=np.random.default_rng(seed=42)
+            seed=42,
         )
 
-        # Set the initial joint configuration.
+        # Initial joint configuration.
         self.q_init = np.array([-0.1, 0.0])
-        data = mujoco.MjData(model)
-        data.qpos = self.q_init.copy()
-        mujoco.mj_kinematics(model, data)
 
-        self.planner = rrt.RRT(options, model, data)
+        self.planner = rrt.RRT(options, model)
 
     def test_extend(self):
         self.load_ball_with_obstacle_model()
@@ -193,7 +187,7 @@ class TestRRT(unittest.TestCase):
         self.load_ball_with_obstacle_model()
 
         q_goal = np.array([0.35])
-        path = self.planner.plan(q_goal)
+        path = self.planner.plan(self.q_init, q_goal)
         self.assertIsNotNone(path)
 
         # The path should start at q_init and end at q_goal
@@ -209,7 +203,7 @@ class TestRRT(unittest.TestCase):
 
         # If we plan to a goal that is directly reachable, the planner should make the direct connection and exit
         q_goal = np.array([-0.05])
-        path = self.planner.plan(q_goal)
+        path = self.planner.plan(self.q_init, q_goal)
         self.assertEqual(len(path), 2)
         self.assertTrue(np.array_equal(path[0], self.q_init))
         self.assertTrue(np.array_equal(path[1], q_goal))

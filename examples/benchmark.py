@@ -13,39 +13,25 @@ The testing methodology is as follows:
 import mujoco
 import numpy as np
 import time
-from pathlib import Path
 
 from mj_maniPlan.rrt import (
     RRT,
     RRTOptions,
 )
+import example_utils as ex_utils
 import mj_maniPlan.utils as utils
-
-
-_HERE = Path(__file__).parent
-_PANDA_XML = _HERE.parent / "models" / "franka_emika_panda" / "scene.xml"
 
 
 if __name__ == '__main__':
     # NOTE: modify these parameters as needed for your benchmarking needs.
-    # The joints to sample during planning.
-    joint_names = [
-        'joint1',
-        'joint2',
-        'joint3',
-        'joint4',
-        'joint5',
-        'joint6',
-        'joint7',
-    ]
+    joint_names = ex_utils.panda_arm_joints()
     max_planning_time = 10
     epsilon = 0.05
-    #seed = 5
-    seed = 42
+    seed = 5
     goal_biasing_probability = 0.1
     number_of_attempts = 15
 
-    model = mujoco.MjModel.from_xml_path(_PANDA_XML.as_posix())
+    model = ex_utils.load_panda_model()
 
     joint_qpos_addrs = utils.joint_names_to_qpos_addrs(joint_names, model)
     lower_limits, upper_limits = utils.joint_limits(joint_names, model)
@@ -53,32 +39,25 @@ if __name__ == '__main__':
     # Plan number_of_attempts times and record benchmarks.
     successful_planning_times = []
     for i in range(number_of_attempts):
-        data = mujoco.MjData(model)
-
-        # Random number generator that's used for sampling joint configurations.
-        rng = np.random.default_rng(seed=seed)
-
         # Generate a valid initial and goal configuration.
+        data = mujoco.MjData(model)
+        rng = np.random.default_rng(seed=seed)
         q_init = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
         q_goal = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
-
-        # set robot joint configuration to q_init
-        data.qpos[joint_qpos_addrs] = q_init
-        mujoco.mj_kinematics(model, data)
 
         planner_options = RRTOptions(
             joint_names=joint_names,
             max_planning_time=max_planning_time,
             epsilon=epsilon,
             shortcut_filler_epsilon=epsilon,
-            rng=rng,
+            seed=seed,
             goal_biasing_probability=goal_biasing_probability,
         )
-        planner = RRT(planner_options, model, data)
+        planner = RRT(planner_options, model)
 
         print(f"Attempt {i}...")
         start_time = time.time()
-        path = planner.plan(q_goal)
+        path = planner.plan(q_init, q_goal)
         elapsed_time = time.time() - start_time
         if path:
             successful_planning_times.append(elapsed_time)
