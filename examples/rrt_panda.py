@@ -54,7 +54,6 @@ def visualize_paths(model, path, shortcut_path, joint_qpos_addrs):
     q_goal = path[-1]
 
     # Smooth the path by performing naive joint-space B-spline interpolation.
-    # This will be used for visualization.
     spline = ex_utils.fit_path_to_spline(path)
     spline_shortcut = ex_utils.fit_path_to_spline(shortcut_path)
 
