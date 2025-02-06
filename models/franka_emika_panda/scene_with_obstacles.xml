@@ -19,9 +19,14 @@
   <worldbody>
     <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
-    <geom name="obstacle_1" type="box" size=".025 .025 .25" pos=".5 0 .25" rgba="1 0 0 1"/>
-    <geom name="obstacle_2" type="sphere" size=".1" pos="0 .5 .5" rgba="0 1 0 1"/>
-    <geom name="obstacle_3" type="capsule" size="0.03" fromto=".4 -.4 .6 -.4 -.4 .6"/>
-    <geom name="obstacle_4" type="capsule" size="0.03" fromto="0 -.4 0.4 0 -.4 .8"/>
+
+    <geom name="obstacle_0" type="box" size=".02 .02 0.4" pos="0 0.45 0.4"/>
+    <geom name="obstacle_1" type="box" size=".02 .18 0.02" pos="0 0.45 0.78"/>
+    <geom name="obstacle_2" type="box" size=".18 0.02 0.02" pos="0.18 0.45 0.78"/>
+
+    <geom name="obstacle_3" type="capsule" size="0.03" fromto=".5 -.4 .5 -.5 -.4 .5"/>
+    <geom name="obstacle_4" type="capsule" size="0.03" fromto="0 -.4 0.1 0 -.4 0.9"/>
+    <geom name="obstacle_5" type="sphere" size=".1" pos=".5 -.4 .5"/>
+    <geom name="obstacle_6" type="sphere" size=".1" pos="0 -.4 0.9"/>
   </worldbody>
 </mujoco>
