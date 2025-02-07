@@ -16,8 +16,8 @@ from mj_maniPlan.rrt import (
 
 _HERE = Path(__file__).parent
 
-_PANDA_XML = _HERE.parent / "models" / "franka_emika_panda" / "scene.xml"
-_PANDA_OBSTACLES_XML = _HERE.parent / "models" / "franka_emika_panda" / "scene_with_obstacles.xml"
+_PANDA_XML = _HERE / "models" / "franka_emika_panda" / "scene.xml"
+_PANDA_OBSTACLES_XML = _HERE / "models" / "franka_emika_panda" / "scene_with_obstacles.xml"
 _PANDA_EE_SITE = 'ee_site'
 
 
