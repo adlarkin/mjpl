@@ -13,7 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        # TODO (#28): add 3.9 here if project supports it
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
       - name: Check out the repository

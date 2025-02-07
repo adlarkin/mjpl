@@ -9,7 +9,8 @@ dependencies = [
   "mujoco >= 3",
   "numpy",
 ]
-requires-python = ">=3.9"
+# TODO (#28): change to 3.9 if project supports it
+requires-python = ">=3.10"
 authors = [
   { name="Ashton Larkin", email="" },
 ]
