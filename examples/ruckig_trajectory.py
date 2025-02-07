@@ -45,9 +45,9 @@ def generate_trajectory(dof, ctrl_cycle_rate, path) -> Trajectory:
     inp.target_acceleration = np.zeros(dof)
 
     # The values chosen here are arbitrary and for demonstration purposes only.
-    inp.max_velocity = np.ones(dof) * np.pi
+    inp.max_velocity = np.ones(dof) * 2 * np.pi
     inp.max_acceleration = np.ones(dof) * np.pi
-    inp.max_jerk = np.ones(dof) * np.pi
+    inp.max_jerk = np.ones(dof) * 2 * np.pi
 
     # Set the beginning of the trajectory to the initial state.
     configs = [inp.current_position.copy()]
