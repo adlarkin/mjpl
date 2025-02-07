@@ -12,6 +12,33 @@ import panda_utils
 import ruckig_trajectory as r_traj
 
 
+# Compute the list of joint torques that need to be applied to follow a trajectory.
+# These torques should be set via data.qfrc_applied
+def computed_torque_ctrl(model: mujoco.MjModel, trajectory: r_traj.Trajectory, jnt_qpos_addrs):
+    data = mujoco.MjData(model)
+    data.qpos[jnt_qpos_addrs] = trajectory.configurations[0]
+    data.qvel[jnt_qpos_addrs] = trajectory.velocities[0]
+    mujoco.mj_forward(model, data)
+
+    ctrl_torques = []
+    for t in range(len(traj.configurations)):
+        # computed torque control with PD feedback for position/velocity error
+        error = traj.configurations[t] - data.qpos[joint_qpos_addrs]
+        error_dot = traj.velocities[t] - data.qvel[joint_qpos_addrs]
+        # NOTE: these gains may need to be tuned
+        Kp = np.eye(len(joint_qpos_addrs)) * 1.0
+        Kd = np.eye(len(joint_qpos_addrs)) * 1.0
+        data.qacc[:] = 0
+        data.qacc[joint_qpos_addrs] = traj.accelerations[t] + Kd.dot(error_dot) + Kp.dot(error)
+        mujoco.mj_inverse(model, data)
+        ctrl_tau = data.qfrc_inverse[jnt_qpos_addrs]
+        data.qfrc_applied[joint_qpos_addrs] = ctrl_tau
+        mujoco.mj_step(model, data)
+
+        ctrl_torques.append(ctrl_tau)
+    return ctrl_torques
+
+
 if __name__ == '__main__':
     visualize, use_obstacles, seed = panda_utils.parse_panda_args("Generate and follow a trajectory from a RRT path with computed torque control.")
     model, _, shortcut_path, joint_qpos_addrs = panda_utils.rrt_panda(use_obstacles, seed)
@@ -21,11 +48,13 @@ if __name__ == '__main__':
     traj = r_traj.generate_trajectory(len(shortcut_path[0]), model.opt.timestep, shortcut_path)
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
+    # Since we are doing computed torque control, we need to "disable" position actuators
+    # so that data.ctrl is not part of the applied force when we step simulation forward.
+    model.actuator_gainprm[:] = 0
+    model.actuator_biasprm[:] = 0
+    ctrl_torques = computed_torque_ctrl(model, traj, joint_qpos_addrs)
+
     if visualize:
-        # Since we are doing computed torque control, we need to "disable" position actuators
-        # so that data.ctrl is not part of the applied force when we step simulation forward.
-        model.actuator_gainprm[:] = 0
-        model.actuator_biasprm[:] = 0
         data = mujoco.MjData(model)
         q_init, q_goal = shortcut_path[0], shortcut_path[-1]
         with mujoco.viewer.launch_passive(model=model, data=data, show_left_ui=False, show_right_ui=False) as viewer:
@@ -57,19 +86,10 @@ if __name__ == '__main__':
                 data.qvel[joint_qpos_addrs] = traj.velocities[0]
                 mujoco.mj_forward(model, data)
 
-                for t in range(len(traj.configurations)):
+                for u_t in ctrl_torques:
                     start_time = time.time()
 
-                    # computed torque control with PD feedback for position/velocity error
-                    error = traj.configurations[t] - data.qpos[joint_qpos_addrs]
-                    error_dot = traj.velocities[t] - data.qvel[joint_qpos_addrs]
-                    # NOTE: these gains may need to be tuned
-                    Kp = np.eye(len(joint_qpos_addrs)) * 1.0
-                    Kd = np.eye(len(joint_qpos_addrs)) * 1.0
-                    data.qacc[:] = 0
-                    data.qacc[joint_qpos_addrs] = traj.accelerations[t] + Kd.dot(error_dot) + Kp.dot(error)
-                    mujoco.mj_inverse(model, data)
-                    data.qfrc_applied[joint_qpos_addrs] = data.qfrc_inverse[joint_qpos_addrs]
+                    data.qfrc_applied[joint_qpos_addrs] = u_t
                     mujoco.mj_step(model, data)
 
                     duration = time.time() - start_time
