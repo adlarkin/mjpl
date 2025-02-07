@@ -29,9 +29,7 @@ classifiers = [
 
 [project.optional-dependencies]
 examples = [
-  # needed for examples/ruckig_trajectory.py
   "ruckig",
-  # needed for make_interp_spline
   "scipy",
 ]
 
