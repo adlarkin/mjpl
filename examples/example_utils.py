@@ -1,33 +1,13 @@
+"""
+Utilities that are used in example scripts.
+"""
 import mujoco
 import numpy as np
-from pathlib import Path
 from scipy.interpolate import make_interp_spline
 
 import mj_maniPlan.utils as utils
+import mj_maniPlan.visualization as viz
 
-
-_HERE = Path(__file__).parent
-
-_PANDA_XML = _HERE.parent / "models" / "franka_emika_panda" / "scene.xml"
-_PANDA_OBSTACLES_XML = _HERE.parent / "models" / "franka_emika_panda" / "scene_with_obstacles.xml"
-_PANDA_EE_SITE = 'ee_site'
-
-
-def load_panda_model(include_obstacles: bool) -> mujoco.MjModel:
-    if include_obstacles:
-        return mujoco.MjModel.from_xml_path(_PANDA_OBSTACLES_XML.as_posix())
-    return mujoco.MjModel.from_xml_path(_PANDA_XML.as_posix())
-
-def panda_arm_joints() -> list[str]:
-    return [
-        'joint1',
-        'joint2',
-        'joint3',
-        'joint4',
-        'joint5',
-        'joint6',
-        'joint7',
-    ]
 
 def fit_path_to_spline(path: list[np.ndarray], interval: tuple[float, float] = (0.0, 1.0)):
     # Create "timing" for the path, which is used for B-spline interpolation.
@@ -40,3 +20,21 @@ def fit_path_to_spline(path: list[np.ndarray], interval: tuple[float, float] = (
     timing = np.interp(timing, (timing[0], timing[-1]), interval)
 
     return make_interp_spline(timing, path)
+
+def add_path(scene: mujoco.MjvScene, model: mujoco.MjModel, site: str, jnt_qpos_addrs, path, rgba):
+    data = mujoco.MjData(model)
+    spl_x_bounds = (0, 1)
+    spline = fit_path_to_spline(path, interval=spl_x_bounds)
+    horizon = np.linspace(spl_x_bounds[0], spl_x_bounds[1], 1000)
+    for t in horizon:
+        q_t = spline(t)
+        utils.fk(q_t, jnt_qpos_addrs, model, data)
+        # Use a sphere at the site's world position to show the current state of the path.
+        world_pos = data.site(site).xpos
+        viz.add_sphere(scene, world_pos, 0.004, rgba)
+
+def add_site_frame(scene: mujoco.MjvScene, model: mujoco.MjModel, site: str, q, jnt_qpos_addrs):
+    data = mujoco.MjData(model)
+    utils.fk(q, jnt_qpos_addrs, model, data)
+    pos, rot, = utils.site_pose(site, data)
+    viz.add_frame(scene, pos, rot)

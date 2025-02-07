@@ -29,7 +29,7 @@ classifiers = [
 
 [project.optional-dependencies]
 examples = [
-  # needed for make_interp_spline in examples/rrt_panda.py
+  "ruckig",
   "scipy",
 ]
 
