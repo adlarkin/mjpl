@@ -41,6 +41,6 @@ jobs:
             # "python examples/computed_torque_ctrl.py -obs -s 12"
           )
           for cmd in "${scripts[@]}"; do
-            echo "Running: $cmd"
-            eval "$cmd"  # Use eval to correctly handle command-line arguments
+            echo -e "\nRunning: $cmd" # -e to enable interpretation of \n
+            eval "$cmd"               # Use eval to correctly handle command-line arguments
           done
