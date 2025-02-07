@@ -33,14 +33,17 @@ jobs:
         run: |
           scripts=(
             "python examples/benchmark.py"
-            "python examples/rrt_panda.py -s 5"
+            "python examples/rrt_panda.py -s 5 -viz"
+            "python examples/benchmark.py"
             # Not running these scripts for now because they use ruckig to generate a trajectory,
             # and ruckig calls a cloud API if the input has intermediate waypoints
             # (calling this cloud API can be flaky in CI)
             # "python examples/position_ctrl.py -s 3"
             # "python examples/computed_torque_ctrl.py -obs -s 12"
           )
+          failed=0
           for cmd in "${scripts[@]}"; do
             echo -e "\nRunning: $cmd" # -e to enable interpretation of \n
-            eval "$cmd"               # Use eval to correctly handle command-line arguments
+            eval "$cmd" || failed=1
           done
+          exit $failed
