@@ -20,18 +20,19 @@ from mj_maniPlan.rrt import (
 )
 import example_utils as ex_utils
 import mj_maniPlan.utils as utils
+import panda_utils
 
 
 if __name__ == '__main__':
     # NOTE: modify these parameters as needed for your benchmarking needs.
-    joint_names = ex_utils.panda_arm_joints()
+    joint_names = panda_utils.panda_arm_joints()
     max_planning_time = 10
     epsilon = 0.05
     seed = 42 #5
     goal_biasing_probability = 0.1
     number_of_attempts = 15
 
-    model = ex_utils.load_panda_model(include_obstacles=False)
+    model = panda_utils.load_panda_model(include_obstacles=False)
 
     joint_qpos_addrs = utils.joint_names_to_qpos_addrs(joint_names, model)
     lower_limits, upper_limits = utils.joint_limits(joint_names, model)
