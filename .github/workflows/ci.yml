@@ -28,7 +28,13 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[examples]"
+          pip install -e ".[all]"
+
+      - name: Linter (Ruff)
+        run: ruff check .
+
+      - name: Formatter (black)
+        run: black --check .
 
       - name: Run tests
         run: python -m unittest -v
@@ -44,6 +50,7 @@ jobs:
             # "python examples/position_ctrl.py -s 3"
             # "python examples/computed_torque_ctrl.py -obs -s 12"
           )
+          # Run all scripts. If any of the scripts fail, report a failure in CI
           failed=0
           for cmd in "${scripts[@]}"; do
             echo -e "\nRunning: $cmd" # -e to enable interpretation of \n

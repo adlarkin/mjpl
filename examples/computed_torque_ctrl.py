@@ -1,20 +1,24 @@
 """
 Plan a path with RRT, generate a trajectory from the path, and then execute the trajectory with computed torque control.
 """
-import mujoco
-import mujoco.viewer
-import numpy as np
+
 import time
 
 import example_utils as ex_utils
-import mj_maniPlan.utils as utils
+import mujoco
+import mujoco.viewer
+import numpy as np
 import panda_utils
 import ruckig_trajectory as r_traj
+
+import mj_maniPlan.utils as utils
 
 
 # Compute the list of joint torques that need to be applied to follow a trajectory.
 # These torques should be set via data.qfrc_applied
-def computed_torque_ctrl(model: mujoco.MjModel, trajectory: r_traj.Trajectory, jnt_qpos_addrs):
+def computed_torque_ctrl(
+    model: mujoco.MjModel, trajectory: r_traj.Trajectory, jnt_qpos_addrs
+):
     data = mujoco.MjData(model)
     data.qpos[jnt_qpos_addrs] = trajectory.configurations[0]
     data.qvel[jnt_qpos_addrs] = trajectory.velocities[0]
@@ -29,7 +33,9 @@ def computed_torque_ctrl(model: mujoco.MjModel, trajectory: r_traj.Trajectory, j
         Kp = np.eye(len(joint_qpos_addrs)) * 1.0
         Kd = np.eye(len(joint_qpos_addrs)) * 1.0
         data.qacc[:] = 0
-        data.qacc[joint_qpos_addrs] = traj.accelerations[t] + Kd.dot(error_dot) + Kp.dot(error)
+        data.qacc[joint_qpos_addrs] = (
+            traj.accelerations[t] + Kd.dot(error_dot) + Kp.dot(error)
+        )
         mujoco.mj_inverse(model, data)
         ctrl_tau = data.qfrc_inverse[jnt_qpos_addrs]
         data.qfrc_applied[joint_qpos_addrs] = ctrl_tau
@@ -39,13 +45,19 @@ def computed_torque_ctrl(model: mujoco.MjModel, trajectory: r_traj.Trajectory, j
     return ctrl_torques
 
 
-if __name__ == '__main__':
-    visualize, use_obstacles, seed = panda_utils.parse_panda_args("Generate and follow a trajectory from a RRT path with computed torque control.")
-    model, _, shortcut_path, joint_qpos_addrs = panda_utils.rrt_panda(use_obstacles, seed)
+if __name__ == "__main__":
+    visualize, use_obstacles, seed = panda_utils.parse_panda_args(
+        "Generate and follow a trajectory from a RRT path with computed torque control."
+    )
+    model, _, shortcut_path, joint_qpos_addrs = panda_utils.rrt_panda(
+        use_obstacles, seed
+    )
 
     print("Generating a trajectory on the shortcut path...")
     start = time.time()
-    traj = r_traj.generate_trajectory(len(shortcut_path[0]), model.opt.timestep, shortcut_path)
+    traj = r_traj.generate_trajectory(
+        len(shortcut_path[0]), model.opt.timestep, shortcut_path
+    )
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
     # Since we are doing computed torque control, we need to "disable" position actuators
@@ -57,7 +69,9 @@ if __name__ == '__main__':
     if visualize:
         data = mujoco.MjData(model)
         q_init, q_goal = shortcut_path[0], shortcut_path[-1]
-        with mujoco.viewer.launch_passive(model=model, data=data, show_left_ui=False, show_right_ui=False) as viewer:
+        with mujoco.viewer.launch_passive(
+            model=model, data=data, show_left_ui=False, show_right_ui=False
+        ) as viewer:
             # Update the viewer's orientation to capture the scene.
             viewer.cam.lookat = [0, 0, 0.35]
             viewer.cam.distance = 2.5
@@ -65,11 +79,30 @@ if __name__ == '__main__':
             viewer.cam.elevation = -25
 
             # Draw the initial and target EE pose.
-            ex_utils.add_site_frame(viewer.user_scn, model, panda_utils._PANDA_EE_SITE, q_init, joint_qpos_addrs)
-            ex_utils.add_site_frame(viewer.user_scn, model, panda_utils._PANDA_EE_SITE, q_goal, joint_qpos_addrs)
+            ex_utils.add_site_frame(
+                viewer.user_scn,
+                model,
+                panda_utils._PANDA_EE_SITE,
+                q_init,
+                joint_qpos_addrs,
+            )
+            ex_utils.add_site_frame(
+                viewer.user_scn,
+                model,
+                panda_utils._PANDA_EE_SITE,
+                q_goal,
+                joint_qpos_addrs,
+            )
 
             # Show the shortcut path.
-            ex_utils.add_path(viewer.user_scn, model, panda_utils._PANDA_EE_SITE, joint_qpos_addrs, shortcut_path, [0.2, 0.6, 0.2, 0.2])
+            ex_utils.add_path(
+                viewer.user_scn,
+                model,
+                panda_utils._PANDA_EE_SITE,
+                joint_qpos_addrs,
+                shortcut_path,
+                [0.2, 0.6, 0.2, 0.2],
+            )
 
             # Ensure the robot is at q_init and then update the viewer to show
             # the frames, paths, and initial state.

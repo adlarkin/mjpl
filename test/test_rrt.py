@@ -1,10 +1,10 @@
-import mujoco
-import numpy as np
 import unittest
 from pathlib import Path
 
-import mj_maniPlan.rrt as rrt
+import mujoco
+import numpy as np
 
+import mj_maniPlan.rrt as rrt
 
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
@@ -16,9 +16,9 @@ class TestRRT(unittest.TestCase):
     def load_ball_with_obstacle_model(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
 
-        self.obstacle = model.geom('wall_obstacle')
+        self.obstacle = model.geom("wall_obstacle")
 
-        joint_names = [ "ball_slide_x" ]
+        joint_names = ["ball_slide_x"]
         options = rrt.RRTOptions(
             joint_names=joint_names,
             max_planning_time=5.0,
@@ -168,7 +168,9 @@ class TestRRT(unittest.TestCase):
         goal_tree.add_node(rrt.Node(np.array([0.5]), None))
         connected_node_b = self.planner.connect(q_new, goal_tree)
 
-        path = self.planner.get_path(start_tree, connected_node_a, goal_tree, connected_node_b)
+        path = self.planner.get_path(
+            start_tree, connected_node_a, goal_tree, connected_node_b
+        )
         expected_path = [
             self.q_init,
             np.array([0.0]),
@@ -196,7 +198,7 @@ class TestRRT(unittest.TestCase):
 
         # The path should be strictly increasing to q_goal
         for i in range(1, len(path)):
-            self.assertGreater(path[i][0], path[i-1][0])
+            self.assertGreater(path[i][0], path[i - 1][0])
 
     def test_trivial_rrt(self):
         self.load_ball_with_obstacle_model()
@@ -211,7 +213,7 @@ class TestRRT(unittest.TestCase):
     def test_shortcut(self):
         self.load_ball_sliding_along_xy_model(0.1, 0.3)
 
-        '''
+        """
         Suboptimal path that can benefit from shortcutting
         (waypoints in this path have a distance of the corresponding RRTOptions.epsilon)
 
@@ -219,7 +221,7 @@ class TestRRT(unittest.TestCase):
                            ^             |
                            |             v
             n_0 -> n_1 -> n_2           n_6 -> n_7
-        '''
+        """
         tree = rrt.Tree()
         n_0 = rrt.Node(self.q_init, None)
         n_1 = rrt.Node(np.array([0.0, 0.0]), n_0)
@@ -229,7 +231,7 @@ class TestRRT(unittest.TestCase):
         n_5 = rrt.Node(np.array([0.3, 0.1]), n_4)
         n_6 = rrt.Node(np.array([0.3, 0.0]), n_5)
         n_7 = rrt.Node(np.array([0.4, 0.0]), n_6)
-        nodes = [ n_0, n_1, n_2, n_3, n_4, n_5, n_6, n_7 ]
+        nodes = [n_0, n_1, n_2, n_3, n_4, n_5, n_6, n_7]
         for n in nodes:
             tree.add_node(n)
 
@@ -268,7 +270,9 @@ class TestRRT(unittest.TestCase):
         self.assertTrue(np.array_equal(shortcut_path[-1], expected_shortcut_path[-1]))
         # Filler waypoint was added since the configuration distance between the first and
         # last waypoint in the shortcut path is greater than RRTOptions.epsilon.
-        self.assertTrue((abs(shortcut_path[1] - expected_shortcut_path[1]) <= 1e-9).all())
+        self.assertTrue(
+            (abs(shortcut_path[1] - expected_shortcut_path[1]) <= 1e-9).all()
+        )
 
         # Shortcutting two adjacent waypoints should keep all of the original path waypoints
         # since the filler epsilon is greater than the epsilon used for the original path.
@@ -279,7 +283,7 @@ class TestRRT(unittest.TestCase):
 
         # Test shortcutting with a filler epsilon of infinity.
         # This has the effect of performing no waypoint filling on the initial shortcut path.
-        self.load_ball_sliding_along_xy_model(0.1, float('inf'))
+        self.load_ball_sliding_along_xy_model(0.1, float("inf"))
         shortcut_path = self.planner.shortcut(path, start_idx=0, end_idx=7)
         # Since no filling is performed, the shortcut path is just the initial and final waypoint
         # from the original path.
@@ -288,7 +292,7 @@ class TestRRT(unittest.TestCase):
         self.assertTrue(np.array_equal(shortcut_path[-1], path[-1]))
 
         # make sure invalid kwargs are caught
-        with self.assertRaisesRegex(ValueError, 'Invalid kwargs'):
+        with self.assertRaisesRegex(ValueError, "Invalid kwargs"):
             self.planner.shortcut(path)
             self.planner.shortcut(path, num_attempts=1, start_idx=5, end_idx=6)
             self.planner.shortcut(path, num_attempts=1, start_idx=5)
@@ -302,5 +306,5 @@ class TestRRT(unittest.TestCase):
             self.assertTrue(np.array_equal(original_path[i], path[i]))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
