@@ -35,6 +35,7 @@ examples = [
 ]
 dev = [
   "black",
+  "pre-commit",
   "ruff",
 ]
 all = [
