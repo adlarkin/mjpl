@@ -11,35 +11,32 @@ import numpy as np
 import panda_utils
 import ruckig_trajectory as r_traj
 
-import mj_maniPlan.utils as utils
+from mj_maniPlan.configuration import Configuration
 
 
 # Compute the list of joint torques that need to be applied to follow a trajectory.
 # These torques should be set via data.qfrc_applied
-def computed_torque_ctrl(
-    model: mujoco.MjModel, trajectory: r_traj.Trajectory, jnt_qpos_addrs
-):
-    data = mujoco.MjData(model)
-    data.qpos[jnt_qpos_addrs] = trajectory.configurations[0]
-    data.qvel[jnt_qpos_addrs] = trajectory.velocities[0]
-    mujoco.mj_forward(model, data)
+def computed_torque_ctrl(trajectory: r_traj.Trajectory, config: Configuration):
+    data = mujoco.MjData(config.model)
+    config.fk(np.array(trajectory.configurations[0]), data)
+    config.set_qvel(np.array(trajectory.velocities[0]), data)
+    mujoco.mj_forward(config.model, data)
 
     ctrl_torques = []
     for t in range(len(traj.configurations)):
         # computed torque control with PD feedback for position/velocity error
-        error = traj.configurations[t] - data.qpos[joint_qpos_addrs]
-        error_dot = traj.velocities[t] - data.qvel[joint_qpos_addrs]
+        error = traj.configurations[t] - config.qpos(data)
+        error_dot = traj.velocities[t] - config.qvel(data)
         # NOTE: these gains may need to be tuned
-        Kp = np.eye(len(joint_qpos_addrs)) * 1.0
-        Kd = np.eye(len(joint_qpos_addrs)) * 1.0
+        Kp = np.eye(len(config.joint_names)) * 1.0
+        Kd = np.eye(len(config.joint_names)) * 1.0
         data.qacc[:] = 0
-        data.qacc[joint_qpos_addrs] = (
-            traj.accelerations[t] + Kd.dot(error_dot) + Kp.dot(error)
-        )
-        mujoco.mj_inverse(model, data)
-        ctrl_tau = data.qfrc_inverse[jnt_qpos_addrs]
-        data.qfrc_applied[joint_qpos_addrs] = ctrl_tau
-        mujoco.mj_step(model, data)
+        target_acc = traj.accelerations[t] + Kd.dot(error_dot) + Kp.dot(error)
+        config.set_qacc(target_acc, data)
+        mujoco.mj_inverse(config.model, data)
+        ctrl_tau = data.qfrc_inverse[config.qpos_addrs]
+        data.qfrc_applied[config.qpos_addrs] = ctrl_tau
+        mujoco.mj_step(config.model, data)
 
         ctrl_torques.append(ctrl_tau)
     return ctrl_torques
@@ -49,28 +46,26 @@ if __name__ == "__main__":
     visualize, use_obstacles, seed = panda_utils.parse_panda_args(
         "Generate and follow a trajectory from a RRT path with computed torque control."
     )
-    model, _, shortcut_path, joint_qpos_addrs = panda_utils.rrt_panda(
-        use_obstacles, seed
-    )
+    _, shortcut_path, config = panda_utils.rrt_panda(use_obstacles, seed)
 
     print("Generating a trajectory on the shortcut path...")
     start = time.time()
     traj = r_traj.generate_trajectory(
-        len(shortcut_path[0]), model.opt.timestep, shortcut_path
+        len(shortcut_path[0]), config.model.opt.timestep, shortcut_path
     )
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
     # Since we are doing computed torque control, we need to "disable" position actuators
     # so that data.ctrl is not part of the applied force when we step simulation forward.
-    model.actuator_gainprm[:] = 0
-    model.actuator_biasprm[:] = 0
-    ctrl_torques = computed_torque_ctrl(model, traj, joint_qpos_addrs)
+    config.model.actuator_gainprm[:] = 0
+    config.model.actuator_biasprm[:] = 0
+    ctrl_torques = computed_torque_ctrl(traj, config)
 
     if visualize:
-        data = mujoco.MjData(model)
+        data = mujoco.MjData(config.model)
         q_init, q_goal = shortcut_path[0], shortcut_path[-1]
         with mujoco.viewer.launch_passive(
-            model=model, data=data, show_left_ui=False, show_right_ui=False
+            model=config.model, data=data, show_left_ui=False, show_right_ui=False
         ) as viewer:
             # Update the viewer's orientation to capture the scene.
             viewer.cam.lookat = [0, 0, 0.35]
@@ -81,32 +76,29 @@ if __name__ == "__main__":
             # Draw the initial and target EE pose.
             ex_utils.add_site_frame(
                 viewer.user_scn,
-                model,
                 panda_utils._PANDA_EE_SITE,
                 q_init,
-                joint_qpos_addrs,
+                config,
             )
             ex_utils.add_site_frame(
                 viewer.user_scn,
-                model,
                 panda_utils._PANDA_EE_SITE,
                 q_goal,
-                joint_qpos_addrs,
+                config,
             )
 
             # Show the shortcut path.
             ex_utils.add_path(
                 viewer.user_scn,
-                model,
                 panda_utils._PANDA_EE_SITE,
-                joint_qpos_addrs,
                 shortcut_path,
+                config,
                 [0.2, 0.6, 0.2, 0.2],
             )
 
             # Ensure the robot is at q_init and then update the viewer to show
             # the frames, paths, and initial state.
-            utils.fk(q_init, joint_qpos_addrs, model, data)
+            config.fk(q_init, data)
             viewer.sync()
 
             # Command the robot along the path via computed torque control.
@@ -114,16 +106,16 @@ if __name__ == "__main__":
                 time.sleep(0.5)
 
                 # Reset to initial state of trajectory
-                mujoco.mj_resetData(model, data)
-                data.qpos[joint_qpos_addrs] = traj.configurations[0]
-                data.qvel[joint_qpos_addrs] = traj.velocities[0]
-                mujoco.mj_forward(model, data)
+                mujoco.mj_resetData(config.model, data)
+                config.fk(np.array(traj.configurations[0]), data)
+                config.set_qvel(np.array(traj.velocities[0]), data)
+                mujoco.mj_forward(config.model, data)
 
                 for u_t in ctrl_torques:
                     start_time = time.time()
 
-                    data.qfrc_applied[joint_qpos_addrs] = u_t
-                    mujoco.mj_step(model, data)
+                    data.qfrc_applied[config.qpos_addrs] = u_t
+                    mujoco.mj_step(config.model, data)
 
                     duration = time.time() - start_time
                     if duration < traj.dt:

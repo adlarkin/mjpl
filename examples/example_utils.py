@@ -8,6 +8,7 @@ from scipy.interpolate import make_interp_spline
 
 import mj_maniPlan.utils as utils
 import mj_maniPlan.visualization as viz
+from mj_maniPlan.configuration import Configuration
 
 
 def fit_path_to_spline(
@@ -25,26 +26,22 @@ def fit_path_to_spline(
     return make_interp_spline(timing, path)
 
 
-def add_path(
-    scene: mujoco.MjvScene, model: mujoco.MjModel, site: str, jnt_qpos_addrs, path, rgba
-):
-    data = mujoco.MjData(model)
+def add_path(scene: mujoco.MjvScene, site: str, path, config: Configuration, rgba):
+    data = mujoco.MjData(config.model)
     spl_x_bounds = (0, 1)
     spline = fit_path_to_spline(path, interval=spl_x_bounds)
     horizon = np.linspace(spl_x_bounds[0], spl_x_bounds[1], 1000)
     for t in horizon:
         q_t = spline(t)
-        utils.fk(q_t, jnt_qpos_addrs, model, data)
+        config.fk(q_t, data)
         # Use a sphere at the site's world position to show the current state of the path.
         world_pos = data.site(site).xpos
         viz.add_sphere(scene, world_pos, 0.004, rgba)
 
 
-def add_site_frame(
-    scene: mujoco.MjvScene, model: mujoco.MjModel, site: str, q, jnt_qpos_addrs
-):
-    data = mujoco.MjData(model)
-    utils.fk(q, jnt_qpos_addrs, model, data)
+def add_site_frame(scene: mujoco.MjvScene, site: str, q, config: Configuration):
+    data = mujoco.MjData(config.model)
+    config.fk(q, data)
     (
         pos,
         rot,

@@ -17,6 +17,7 @@ import numpy as np
 import panda_utils
 
 import mj_maniPlan.utils as utils
+from mj_maniPlan.configuration import Configuration
 from mj_maniPlan.rrt import (
     RRT,
     RRTOptions,
@@ -33,8 +34,7 @@ if __name__ == "__main__":
 
     model = panda_utils.load_panda_model(include_obstacles=False)
 
-    joint_qpos_addrs = utils.joint_names_to_qpos_addrs(joint_names, model)
-    lower_limits, upper_limits = utils.joint_limits(joint_names, model)
+    config = Configuration(joint_names, model)
 
     # Plan number_of_attempts times and record benchmarks.
     successful_planning_times = []
@@ -42,12 +42,8 @@ if __name__ == "__main__":
         # Generate a valid initial and goal configuration.
         data = mujoco.MjData(model)
         rng = np.random.default_rng(seed=seed)
-        q_init = utils.random_valid_config(
-            rng, lower_limits, upper_limits, joint_qpos_addrs, model, data
-        )
-        q_goal = utils.random_valid_config(
-            rng, lower_limits, upper_limits, joint_qpos_addrs, model, data
-        )
+        q_init = utils.random_valid_config(rng, config, data)
+        q_goal = utils.random_valid_config(rng, config, data)
 
         planner_options = RRTOptions(
             joint_names=joint_names,

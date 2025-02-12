@@ -5,6 +5,7 @@ import mujoco
 import numpy as np
 
 from . import utils
+from .configuration import Configuration
 
 
 class Node:
@@ -110,23 +111,18 @@ class RRT:
 
         self.options = options
         self.rng = np.random.default_rng(seed=options.seed)
-        self.joint_qpos_addrs = utils.joint_names_to_qpos_addrs(
-            options.joint_names, self.model
-        )
-        self.joint_limits_lower, self.joint_limits_upper = utils.joint_limits(
-            options.joint_names, self.model
-        )
+        self.config = Configuration(options.joint_names, model)
 
     def plan(self, q_init: np.ndarray, q_goal: np.ndarray) -> list[np.ndarray]:
-        if not self.__is_valid_config(q_init):
+        if not utils.is_valid_config(q_init, self.config, self.data):
             print("q_init is not a valid configuration")
             return []
-        if not self.__is_valid_config(q_goal):
+        if not utils.is_valid_config(q_goal, self.config, self.data):
             print("q_goal is not a valid configuration")
             return []
 
         # Initialize MjData to q_init.
-        utils.fk(q_init, self.joint_qpos_addrs, self.model, self.data)
+        self.config.fk(q_init, self.data)
 
         start_tree = Tree()
         start_tree.add_node(Node(q_init, None))
@@ -152,9 +148,7 @@ class RRT:
             if self.rng.random() <= self.options.goal_biasing_probability:
                 q_rand = q_goal
             else:
-                q_rand = utils.random_config(
-                    self.rng, self.joint_limits_lower, self.joint_limits_upper
-                )
+                q_rand = self.config.random_config(self.rng)
             new_start_tree_node = self.connect(q_rand, start_tree)
             if new_start_tree_node:
                 new_goal_tree_node = self.connect(new_start_tree_node.q, goal_tree)
@@ -188,7 +182,7 @@ class RRT:
         if q_dist > eps:
             q_increment = eps * ((q - nearest_node.q) / q_dist)
             q_extend = nearest_node.q + q_increment
-        if self.__is_valid_config(q_extend):
+        if utils.is_valid_config(q_extend, self.config, self.data):
             node_extend = Node(q_extend, nearest_node)
             tree.add_node(node_extend)
             return node_extend
@@ -291,13 +285,3 @@ class RRT:
                 dense_path += intermediate_configs[1:-1]
         dense_path.append(path[-1])
         return dense_path
-
-    def __is_valid_config(self, q: np.ndarray) -> bool:
-        return utils.is_valid_config(
-            q,
-            self.joint_limits_lower,
-            self.joint_limits_upper,
-            self.joint_qpos_addrs,
-            self.model,
-            self.data,
-        )

@@ -10,6 +10,7 @@ import mujoco
 import numpy as np
 
 import mj_maniPlan.utils as utils
+from mj_maniPlan.configuration import Configuration
 from mj_maniPlan.rrt import (
     RRT,
     RRTOptions,
@@ -39,6 +40,19 @@ def panda_arm_joints() -> list[str]:
         "joint5",
         "joint6",
         "joint7",
+    ]
+
+
+def panda_arm_actuators() -> list[str]:
+    # Actuators that correspond to the joints in panda_arm_joints()
+    return [
+        "actuator1",
+        "actuator2",
+        "actuator3",
+        "actuator4",
+        "actuator5",
+        "actuator6",
+        "actuator7",
     ]
 
 
@@ -81,15 +95,14 @@ def rrt_panda(use_obstacles: bool, seed: int | None):
     # the finger joints of the gripper are excluded.
     joint_names = panda_arm_joints()
 
+    config = Configuration(joint_names, model)
+
     # Use the "home" configuration as q_init.
-    joint_qpos_addrs = utils.joint_names_to_qpos_addrs(joint_names, model)
-    q_init = model.key("home").qpos[joint_qpos_addrs]
+    mujoco.mj_resetDataKeyframe(model, data, model.keyframe("home").id)
+    q_init = config.qpos(data)
     # Generate valid goal configuration.
-    lower_limits, upper_limits = utils.joint_limits(joint_names, model)
     rng = np.random.default_rng(seed=seed)
-    q_goal = utils.random_valid_config(
-        rng, lower_limits, upper_limits, joint_qpos_addrs, model, data
-    )
+    q_goal = utils.random_valid_config(rng, config, data)
 
     # Set up the planner.
     epsilon = 0.05
@@ -116,4 +129,4 @@ def rrt_panda(use_obstacles: bool, seed: int | None):
     shortcut_path = planner.shortcut(path, num_attempts=len(path))
     print(f"Shortcutting took {(time.time() - start):.4f}s")
 
-    return model, path, shortcut_path, joint_qpos_addrs
+    return path, shortcut_path, config
