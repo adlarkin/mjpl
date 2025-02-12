@@ -1,4 +1,4 @@
-'''
+"""
 Benchmark for testing planning time.
 
 The testing methodology is as follows:
@@ -8,27 +8,26 @@ The testing methodology is as follows:
 4. Report the following:
     a. How many plans succeeded vs how many plans timed out (success rate)
     b. Median planning time of successful planning attempts
-'''
+"""
+
+import time
 
 import mujoco
 import numpy as np
-import time
+import panda_utils
 
+import mj_maniPlan.utils as utils
 from mj_maniPlan.rrt import (
     RRT,
     RRTOptions,
 )
-import example_utils as ex_utils
-import mj_maniPlan.utils as utils
-import panda_utils
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     # NOTE: modify these parameters as needed for your benchmarking needs.
     joint_names = panda_utils.panda_arm_joints()
     max_planning_time = 10
     epsilon = 0.05
-    seed = 42 #5
+    seed = 42  # 5
     goal_biasing_probability = 0.1
     number_of_attempts = 15
 
@@ -43,8 +42,12 @@ if __name__ == '__main__':
         # Generate a valid initial and goal configuration.
         data = mujoco.MjData(model)
         rng = np.random.default_rng(seed=seed)
-        q_init = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
-        q_goal = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
+        q_init = utils.random_valid_config(
+            rng, lower_limits, upper_limits, joint_qpos_addrs, model, data
+        )
+        q_goal = utils.random_valid_config(
+            rng, lower_limits, upper_limits, joint_qpos_addrs, model, data
+        )
 
         planner_options = RRTOptions(
             joint_names=joint_names,
@@ -67,5 +70,9 @@ if __name__ == '__main__':
     successful_attempts = len(successful_planning_times)
     success_rate = successful_attempts / number_of_attempts
     median_planning_time = np.median(successful_planning_times)
-    print(f"Attempted {number_of_attempts} plans, succeeded on {successful_attempts} attempts (success rate of {success_rate:.2f})")
-    print(f"Median planning time of successful plans: {median_planning_time:.4f} seconds")
+    print(
+        f"Attempted {number_of_attempts} plans, succeeded on {successful_attempts} attempts (success rate of {success_rate:.2f})"
+    )
+    print(
+        f"Median planning time of successful plans: {median_planning_time:.4f} seconds"
+    )

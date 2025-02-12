@@ -1,9 +1,8 @@
-import copy
+import time
+from dataclasses import dataclass
+
 import mujoco
 import numpy as np
-import time
-
-from dataclasses import dataclass
 
 from . import utils
 
@@ -44,12 +43,16 @@ class Tree:
                 closest_node = n
                 min_dist = neighboring_dist
         if not closest_node:
-            raise ValueError(f"No nearest neighbor found for {q}. Did you call this method before adding any nodes to the tree?")
+            raise ValueError(
+                f"No nearest neighbor found for {q}. Did you call this method before adding any nodes to the tree?"
+            )
         return closest_node
 
     def get_path(self, node: Node) -> list[np.ndarray]:
         if node not in self.nodes:
-            raise ValueError("Called get_path starting from a node that is not in the tree.")
+            raise ValueError(
+                "Called get_path starting from a node that is not in the tree."
+            )
         path = []
         curr_node = node
         while curr_node is not None:
@@ -107,8 +110,12 @@ class RRT:
 
         self.options = options
         self.rng = np.random.default_rng(seed=options.seed)
-        self.joint_qpos_addrs = utils.joint_names_to_qpos_addrs(options.joint_names, self.model)
-        self.joint_limits_lower, self.joint_limits_upper = utils.joint_limits(options.joint_names, self.model)
+        self.joint_qpos_addrs = utils.joint_names_to_qpos_addrs(
+            options.joint_names, self.model
+        )
+        self.joint_limits_lower, self.joint_limits_upper = utils.joint_limits(
+            options.joint_names, self.model
+        )
 
     def plan(self, q_init: np.ndarray, q_goal: np.ndarray) -> list[np.ndarray]:
         if not self.__is_valid_config(q_init):
@@ -129,23 +136,38 @@ class RRT:
         # Is there a direct connection to q_goal from q_init?
         potential_goal_node = self.connect(q_goal, start_tree)
         if np.array_equal(potential_goal_node.q, q_goal):
-            return self.get_path(start_tree, potential_goal_node, goal_tree, goal_tree.nearest_neighbor(q_goal))
+            return self.get_path(
+                start_tree,
+                potential_goal_node,
+                goal_tree,
+                goal_tree.nearest_neighbor(q_goal),
+            )
 
         max_planning_time = self.options.max_planning_time
         if max_planning_time <= 0:
-            max_planning_time = float('inf')
+            max_planning_time = float("inf")
 
         start_time = time.time()
         while time.time() - start_time < max_planning_time:
             if self.rng.random() <= self.options.goal_biasing_probability:
                 q_rand = q_goal
             else:
-                q_rand = utils.random_config(self.rng, self.joint_limits_lower, self.joint_limits_upper)
+                q_rand = utils.random_config(
+                    self.rng, self.joint_limits_lower, self.joint_limits_upper
+                )
             new_start_tree_node = self.connect(q_rand, start_tree)
             if new_start_tree_node:
                 new_goal_tree_node = self.connect(new_start_tree_node.q, goal_tree)
-                if new_goal_tree_node and utils.configuration_distance(new_start_tree_node.q, new_goal_tree_node.q) < self.options.epsilon:
-                    return self.get_path(start_tree, new_start_tree_node, goal_tree, new_goal_tree_node)
+                if (
+                    new_goal_tree_node
+                    and utils.configuration_distance(
+                        new_start_tree_node.q, new_goal_tree_node.q
+                    )
+                    < self.options.epsilon
+                ):
+                    return self.get_path(
+                        start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
+                    )
         return []
 
     def extend(
@@ -182,10 +204,11 @@ class RRT:
         return nearest_node
 
     def get_path(
-        self, start_tree: Tree,
+        self,
+        start_tree: Tree,
         start_tree_node: Node,
         goal_tree: Tree,
-        goal_tree_node: Node
+        goal_tree_node: Node,
     ) -> list[np.ndarray]:
         # The path generated from start_tree ends at q_init, but we want it to start at q_init. So we must reverse it.
         path_start = start_tree.get_path(start_tree_node)
@@ -205,9 +228,9 @@ class RRT:
     #   shortcut(path, start_idx=, end_idx=)
     #       - This will try to shortcut `path` between points at indices `start_idx` and `end_idx`, assuming start_idx < end_idx
     def shortcut(self, path: list[np.ndarray], **kwargs) -> list[np.ndarray]:
-        if len(kwargs) == 1 and 'num_attempts' in kwargs:
+        if len(kwargs) == 1 and "num_attempts" in kwargs:
             shortened_path = path.copy()
-            for _ in range(kwargs['num_attempts']):
+            for _ in range(kwargs["num_attempts"]):
                 # randomly pick 2 waypoints
                 start, end = 0, 0
                 while start == end:
@@ -219,13 +242,17 @@ class RRT:
                     # we can go directly from start to goal, so no more shortcutting can be done
                     break
             return self.__make_dense_path(shortened_path)
-        elif len(kwargs) == 2 and ('start_idx' in kwargs and 'end_idx' in kwargs):
-            return self.__shortcut(path, kwargs['start_idx'], kwargs['end_idx'], True)
+        elif len(kwargs) == 2 and ("start_idx" in kwargs and "end_idx" in kwargs):
+            return self.__shortcut(path, kwargs["start_idx"], kwargs["end_idx"], True)
         else:
-            raise ValueError(f"Invalid kwargs combination. Expected ['num_attempts'] or ['start_idx', 'end_idx'], but received {list(kwargs.keys())}")
+            raise ValueError(
+                f"Invalid kwargs combination. Expected ['num_attempts'] or ['start_idx', 'end_idx'], but received {list(kwargs.keys())}"
+            )
 
     # Helper function for performing the actual shortcutting - see the `shortcut` method
-    def __shortcut(self, path: list[np.ndarray], start: int, end: int, make_dense) -> list[np.ndarray]:
+    def __shortcut(
+        self, path: list[np.ndarray], start: int, end: int, make_dense
+    ) -> list[np.ndarray]:
         q_start = path[start]
         q_end = path[end]
         # see if these 2 waypoints can make a valid path
@@ -233,7 +260,7 @@ class RRT:
         tree.add_node(Node(q_start, None))
         connected_node = self.connect(q_end, tree)
         if np.array_equal(connected_node.q, q_end):
-            shortened_path = path[:start+1] + path[end:]
+            shortened_path = path[: start + 1] + path[end:]
             if make_dense:
                 shortened_path = self.__make_dense_path(shortened_path)
             return shortened_path
@@ -246,12 +273,17 @@ class RRT:
         dense_path = []
         for i in range(len(path) - 1):
             q_curr = path[i]
-            q_next = path[i+1]
+            q_next = path[i + 1]
             dense_path.append(q_curr)
-            if utils.configuration_distance(q_curr, q_next) > self.options.shortcut_filler_epsilon:
+            if (
+                utils.configuration_distance(q_curr, q_next)
+                > self.options.shortcut_filler_epsilon
+            ):
                 tree = Tree()
                 tree.add_node(Node(q_curr, None))
-                connected_node = self.connect(q_next, tree, eps=self.options.shortcut_filler_epsilon)
+                connected_node = self.connect(
+                    q_next, tree, eps=self.options.shortcut_filler_epsilon
+                )
                 intermediate_configs = tree.get_path(connected_node)
                 intermediate_configs.reverse()
                 # don't add the first (q_curr) or last (q_next) elements since that
@@ -267,5 +299,5 @@ class RRT:
             self.joint_limits_upper,
             self.joint_qpos_addrs,
             self.model,
-            self.data
+            self.data,
         )

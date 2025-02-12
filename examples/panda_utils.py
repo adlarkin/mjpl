@@ -1,11 +1,13 @@
 """
 Utilities used for example scripts that use the Franka Panda MuJoCo models.
 """
+
 import argparse
-import mujoco
-import numpy as np
 import time
 from pathlib import Path
+
+import mujoco
+import numpy as np
 
 import mj_maniPlan.utils as utils
 from mj_maniPlan.rrt import (
@@ -13,12 +15,13 @@ from mj_maniPlan.rrt import (
     RRTOptions,
 )
 
-
 _HERE = Path(__file__).parent
 
 _PANDA_XML = _HERE / "models" / "franka_emika_panda" / "scene.xml"
-_PANDA_OBSTACLES_XML = _HERE / "models" / "franka_emika_panda" / "scene_with_obstacles.xml"
-_PANDA_EE_SITE = 'ee_site'
+_PANDA_OBSTACLES_XML = (
+    _HERE / "models" / "franka_emika_panda" / "scene_with_obstacles.xml"
+)
+_PANDA_EE_SITE = "ee_site"
 
 
 def load_panda_model(include_obstacles: bool) -> mujoco.MjModel:
@@ -26,47 +29,48 @@ def load_panda_model(include_obstacles: bool) -> mujoco.MjModel:
         return mujoco.MjModel.from_xml_path(_PANDA_OBSTACLES_XML.as_posix())
     return mujoco.MjModel.from_xml_path(_PANDA_XML.as_posix())
 
+
 def panda_arm_joints() -> list[str]:
     return [
-        'joint1',
-        'joint2',
-        'joint3',
-        'joint4',
-        'joint5',
-        'joint6',
-        'joint7',
+        "joint1",
+        "joint2",
+        "joint3",
+        "joint4",
+        "joint5",
+        "joint6",
+        "joint7",
     ]
 
+
 def parse_panda_args(description: str):
-    parser = argparse.ArgumentParser(
-        description=description
-    )
+    parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
         "-viz",
         "--visualize",
-        action="store_true",    # set to True if flag is provided
-        default=False,          # default value if flag is not provided
-        help="Visualize paths via the mujoco viewer"
+        action="store_true",  # set to True if flag is provided
+        default=False,  # default value if flag is not provided
+        help="Visualize paths via the mujoco viewer",
     )
     parser.add_argument(
         "-obs",
         "--obstacles",
-        action="store_true",    # set to True if flag is provided
-        default=False,          # default value if flag is not provided
-        help="Use obstacles in the environment"
+        action="store_true",  # set to True if flag is provided
+        default=False,  # default value if flag is not provided
+        help="Use obstacles in the environment",
     )
     parser.add_argument(
         "-s",
         "--seed",
         type=int,
         default=-1,
-        help="Seed for random sampling. Must be >= 0. If not set, a random seed will be used"
+        help="Seed for random sampling. Must be >= 0. If not set, a random seed will be used",
     )
     args = parser.parse_args()
     seed = args.seed
     if seed < 0:
         seed = None
     return args.visualize, args.obstacles, seed
+
 
 def rrt_panda(use_obstacles: bool, seed: int | None):
     model = load_panda_model(include_obstacles=use_obstacles)
@@ -79,11 +83,13 @@ def rrt_panda(use_obstacles: bool, seed: int | None):
 
     # Use the "home" configuration as q_init.
     joint_qpos_addrs = utils.joint_names_to_qpos_addrs(joint_names, model)
-    q_init = model.key('home').qpos[joint_qpos_addrs]
+    q_init = model.key("home").qpos[joint_qpos_addrs]
     # Generate valid goal configuration.
     lower_limits, upper_limits = utils.joint_limits(joint_names, model)
     rng = np.random.default_rng(seed=seed)
-    q_goal = utils.random_valid_config(rng, lower_limits, upper_limits, joint_qpos_addrs, model, data)
+    q_goal = utils.random_valid_config(
+        rng, lower_limits, upper_limits, joint_qpos_addrs, model, data
+    )
 
     # Set up the planner.
     epsilon = 0.05
@@ -91,7 +97,7 @@ def rrt_panda(use_obstacles: bool, seed: int | None):
         joint_names=joint_names,
         max_planning_time=10,
         epsilon=epsilon,
-        shortcut_filler_epsilon=10*epsilon,
+        shortcut_filler_epsilon=10 * epsilon,
         seed=seed,
         goal_biasing_probability=0.1,
     )

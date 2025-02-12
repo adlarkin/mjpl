@@ -22,10 +22,10 @@ readme = "README.md"
 license = {file = "LICENSE"}
 keywords = ["robotics", "motion", "planning", "manipulation", "mujoco"]
 classifiers = [
-    "Framework :: Robot Framework :: Library",
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
+  "Framework :: Robot Framework :: Library",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
 ]
 
 [project.optional-dependencies]
@@ -33,6 +33,33 @@ examples = [
   "ruckig",
   "scipy",
 ]
+dev = [
+  "black",
+  "pre-commit",
+  "ruff",
+]
+all = [
+  "mj_maniplan[examples,dev]"
+]
 
 [project.urls]
 Homepage = "https://github.com/adlarkin/mj_maniPlan"
+
+[tool.ruff]
+# TODO (#28): change to 3.9 (py39) if project supports it
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+  # pyflakes
+  "F",
+  # pycodestyle
+  "E",
+  "W",
+  # isort
+  "I"
+]
+ignore = [
+  # Line too long.
+  "E501"
+]

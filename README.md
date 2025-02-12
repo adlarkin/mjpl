@@ -19,10 +19,30 @@ To run examples locally, install the example dependencies:
 pip3 install -e ".[examples]"
 ```
 
-## Run tests
+## Development
 
+For local development, install the developer dependencies:
 ```
-python3 -m unittest -v
+pip3 install -e ".[dev]"
+```
+
+This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and [Black](https://black.readthedocs.io/en/stable/) for formatting.
+Unit tests are written via the [unittest](https://docs.python.org/3/library/unittest.html) framework.
+
+[Pre-commit](https://pre-commit.com/) hooks are available which run the linter, formatter, and unit tests.
+To trigger these checks automatically on commit, install the pre-commit hooks:
+```
+pre-commit install
+```
+
+To trigger the hooks manually:
+```
+pre-commmit run --all-files
+```
+
+To bypass installed pre-commit hooks on commit:
+```
+git commit --no-verify -m "your message"
 ```
 
 ## Other notes

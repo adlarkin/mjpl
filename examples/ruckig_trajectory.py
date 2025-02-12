@@ -1,9 +1,10 @@
-'''
+"""
 APIs for generating a trajectory from a path with Rucking: https://ruckig.com/
-'''
+"""
+
+from dataclasses import dataclass
 
 import numpy as np
-from dataclasses import dataclass
 from ruckig import InputParameter, OutputParameter, Result, Ruckig
 
 
@@ -25,6 +26,7 @@ class Trajectory:
     # Acceleration snapshots at increments of dt, ranging from t = [t_0, t_f]
     # Each acceleration size is mjData.qacc
     accelerations: list[list[float]]
+
 
 def generate_trajectory(dof, ctrl_cycle_rate, path) -> Trajectory:
     otg = Ruckig(dof, ctrl_cycle_rate, len(path))
@@ -62,6 +64,8 @@ def generate_trajectory(dof, ctrl_cycle_rate, path) -> Trajectory:
         accels.append(out.new_acceleration)
         out.pass_to_input(inp)
     if res != Result.Finished:
-        raise ValueError("Did not successfully complete trajectory generation (this should not happen!)")
+        raise ValueError(
+            "Did not successfully complete trajectory generation (this should not happen!)"
+        )
 
     return Trajectory(ctrl_cycle_rate, configs, vels, accels)
