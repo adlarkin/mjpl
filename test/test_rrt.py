@@ -20,8 +20,8 @@ class TestRRT(unittest.TestCase):
 
         self.obstacle = model.geom("wall_obstacle")
 
-        joint_ids = [model.joint("ball_slide_x").id]
-        jg = JointGroup(joint_ids, model)
+        planning_joints = [model.joint("ball_slide_x").id]
+        jg = JointGroup(model, planning_joints)
 
         allowed_collisions = []
         cr = CollisionRuleset(model, allowed_collisions)
@@ -45,11 +45,11 @@ class TestRRT(unittest.TestCase):
     def load_ball_sliding_along_xy_model(self, epsilon, shortcut_filler_epsilon):
         model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
 
-        joint_ids = [
+        planning_joints = [
             model.joint("ball_slide_x").id,
             model.joint("ball_slide_y").id,
         ]
-        jg = JointGroup(joint_ids, model)
+        jg = JointGroup(model, planning_joints)
 
         allowed_collisions = []
         cr = CollisionRuleset(model, allowed_collisions)
@@ -204,7 +204,6 @@ class TestRRT(unittest.TestCase):
 
         q_goal = np.array([0.35])
         path = self.planner.plan(self.q_init, q_goal)
-        self.assertIsNotNone(path)
         self.assertGreater(len(path), 2)
 
         # The path should start at q_init and end at q_goal
@@ -221,7 +220,6 @@ class TestRRT(unittest.TestCase):
         # If we plan to a goal that is directly reachable, the planner should make the direct connection and exit
         q_goal = np.array([-0.05])
         path = self.planner.plan(self.q_init, q_goal)
-        self.assertIsNotNone(path)
         self.assertEqual(len(path), 2)
         self.assertTrue(np.array_equal(path[0], self.q_init))
         self.assertTrue(np.array_equal(path[1], q_goal))

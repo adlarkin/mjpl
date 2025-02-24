@@ -1,7 +1,3 @@
-"""
-APIs for generating a trajectory from a path with Rucking: https://ruckig.com/
-"""
-
 from dataclasses import dataclass
 
 import numpy as np

@@ -1,8 +1,7 @@
 import mujoco
 import numpy as np
 
-from mj_maniPlan.collision_ruleset import CollisionRuleset
-
+from .collision_ruleset import CollisionRuleset
 from .joint_group import JointGroup
 
 

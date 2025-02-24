@@ -30,16 +30,10 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-examples = [
-  "scipy",
-]
 dev = [
   "black",
   "pre-commit",
   "ruff",
-]
-all = [
-  "mj_maniplan[examples,dev]"
 ]
 
 [project.urls]

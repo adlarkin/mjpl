@@ -31,7 +31,7 @@ _PANDA_XML = _HERE / "models" / "franka_emika_panda" / "scene.xml"
 if __name__ == "__main__":
     # NOTE: modify these parameters as needed for your benchmarking needs.
     model = mujoco.MjModel.from_xml_path(_PANDA_XML.as_posix())
-    joint_ids = [
+    planning_joints = [
         model.joint("joint1").id,
         model.joint("joint2").id,
         model.joint("joint3").id,
@@ -45,11 +45,11 @@ if __name__ == "__main__":
     ]
     max_planning_time = 10
     epsilon = 0.05
-    seed = 42  # 5
+    seed = 42
     goal_biasing_probability = 0.1
     number_of_attempts = 15
 
-    jg = JointGroup(joint_ids, model)
+    jg = JointGroup(model, planning_joints)
     cr = CollisionRuleset(model, allowed_collisions)
 
     # Plan number_of_attempts times and record benchmarks.
@@ -58,7 +58,7 @@ if __name__ == "__main__":
         # Generate a valid initial and goal configuration.
         data = mujoco.MjData(model)
         rng = np.random.default_rng(seed=seed)
-        world_q_init = model.keyframe("home").qpos
+        q_init_world = model.keyframe("home").qpos
         q_goal = utils.random_valid_config(rng, jg, data, cr)
 
         planner_options = RRTOptions(
@@ -74,7 +74,7 @@ if __name__ == "__main__":
 
         print(f"Attempt {i}...")
         start_time = time.time()
-        path = planner.plan(world_q_init, q_goal)
+        path = planner.plan(q_init_world, q_goal)
         elapsed_time = time.time() - start_time
         if path:
             successful_planning_times.append(elapsed_time)

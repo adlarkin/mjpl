@@ -112,11 +112,11 @@ class RRT:
         self.options = options
         self.rng = np.random.default_rng(seed=options.seed)
 
-    def plan(self, world_q_init: np.ndarray, q_goal: np.ndarray) -> list[np.ndarray]:
-        assert world_q_init.size == self.data.qpos.size
-        assert q_goal.size == len(self.options.jg.joints())
+    def plan(self, q_init_world: np.ndarray, q_goal: np.ndarray) -> list[np.ndarray]:
+        assert q_init_world.size == self.data.qpos.size
+        assert q_goal.size == len(self.options.jg.joint_ids)
 
-        self.data.qpos = world_q_init
+        self.data.qpos = q_init_world
         q_init = self.options.jg.qpos(self.data)
         if not utils.is_valid_config(
             q_init, self.options.jg, self.data, self.options.cr
