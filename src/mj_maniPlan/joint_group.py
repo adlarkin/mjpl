@@ -2,40 +2,36 @@ import mujoco
 import numpy as np
 
 
-# Get the joint addresses in the model's corresponding data.qpos for the named joints.
-# This assumes that `joint_names` refer to joints with 1 DOF.
-def joint_names_to_qpos_addrs(
-    joint_names: list[str], model: mujoco.MjModel
-) -> np.ndarray:
-    return np.array([model.joint(name).qposadr.item() for name in joint_names])
+# Get the joint addresses in the model's corresponding data.qpos for the specified joints.
+# This assumes that `joint_ids` refer to joints with 1 DOF.
+def joint_ids_to_qpos_addrs(joint_ids: list[int], model: mujoco.MjModel) -> np.ndarray:
+    return np.array([model.joint(id).qposadr.item() for id in joint_ids])
 
 
-# Get the joint addresses in the model's corresponding data.qvel/data.qacc for the named joints.
-# This assumes that `joint_names` refer to joints with 1 DOF.
-def joint_names_to_dof_addrs(
-    joint_names: list[str], model: mujoco.MjModel
-) -> np.ndarray:
-    return np.array([model.joint(name).dofadr.item() for name in joint_names])
+# Get the joint addresses in the model's corresponding data.qvel/data.qacc for the specified joints.
+# This assumes that `joint_ids` refer to joints with 1 DOF.
+def joint_ids_to_dof_addrs(joint_ids: list[int], model: mujoco.MjModel) -> np.ndarray:
+    return np.array([model.joint(id).dofadr.item() for id in joint_ids])
 
 
 def joint_limits(
-    joint_names: list[str], model: mujoco.MjModel
+    joint_ids: list[int], model: mujoco.MjModel
 ) -> tuple[np.ndarray, np.ndarray]:
-    lower_limits = np.array([model.joint(name).range[0] for name in joint_names])
-    upper_limits = np.array([model.joint(name).range[1] for name in joint_names])
+    lower_limits = np.array([model.joint(id).range[0] for id in joint_ids])
+    upper_limits = np.array([model.joint(id).range[1] for id in joint_ids])
     return lower_limits, upper_limits
 
 
 # Wrapper for handling a joint configuration.
 # This is useful when a user is interested in interacting with a subset of the joints in MjData.
 # This class assumes the joint(s) of interest have 1 DOF.
-class Configuration:
-    def __init__(self, joint_names: list[str], model: mujoco.MjModel):
-        self.joint_names = joint_names
+class JointGroup:
+    def __init__(self, joint_ids: list[int], model: mujoco.MjModel):
+        self.joint_ids = joint_ids
         self.model = model
-        self.qpos_addrs = joint_names_to_qpos_addrs(joint_names, model)
-        self.qvel_qacc_addrs = joint_names_to_dof_addrs(joint_names, model)
-        self.lower_limits, self.upper_limits = joint_limits(joint_names, model)
+        self.qpos_addrs = joint_ids_to_qpos_addrs(joint_ids, model)
+        self.qvel_qacc_addrs = joint_ids_to_dof_addrs(joint_ids, model)
+        self.lower_limits, self.upper_limits = joint_limits(joint_ids, model)
 
     # Create a random joint configuration within the joint limits
     def random_config(self, rng: np.random.Generator) -> np.ndarray:
@@ -71,3 +67,6 @@ class Configuration:
     # Get the joint accelerations from MjData
     def qacc(self, data: mujoco.MjData) -> np.ndarray:
         return data.qacc[self.qvel_qacc_addrs]
+
+    def joints(self) -> list[int]:
+        return self.joint_ids

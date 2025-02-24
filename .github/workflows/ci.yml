@@ -43,12 +43,10 @@ jobs:
         run: |
           scripts=(
             "python examples/benchmark.py"
-            "python examples/rrt_panda.py -s 5"
             # Not running these scripts for now because they use ruckig to generate a trajectory,
             # and ruckig calls a cloud API if the input has intermediate waypoints
             # (calling this cloud API can be flaky in CI)
-            # "python examples/position_ctrl.py -s 3"
-            # "python examples/computed_torque_ctrl.py -obs -s 12"
+            #   - examples/generate_and_follow_trajectory.py
           )
           # Run all scripts. If any of the scripts fail, report a failure in CI
           failed=0

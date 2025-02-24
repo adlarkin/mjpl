@@ -7,6 +7,18 @@ from dataclasses import dataclass
 import numpy as np
 from ruckig import InputParameter, OutputParameter, Result, Ruckig
 
+from .joint_group import JointGroup
+
+
+@dataclass
+class TrajectoryLimits:
+    # The JointGroup the trajectory limits apply to.
+    jg: JointGroup
+    # Limits for the joints in the JointGroup.
+    velocity: np.ndarray
+    acceleration: np.ndarray
+    jerk: np.ndarray
+
 
 # Trajectory data for a list of waypoints.
 # n = the number of configurations, velocities, and accelerations.
@@ -15,21 +27,23 @@ from ruckig import InputParameter, OutputParameter, Result, Ruckig
 # The first state of the trajectory is the initial state.
 @dataclass
 class Trajectory:
-    # The timestep between each configuration, velocity, and acceleration.
+    # The JointGroup the configurations, velocities, and accelerations apply to.
+    jg: JointGroup
+    # The timestep between each configuration, velocity, and acceleration snpashot.
     dt: float
-    # Configuration snapshots at increments of dt, ranging from t = [t_0, t_f].
-    # Each configuration snapshot size is mjData.qpos
-    configurations: list[list[float]]
-    # Velocity snapshots at increments of dt, ranging from t = [t_0, t_f]
-    # Each velocity snapshot size is mjData.qvel
-    velocities: list[list[float]]
-    # Acceleration snapshots at increments of dt, ranging from t = [t_0, t_f]
-    # Each acceleration size is mjData.qacc
-    accelerations: list[list[float]]
+    # Configuration snapshots at increments of dt, ranging from t = [dt, t_f].
+    configurations: list[np.ndarray]
+    # Velocity snapshots at increments of dt, ranging from t = [dt, t_f]
+    velocities: list[np.ndarray]
+    # Acceleration snapshots at increments of dt, ranging from t = [dt, t_f]
+    accelerations: list[np.ndarray]
 
 
-def generate_trajectory(dof, ctrl_cycle_rate, path) -> Trajectory:
-    otg = Ruckig(dof, ctrl_cycle_rate, len(path))
+def generate_trajectory(
+    path: list[np.ndarray], limits: TrajectoryLimits, dt: float
+) -> Trajectory:
+    dof = path[0].size
+    otg = Ruckig(dof, dt, len(path))
     inp = InputParameter(dof)
     out = OutputParameter(dof, len(path))
 
@@ -47,25 +61,24 @@ def generate_trajectory(dof, ctrl_cycle_rate, path) -> Trajectory:
     inp.target_acceleration = np.zeros(dof)
 
     # The values chosen here are arbitrary and for demonstration purposes only.
-    inp.max_velocity = np.ones(dof) * 2 * np.pi
-    inp.max_acceleration = np.ones(dof) * np.pi
-    inp.max_jerk = np.ones(dof) * 2 * np.pi
+    inp.max_velocity = limits.velocity
+    inp.max_acceleration = limits.acceleration
+    inp.max_jerk = limits.jerk
 
-    # Set the beginning of the trajectory to the initial state.
-    configs = [inp.current_position.copy()]
-    vels = [inp.current_velocity.copy()]
-    accels = [inp.current_acceleration.copy()]
+    configs = []
+    vels = []
+    accels = []
 
     res = Result.Working
     while res == Result.Working:
         res = otg.update(inp, out)
-        configs.append(out.new_position)
-        vels.append(out.new_velocity)
-        accels.append(out.new_acceleration)
+        configs.append(np.array(out.new_position))
+        vels.append(np.array(out.new_velocity))
+        accels.append(np.array(out.new_acceleration))
         out.pass_to_input(inp)
     if res != Result.Finished:
         raise ValueError(
             "Did not successfully complete trajectory generation (this should not happen!)"
         )
 
-    return Trajectory(ctrl_cycle_rate, configs, vels, accels)
+    return Trajectory(limits.jg, dt, configs, vels, accels)
