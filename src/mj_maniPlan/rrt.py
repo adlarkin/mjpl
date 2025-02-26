@@ -5,6 +5,8 @@ import mujoco
 import numpy as np
 
 from . import utils
+from .collision_ruleset import CollisionRuleset
+from .joint_group import JointGroup
 
 
 class Node:
@@ -64,7 +66,9 @@ class Tree:
 @dataclass
 class RRTOptions:
     # The joints to plan for.
-    joint_names: list[str]
+    jg: JointGroup
+    # The collision rules to enforce during planning.
+    cr: CollisionRuleset
     # Maximum planning time, in seconds.
     # If this value is <= 0, the planner will run until a solution is found.
     # A value <= 0 may lead to infinite run time, since sampling-based planners are probabilistically complete!
@@ -100,33 +104,30 @@ class RRTOptions:
 # The reference above runs EXTEND on one tree and CONNECT on the other, swapping trees every iteration.
 # This implementation runs CONNECT on both trees, removing the need for tree swapping.
 class RRT:
-    def __init__(self, options: RRTOptions, model: mujoco.MjModel) -> None:
-        # The model should be read-only, so we don't need to make a deep copy of it.
-        self.model = model
-
+    def __init__(self, options: RRTOptions) -> None:
         # During planning, we need to use MjData for things like forward kinematics
         # to confirm that sampled configurations are valid.
-        self.data = mujoco.MjData(model)
+        self.data = mujoco.MjData(options.jg.model)
 
         self.options = options
         self.rng = np.random.default_rng(seed=options.seed)
-        self.joint_qpos_addrs = utils.joint_names_to_qpos_addrs(
-            options.joint_names, self.model
-        )
-        self.joint_limits_lower, self.joint_limits_upper = utils.joint_limits(
-            options.joint_names, self.model
-        )
 
-    def plan(self, q_init: np.ndarray, q_goal: np.ndarray) -> list[np.ndarray]:
-        if not self.__is_valid_config(q_init):
+    def plan(self, q_init_world: np.ndarray, q_goal: np.ndarray) -> list[np.ndarray]:
+        assert q_init_world.size == self.data.qpos.size
+        assert q_goal.size == len(self.options.jg.joint_ids)
+
+        self.data.qpos = q_init_world
+        q_init = self.options.jg.qpos(self.data)
+        if not utils.is_valid_config(
+            q_init, self.options.jg, self.data, self.options.cr
+        ):
             print("q_init is not a valid configuration")
             return []
-        if not self.__is_valid_config(q_goal):
+        if not utils.is_valid_config(
+            q_goal, self.options.jg, self.data, self.options.cr
+        ):
             print("q_goal is not a valid configuration")
             return []
-
-        # Initialize MjData to q_init.
-        utils.fk(q_init, self.joint_qpos_addrs, self.model, self.data)
 
         start_tree = Tree()
         start_tree.add_node(Node(q_init, None))
@@ -152,9 +153,7 @@ class RRT:
             if self.rng.random() <= self.options.goal_biasing_probability:
                 q_rand = q_goal
             else:
-                q_rand = utils.random_config(
-                    self.rng, self.joint_limits_lower, self.joint_limits_upper
-                )
+                q_rand = self.options.jg.random_config(self.rng)
             new_start_tree_node = self.connect(q_rand, start_tree)
             if new_start_tree_node:
                 new_goal_tree_node = self.connect(new_start_tree_node.q, goal_tree)
@@ -188,7 +187,7 @@ class RRT:
         if q_dist > eps:
             q_increment = eps * ((q - nearest_node.q) / q_dist)
             q_extend = nearest_node.q + q_increment
-        if self.__is_valid_config(q_extend):
+        if utils.is_valid_config(q_extend, self.options.jg, self.data, self.options.cr):
             node_extend = Node(q_extend, nearest_node)
             tree.add_node(node_extend)
             return node_extend
@@ -251,7 +250,7 @@ class RRT:
 
     # Helper function for performing the actual shortcutting - see the `shortcut` method
     def __shortcut(
-        self, path: list[np.ndarray], start: int, end: int, make_dense
+        self, path: list[np.ndarray], start: int, end: int, make_dense: bool
     ) -> list[np.ndarray]:
         q_start = path[start]
         q_end = path[end]
@@ -291,13 +290,3 @@ class RRT:
                 dense_path += intermediate_configs[1:-1]
         dense_path.append(path[-1])
         return dense_path
-
-    def __is_valid_config(self, q: np.ndarray) -> bool:
-        return utils.is_valid_config(
-            q,
-            self.joint_limits_lower,
-            self.joint_limits_upper,
-            self.joint_qpos_addrs,
-            self.model,
-            self.data,
-        )

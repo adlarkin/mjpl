@@ -1,72 +1,42 @@
 import mujoco
 import numpy as np
 
+from .collision_ruleset import CollisionRuleset
+from .joint_group import JointGroup
+
 
 def configuration_distance(q_from: np.ndarray, q_to: np.ndarray):
     return np.linalg.norm(q_to - q_from)
 
 
-def joint_names_to_qpos_addrs(
-    joint_names: list[str], model: mujoco.MjModel
-) -> np.ndarray:
-    return np.array([model.joint(name).qposadr.item() for name in joint_names])
-
-
-def joint_limits(
-    joint_names: list[str], model: mujoco.MjModel
-) -> tuple[np.ndarray, np.ndarray]:
-    lower_limits = np.array([model.joint(name).range[0] for name in joint_names])
-    upper_limits = np.array([model.joint(name).range[1] for name in joint_names])
-    return lower_limits, upper_limits
-
-
-def random_config(
-    rng: np.random.Generator, lower_limits: np.ndarray, upper_limits: np.ndarray
-) -> np.ndarray:
-    return rng.uniform(low=lower_limits, high=upper_limits)
-
-
-def fk(
-    q: np.ndarray, qpos_addrs: np.ndarray, model: mujoco.MjModel, data: mujoco.MjData
-):
-    data.qpos[qpos_addrs] = q
-    mujoco.mj_kinematics(model, data)
-
-
 # NOTE: this will modify `data` in-place.
 def is_valid_config(
     q: np.ndarray,
-    lower_limits: np.ndarray,
-    upper_limits: np.ndarray,
-    qpos_addrs: np.ndarray,
-    model: mujoco.MjModel,
+    jg: JointGroup,
     data: mujoco.MjData,
+    cr: CollisionRuleset,
 ) -> bool:
     # Check joint limits.
-    if not ((q >= lower_limits) & (q <= upper_limits)).all():
+    if not np.all((q >= jg.lower_limits) & (q <= jg.upper_limits)):
         return False
 
     # Check for collisions.
     # We have to run FK once data.qpos is updated before running the collision checker.
-    fk(q, qpos_addrs, model, data)
-    mujoco.mj_collision(model, data)
-    return not data.ncon
+    jg.fk(q, data)
+    mujoco.mj_collision(jg.model, data)
+    return cr.obeys_ruleset(data.contact.geom)
 
 
 # NOTE: this will modify `data` in-place, since it calls is_valid_config internally.
 def random_valid_config(
     rng: np.random.Generator,
-    lower_limits: np.ndarray,
-    upper_limits: np.ndarray,
-    joint_qpos_addrs: np.ndarray,
-    model: mujoco.MjModel,
+    jg: JointGroup,
     data: mujoco.MjData,
+    cr: CollisionRuleset,
 ) -> np.ndarray:
-    q_rand = random_config(rng, lower_limits, upper_limits)
-    while not is_valid_config(
-        q_rand, lower_limits, upper_limits, joint_qpos_addrs, model, data
-    ):
-        q_rand = random_config(rng, lower_limits, upper_limits)
+    q_rand = jg.random_config(rng)
+    while not is_valid_config(q_rand, jg, data, cr):
+        q_rand = jg.random_config(rng)
     return q_rand
 
 

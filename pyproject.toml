@@ -8,6 +8,7 @@ version = "0.0.1"
 dependencies = [
   "mujoco >= 3",
   "numpy",
+  "ruckig",
 ]
 # TODO (#28): change to 3.9 if project supports it
 requires-python = ">=3.10"
@@ -29,17 +30,16 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-examples = [
-  "ruckig",
-  "scipy",
-]
 dev = [
   "black",
   "pre-commit",
   "ruff",
 ]
+test = [
+  "robot_descriptions",
+]
 all = [
-  "mj_maniplan[examples,dev]"
+  "mj_maniplan[dev,test]"
 ]
 
 [project.urls]

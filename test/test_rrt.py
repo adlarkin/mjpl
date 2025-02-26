@@ -5,6 +5,8 @@ import mujoco
 import numpy as np
 
 import mj_maniPlan.rrt as rrt
+from mj_maniPlan.collision_ruleset import CollisionRuleset
+from mj_maniPlan.joint_group import JointGroup
 
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
@@ -18,9 +20,14 @@ class TestRRT(unittest.TestCase):
 
         self.obstacle = model.geom("wall_obstacle")
 
-        joint_names = ["ball_slide_x"]
+        planning_joints = [model.joint("ball_slide_x").id]
+        jg = JointGroup(model, planning_joints)
+
+        cr = CollisionRuleset(model)
+
         options = rrt.RRTOptions(
-            joint_names=joint_names,
+            jg=jg,
+            cr=cr,
             max_planning_time=5.0,
             epsilon=0.1,
             shortcut_filler_epsilon=0.1,
@@ -32,17 +39,22 @@ class TestRRT(unittest.TestCase):
         # So there's only one value in data.qpos (the ball's x position)
         self.q_init = np.array([-0.1])
 
-        self.planner = rrt.RRT(options, model)
+        self.planner = rrt.RRT(options)
 
     def load_ball_sliding_along_xy_model(self, epsilon, shortcut_filler_epsilon):
         model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
 
-        joint_names = [
-            "ball_slide_x",
-            "ball_slide_y",
+        planning_joints = [
+            model.joint("ball_slide_x").id,
+            model.joint("ball_slide_y").id,
         ]
+        jg = JointGroup(model, planning_joints)
+
+        cr = CollisionRuleset(model)
+
         options = rrt.RRTOptions(
-            joint_names=joint_names,
+            jg=jg,
+            cr=cr,
             max_planning_time=5.0,
             epsilon=epsilon,
             shortcut_filler_epsilon=shortcut_filler_epsilon,
@@ -52,7 +64,7 @@ class TestRRT(unittest.TestCase):
         # Initial joint configuration.
         self.q_init = np.array([-0.1, 0.0])
 
-        self.planner = rrt.RRT(options, model)
+        self.planner = rrt.RRT(options)
 
     def test_extend(self):
         self.load_ball_with_obstacle_model()
@@ -190,7 +202,7 @@ class TestRRT(unittest.TestCase):
 
         q_goal = np.array([0.35])
         path = self.planner.plan(self.q_init, q_goal)
-        self.assertIsNotNone(path)
+        self.assertGreater(len(path), 2)
 
         # The path should start at q_init and end at q_goal
         self.assertTrue(np.array_equal(path[0], self.q_init))
