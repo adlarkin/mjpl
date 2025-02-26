@@ -35,6 +35,12 @@ dev = [
   "pre-commit",
   "ruff",
 ]
+test = [
+  "robot_descriptions",
+]
+all = [
+  "mj_maniplan[dev,test]"
+]
 
 [project.urls]
 Homepage = "https://github.com/adlarkin/mj_maniPlan"

@@ -61,7 +61,7 @@ class JointGroup:
 
         Returns:
             A joint configuration for the joints in the JointGroup that is
-            within their joint limits.
+            within joint limits.
         """
         return rng.uniform(low=self.lower_limits, high=self.upper_limits)
 
