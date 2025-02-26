@@ -43,10 +43,11 @@ jobs:
         run: |
           scripts=(
             "python examples/benchmark.py"
-            # Not running these scripts for now because they use ruckig to generate a trajectory,
-            # and ruckig calls a cloud API if the input has intermediate waypoints
-            # (calling this cloud API can be flaky in CI)
-            #   - examples/rrt_trajectory.py
+            # These scripts use ruckig for trajectory generation.
+            # Ruckig community version uses a cloud API for intermediate waypoints,
+            # which may cause flakes in CI.
+            "python examples/rrt_trajectory.py -no-viz -s 5"
+            "python examples/rrt_trajectory.py -no-viz -obs -s 5"
           )
           # Run all scripts. If any of the scripts fail, report a failure in CI
           failed=0
