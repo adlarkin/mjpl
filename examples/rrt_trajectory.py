@@ -118,10 +118,13 @@ def main():
 
     # These values are for demonstration purposes only.
     # In practice, consult your hardware spec sheet for this information.
+    dof = len(planning_joints)
     tr_limits = TrajectoryLimits(
         jg=jg,
-        velocity=np.ones(len(planning_joints)) * np.pi,
-        acceleration=np.ones(len(planning_joints)) * 0.5 * np.pi,
+        max_velocity=np.ones(dof) * np.pi,
+        min_velocity=-np.ones(dof) * np.pi,
+        max_acceleration=np.ones(dof) * 0.5 * np.pi,
+        min_acceleration=-np.ones(dof) * 0.5 * np.pi,
         jerk=np.ones(len(planning_joints)),
     )
 
@@ -144,7 +147,7 @@ def main():
 
     # Follow the trajectory via position control, starting from the initial state.
     data.qpos = q_init_world
-    mujoco.mj_kinematics(model, data)
+    mujoco.mj_forward(model, data)
     q_t = [jg.qpos(data)]
     for q_ref in traj.configurations:
         data.ctrl[actuator_ids] = q_ref

@@ -12,7 +12,7 @@ def joint_ids_to_qpos_addrs(model: mujoco.MjModel, joint_ids: list[int]) -> np.n
         joint_ids: The joints of interest from the MuJoCo model.
 
     Returns:
-        A list of joint addresses that correspond to the joints in joint_ids.
+        A list of joint addresses that correspond to the joints in `joint_ids`.
         These addresses can be used with MjData.qpos
     """
     return np.array([model.joint(id).qposadr.item() for id in joint_ids])
@@ -28,7 +28,7 @@ def joint_limits(
         joint_ids: The joints of interest from the MuJoCo model.
 
     Returns:
-        A tuple of (lower, upper) limit arrays for each joint in joint_ids.
+        A tuple of (lower, upper) limit arrays for each joint in `joint_ids`.
     """
     lower_limits = np.array([model.joint(id).range[0] for id in joint_ids])
     upper_limits = np.array([model.joint(id).range[1] for id in joint_ids])
@@ -38,7 +38,7 @@ def joint_limits(
 class JointGroup:
     """Class for handling a subset of joints in a MuJoCo model.
 
-    This class assumes the joint(s) of interest have 1 DOF.
+    This class assumes the joints of interest have 1 DOF.
     """
 
     def __init__(self, model: mujoco.MjModel, joint_ids: list[int]):

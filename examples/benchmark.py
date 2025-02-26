@@ -19,10 +19,7 @@ import numpy as np
 import mj_maniPlan.utils as utils
 from mj_maniPlan.collision_ruleset import CollisionRuleset
 from mj_maniPlan.joint_group import JointGroup
-from mj_maniPlan.rrt import (
-    RRT,
-    RRTOptions,
-)
+from mj_maniPlan.rrt import RRT, RRTOptions
 
 _HERE = Path(__file__).parent
 _PANDA_XML = _HERE / "models" / "franka_emika_panda" / "scene.xml"

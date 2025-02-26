@@ -2,7 +2,6 @@ import mujoco
 import numpy as np
 
 
-# NOTE: allowed_collisions are BODY ids, collision_matrix are GEOM ids
 class CollisionRuleset:
     """Class that defines which bodies are allowed to be in collision.
 
@@ -33,11 +32,13 @@ class CollisionRuleset:
         }
 
     def obeys_ruleset(self, collision_matrix: np.ndarray) -> bool:
-        """Check if a collision matrix violates the allowed body collisions.
+        """Check if a collision matrix adheres to the allowed body collisions.
 
         A collision matrix defines geometries that are in collision.
+        Note that this is different from the allowed collision matrix, which
+        specifies bodies.
 
-        In MjData, the collision matrix is stored in data.contact.geom
+        In MuJoCo, the collision matrix is stored in MjData.contact.geom
 
         Args:
             collision_matrix: A nx2 matrix, where n=number of collisions. Each row

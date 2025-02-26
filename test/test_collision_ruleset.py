@@ -26,6 +26,8 @@ class TestCollisionRuleset(unittest.TestCase):
         # Geometry ids that can be used for creating a collision matrix.
         # A body may have multiple geometries associated with it.
         # Here, we are using the first geometry tied to a body.
+        # To get all geometries tied to a body, see:
+        # https://github.com/kevinzakka/mink/blob/cce9cf4ed13e461dc1b3d38fe88f245700aa98c2/mink/utils.py#L137
         self.link1_geom = self.model.body_geomadr[self.link1]
         self.link2_geom = self.model.body_geomadr[self.link2]
         self.link3_geom = self.model.body_geomadr[self.link3]
