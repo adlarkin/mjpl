@@ -10,40 +10,59 @@ class CollisionRuleset:
     """
 
     def __init__(
-        self, model: mujoco.MjModel, allowed_collision_bodies: list[tuple[int, int]]
+        self,
+        model: mujoco.MjModel,
+        allowed_collision_bodies: np.ndarray = np.empty((0, 2)),
     ) -> None:
         """Constructor.
 
         Args:
             model: MuJoCo model.
             allowed_collision_bodies: Bodies that are allowed to be in collision.
+                                      This should be a nx2 matrix, where each row
+                                      specifies a pair of bodies that are allowed
+                                      to be in collision.
         """
         self.model = model
-        self.allowed_collision_bodies = [
-            set(body_pair) for body_pair in allowed_collision_bodies
-        ]
+        assert allowed_collision_bodies.shape[1] == 2
+        self._allowed_collision_bodies = allowed_collision_bodies
+        # Convert allowed body matrix to a set of tuples. Sort matrix rows
+        # since equivalence between two collision ID pairs is order independent.
+        self.allowed_set = {
+            tuple(row) for row in np.sort(allowed_collision_bodies, axis=1)
+        }
 
     def obeys_ruleset(self, collision_matrix: np.ndarray) -> bool:
         """Check if a collision matrix violates the allowed body collisions.
 
         A collision matrix defines geometries that are in collision.
 
+        In MjData, the collision matrix is stored in data.contact.geom
+
         Args:
-            collision_matrix: A nx2 matrix, where n=number of collisions. Each
-                              row represents a pair of geometries that are in collision.
+            collision_matrix: A nx2 matrix, where n=number of collisions. Each row
+                              represents a pair of geometries that are in collision.
 
         Returns:
             True if the geometry pairs in the collision matrix map to allowed body
             collision pairs. False otherwise.
         """
-        # collision matrix should be n x 2, where n = number of collisions
-        # (each row in the collision matrix represents a pair of geoms that are in collision)
-        #
-        # When working with MjData, collision matrix is stored in data.contact.geom
         assert collision_matrix.shape[1] == 2
-        for geom1, geom2 in collision_matrix:
-            body1 = self.model.geom_bodyid[geom1]
-            body2 = self.model.geom_bodyid[geom2]
-            if {body1, body2} not in self.allowed_collision_bodies:
-                return False
-        return True
+        if collision_matrix.shape[0] == 0:
+            # No collisions
+            return True
+        elif self._allowed_collision_bodies.shape[0] == 0:
+            # Collisions are present, but the ruleset doesn't allow any collisions
+            return False
+        # Map geometry IDs to their respective body IDs. Sort matrix rows since
+        # equivalence between two collision ID pairs is order independent.
+        collision_bodies = self.model.geom_bodyid[np.sort(collision_matrix, axis=1)]
+        # Convert the collision matrix to a set of tuples.
+        # The collision matrix obeys the ruleset if the collision body set is
+        # a subset of the allowed body set.
+        return all(tuple(row) in self.allowed_set for row in collision_bodies)
+
+    @property
+    def allowed_collision_bodies(self) -> np.ndarray:
+        """The matrix of allowed collision bodies."""
+        return self._allowed_collision_bodies.copy()

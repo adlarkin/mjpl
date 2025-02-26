@@ -110,9 +110,14 @@ class TestJointGroup(unittest.TestCase):
 
     def test_joint_ids(self):
         arm_jg = JointGroup(self.model, self.arm_joint_ids)
-        self.assertListEqual(self.arm_joint_ids, arm_jg.joint_ids)
+        arm_joint_ids = arm_jg.joint_ids
+        self.assertListEqual(self.arm_joint_ids, arm_joint_ids)
+        self.assertIsNot(self.arm_joint_ids, arm_joint_ids)
+
         hand_jg = JointGroup(self.model, self.hand_joint_ids)
-        self.assertListEqual(self.hand_joint_ids, hand_jg.joint_ids)
+        hand_joint_ids = hand_jg.joint_ids
+        self.assertListEqual(self.hand_joint_ids, hand_joint_ids)
+        self.assertIsNot(self.hand_joint_ids, hand_joint_ids)
 
 
 if __name__ == "__main__":

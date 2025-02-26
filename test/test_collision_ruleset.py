@@ -37,10 +37,15 @@ class TestCollisionRuleset(unittest.TestCase):
         self.right_finger_geom = self.model.body_geomadr[self.right_finger]
 
     def test_single_valid_collision(self):
-        valid_collision_bodies = [
-            (self.link1, self.link2),
-        ]
+        valid_collision_bodies = np.array(
+            [
+                [self.link1, self.link2],
+            ]
+        )
         cr = CollisionRuleset(self.model, valid_collision_bodies)
+
+        geom_collision_matrix = np.empty((0, 2))
+        self.assertTrue(cr.obeys_ruleset(geom_collision_matrix))
 
         geom_collision_matrix = np.array(
             [
@@ -87,12 +92,17 @@ class TestCollisionRuleset(unittest.TestCase):
         self.assertFalse(cr.obeys_ruleset(geom_collision_matrix))
 
     def test_multiple_valid_collisions(self):
-        valid_collision_bodies = [
-            (self.link1, self.link2),
-            (self.link6, self.link7),
-            (self.left_finger, self.right_finger),
-        ]
+        valid_collision_bodies = np.array(
+            [
+                [self.link1, self.link2],
+                [self.link6, self.link7],
+                [self.left_finger, self.right_finger],
+            ]
+        )
         cr = CollisionRuleset(self.model, valid_collision_bodies)
+
+        geom_collision_matrix = np.empty((0, 2))
+        self.assertTrue(cr.obeys_ruleset(geom_collision_matrix))
 
         geom_collision_matrix = np.array(
             [
@@ -149,7 +159,7 @@ class TestCollisionRuleset(unittest.TestCase):
         self.assertFalse(cr.obeys_ruleset(geom_collision_matrix))
 
     def test_no_valid_collisions(self):
-        cr = CollisionRuleset(self.model, [])
+        cr = CollisionRuleset(self.model)
 
         no_collisions = np.empty((0, 2))
         self.assertTrue(cr.obeys_ruleset(no_collisions))
@@ -160,6 +170,19 @@ class TestCollisionRuleset(unittest.TestCase):
             ]
         )
         self.assertFalse(cr.obeys_ruleset(geom_collision_matrix))
+
+    def test_get_allowed_collision_bodies(self):
+        valid_collision_bodies = np.array(
+            [
+                [self.link3, self.link4],
+                [self.link5, self.link6],
+            ]
+        )
+        cr = CollisionRuleset(self.model, valid_collision_bodies)
+
+        allowed_bodies = cr.allowed_collision_bodies
+        self.assertTrue(np.array_equal(allowed_bodies, valid_collision_bodies))
+        self.assertIsNot(allowed_bodies, valid_collision_bodies)
 
 
 if __name__ == "__main__":

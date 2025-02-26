@@ -68,9 +68,11 @@ def main():
     ]
     jg = JointGroup(model, planning_joints)
 
-    allowed_collisions = [
-        (model.body("left_finger").id, model.body("right_finger").id),
-    ]
+    allowed_collisions = np.array(
+        [
+            [model.body("left_finger").id, model.body("right_finger").id],
+        ]
+    )
     cr = CollisionRuleset(model, allowed_collisions)
 
     # Use the 'home' keyframe position as q_init.

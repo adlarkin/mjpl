@@ -40,9 +40,11 @@ if __name__ == "__main__":
         model.joint("joint6").id,
         model.joint("joint7").id,
     ]
-    allowed_collisions = [
-        (model.body("left_finger").id, model.body("right_finger").id),
-    ]
+    allowed_collisions = np.array(
+        [
+            [model.body("left_finger").id, model.body("right_finger").id],
+        ]
+    )
     max_planning_time = 10
     epsilon = 0.05
     seed = 42

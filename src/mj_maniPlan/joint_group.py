@@ -95,4 +95,4 @@ class JointGroup:
     @property
     def joint_ids(self) -> list[int]:
         """The joints associated with the JointGroup."""
-        return self._joint_ids
+        return self._joint_ids.copy()

@@ -23,8 +23,7 @@ class TestRRT(unittest.TestCase):
         planning_joints = [model.joint("ball_slide_x").id]
         jg = JointGroup(model, planning_joints)
 
-        allowed_collisions = []
-        cr = CollisionRuleset(model, allowed_collisions)
+        cr = CollisionRuleset(model)
 
         options = rrt.RRTOptions(
             jg=jg,
@@ -51,8 +50,7 @@ class TestRRT(unittest.TestCase):
         ]
         jg = JointGroup(model, planning_joints)
 
-        allowed_collisions = []
-        cr = CollisionRuleset(model, allowed_collisions)
+        cr = CollisionRuleset(model)
 
         options = rrt.RRTOptions(
             jg=jg,
