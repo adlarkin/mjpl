@@ -17,7 +17,7 @@ def is_valid_config(
     cr: CollisionRuleset,
 ) -> bool:
     # Check joint limits.
-    if not ((q >= jg.lower_limits) & (q <= jg.upper_limits)).all():
+    if not np.all((q >= jg.lower_limits) & (q <= jg.upper_limits)):
         return False
 
     # Check for collisions.

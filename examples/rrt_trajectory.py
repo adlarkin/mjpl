@@ -31,15 +31,15 @@ def parse_args() -> tuple[bool, bool, int | None]:
     )
     parser.add_argument(
         "-no-viz",
-        action="store_true",  # set to True if flag is provided
-        default=False,  # default value if flag is not provided
+        action="store_true",
+        default=False,
         help="Do not visualize the trajectory in the MuJoCo viewer",
     )
     parser.add_argument(
         "-obs",
         "--obstacles",
-        action="store_true",  # set to True if flag is provided
-        default=False,  # default value if flag is not provided
+        action="store_true",
+        default=False,
         help="Use obstacles in the environment",
     )
     parser.add_argument(
@@ -74,7 +74,7 @@ def main():
         model.joint("joint6").id,
         model.joint("joint7").id,
     ]
-    jg = JointGroup(model, planning_joints)
+    arm_jg = JointGroup(model, planning_joints)
 
     allowed_collisions = np.array(
         [
@@ -88,12 +88,12 @@ def main():
 
     # Generate valid goal configuration.
     rng = np.random.default_rng(seed=seed)
-    q_goal = utils.random_valid_config(rng, jg, data, cr)
+    q_goal = utils.random_valid_config(rng, arm_jg, data, cr)
 
     # Set up the planner.
     epsilon = 0.05
     planner_options = RRTOptions(
-        jg=jg,
+        jg=arm_jg,
         cr=cr,
         max_planning_time=10,
         epsilon=epsilon,
@@ -120,7 +120,7 @@ def main():
     # In practice, consult your hardware spec sheet for this information.
     dof = len(planning_joints)
     tr_limits = TrajectoryLimits(
-        jg=jg,
+        jg=arm_jg,
         min_velocity=-np.ones(dof) * np.pi,
         max_velocity=np.ones(dof) * np.pi,
         min_acceleration=-np.ones(dof) * 0.5 * np.pi,
@@ -148,11 +148,11 @@ def main():
     # Follow the trajectory via position control, starting from the initial state.
     data.qpos = q_init_world
     mujoco.mj_forward(model, data)
-    q_t = [jg.qpos(data)]
+    q_t = [arm_jg.qpos(data)]
     for q_ref in traj.configurations:
         data.ctrl[actuator_ids] = q_ref
         mujoco.mj_step(model, data)
-        q_t.append(jg.qpos(data))
+        q_t.append(arm_jg.qpos(data))
 
     if not no_viz:
         with mujoco.viewer.launch_passive(
@@ -171,14 +171,14 @@ def main():
             viz.add_frame(viewer.user_scn, pos, rot)
 
             # Visualize the target EE pose.
-            jg.fk(q_goal, data)
+            arm_jg.fk(q_goal, data)
             pos, rot = utils.site_pose(_PANDA_EE_SITE, data)
             viz.add_frame(viewer.user_scn, pos, rot)
 
             # Visualize the trajectory. The trajectory is of high resolution,
             # so plotting every other timestep should be sufficient.
             for q_ref in traj.configurations[::2]:
-                jg.fk(q_ref, data)
+                arm_jg.fk(q_ref, data)
                 pos = data.site(_PANDA_EE_SITE).xpos
                 viz.add_sphere(viewer.user_scn, pos, 0.004, [0.2, 0.6, 0.2, 0.2])
 
@@ -187,7 +187,7 @@ def main():
                 start_time = time.time()
                 if not viewer.is_running():
                     return
-                jg.fk(q_actual, data)
+                arm_jg.fk(q_actual, data)
                 viewer.sync()
                 time_until_next_step = model.opt.timestep - (time.time() - start_time)
                 if time_until_next_step > 0:

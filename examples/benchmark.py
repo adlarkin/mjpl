@@ -48,7 +48,7 @@ if __name__ == "__main__":
     goal_biasing_probability = 0.1
     number_of_attempts = 15
 
-    jg = JointGroup(model, planning_joints)
+    arm_jg = JointGroup(model, planning_joints)
     cr = CollisionRuleset(model, allowed_collisions)
 
     # Plan number_of_attempts times and record benchmarks.
@@ -58,10 +58,10 @@ if __name__ == "__main__":
         data = mujoco.MjData(model)
         rng = np.random.default_rng(seed=seed)
         q_init_world = model.keyframe("home").qpos
-        q_goal = utils.random_valid_config(rng, jg, data, cr)
+        q_goal = utils.random_valid_config(rng, arm_jg, data, cr)
 
         planner_options = RRTOptions(
-            jg=jg,
+            jg=arm_jg,
             cr=cr,
             max_planning_time=max_planning_time,
             epsilon=epsilon,
