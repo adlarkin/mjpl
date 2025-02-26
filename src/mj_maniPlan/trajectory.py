@@ -13,10 +13,10 @@ class TrajectoryLimits:
     # The JointGroup the trajectory limits apply to.
     jg: JointGroup
     # Limits for the joints in the JointGroup.
-    max_velocity: np.ndarray
     min_velocity: np.ndarray
-    max_acceleration: np.ndarray
+    max_velocity: np.ndarray
     min_acceleration: np.ndarray
+    max_acceleration: np.ndarray
     jerk: np.ndarray
 
 
@@ -75,10 +75,10 @@ def generate_trajectory(
     inp.target_velocity = np.zeros(dof)
     inp.target_acceleration = np.zeros(dof)
 
-    inp.max_velocity = limits.max_velocity
     inp.min_velocity = limits.min_velocity
-    inp.max_acceleration = limits.max_acceleration
+    inp.max_velocity = limits.max_velocity
     inp.min_acceleration = limits.min_acceleration
+    inp.max_acceleration = limits.max_acceleration
     inp.max_jerk = limits.jerk
 
     configs = []

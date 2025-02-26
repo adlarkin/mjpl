@@ -121,10 +121,10 @@ def main():
     dof = len(planning_joints)
     tr_limits = TrajectoryLimits(
         jg=jg,
-        max_velocity=np.ones(dof) * np.pi,
         min_velocity=-np.ones(dof) * np.pi,
-        max_acceleration=np.ones(dof) * 0.5 * np.pi,
+        max_velocity=np.ones(dof) * np.pi,
         min_acceleration=-np.ones(dof) * 0.5 * np.pi,
+        max_acceleration=np.ones(dof) * 0.5 * np.pi,
         jerk=np.ones(len(planning_joints)),
     )
 

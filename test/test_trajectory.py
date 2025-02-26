@@ -35,14 +35,25 @@ class TestTrajectory(unittest.TestCase):
         path = [q_init_arm, q_goal]
         limits = traj.TrajectoryLimits(
             jg=arm_jg,
-            max_velocity=np.ones(dof),
             min_velocity=-np.ones(dof),
-            max_acceleration=np.ones(dof),
+            max_velocity=np.ones(dof),
             min_acceleration=-np.ones(dof),
+            max_acceleration=np.ones(dof),
             jerk=np.ones(dof),
         )
         t = traj.generate_trajectory(path, limits, model.opt.timestep)
 
+        # Ensure limits are enforced.
+        for v in t.velocities:
+            self.assertTrue(
+                np.all((v >= limits.min_velocity) & (v <= limits.max_velocity))
+            )
+        for a in t.accelerations:
+            self.assertTrue(
+                np.all((a >= limits.min_acceleration) & (a <= limits.max_acceleration))
+            )
+
+        # Ensure trajectory achieves the goal state.
         np.testing.assert_allclose(q_goal, t.configurations[-1], rtol=1e-5, atol=1e-8)
         # The final velocities and accelerations should be the zero vector,
         # so enforce absolute tolerance only since tolerance is not scale-dependent.
