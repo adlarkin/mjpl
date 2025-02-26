@@ -24,7 +24,7 @@ def is_valid_config(
     # We have to run FK once data.qpos is updated before running the collision checker.
     jg.fk(q, data)
     mujoco.mj_collision(jg.model, data)
-    return cr.obeys_ruleset(data)
+    return cr.obeys_ruleset(data.contact.geom)
 
 
 # NOTE: this will modify `data` in-place, since it calls is_valid_config internally.
