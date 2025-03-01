@@ -73,7 +73,7 @@ if __name__ == "__main__":
 
         print(f"Attempt {i}...")
         start_time = time.time()
-        path = planner.plan(q_init_world, q_goal)
+        path = planner.plan_to_config(q_init_world, q_goal)
         elapsed_time = time.time() - start_time
         if path:
             successful_planning_times.append(elapsed_time)

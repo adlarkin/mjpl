@@ -65,7 +65,7 @@ def main():
 
     print("Planning...")
     start = time.time()
-    path = planner.plan(q_init_world, q_goal)
+    path = planner.plan_to_config(q_init_world, q_goal)
     if not path:
         print("Planning failed")
         return

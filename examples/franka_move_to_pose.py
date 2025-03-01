@@ -6,7 +6,6 @@ import mujoco.viewer
 import numpy as np
 from example_utils import parse_args
 
-import mj_maniPlan.inverse_kinematics as ik
 import mj_maniPlan.visualization as viz
 from mj_maniPlan.collision_ruleset import CollisionRuleset
 from mj_maniPlan.joint_group import JointGroup
@@ -45,22 +44,8 @@ def main():
     data = mujoco.MjData(model)
     q_rand = random_valid_config(rng, arm_jg, data, CollisionRuleset(model))
     arm_jg.fk(q_rand, data)
-    target_ee_pos = data.site(_PANDA_EE_SITE).xpos.copy()
-    target_ee_rotmat = data.site(_PANDA_EE_SITE).xmat.copy()
-
-    # Solve IK to get a configuration to plan to.
-    # There may be multiple configurations that satisfy the target pose,
-    # so there's no guarantee that the resulting joint configuration matches q_rand.
-    print("Solving IK...")
-    opts = ik.IKOptions(q_init=q_init)
-    start_time = time.time()
-    q_goal = ik.solve_ik(
-        model, _PANDA_EE_SITE, target_ee_pos, target_ee_rotmat.reshape(3, 3), opts
-    )
-    if q_goal is None:
-        print("Unable to find IK solution.")
-        return
-    print(f"IK solved in {time.time() - start_time:.4f}s")
+    target_pos = data.site(_PANDA_EE_SITE).xpos.copy()
+    target_rotmat = data.site(_PANDA_EE_SITE).xmat.copy()
 
     allowed_collisions = np.array(
         [
@@ -68,21 +53,6 @@ def main():
         ]
     )
     cr = CollisionRuleset(model, allowed_collisions)
-
-    # Now that we have an IK solution that satisfies the target pose, we must make sure that the
-    # IK solution is a valid configuration. The IK solver ensures the joints are within joint limits,
-    # so we just need to make sure that the configuration doesn't violate the CollisionRuleset.
-    data.qpos = q_goal
-    mujoco.mj_kinematics(model, data)
-    mujoco.mj_collision(model, data)
-    if not cr.obeys_ruleset(data.contact.geom):
-        print("IK solution violates allowed collisions.")
-        return
-
-    # IK solution matches the configuration space of the world, but for planning we only want
-    # the joints for the planning JointGroup.
-    q_goal = arm_jg.qpos(data)
-
     # Set up the planner.
     epsilon = 0.05
     planner_options = RRTOptions(
@@ -98,7 +68,9 @@ def main():
 
     print("Planning...")
     start = time.time()
-    path = planner.plan(q_init, q_goal)
+    path = planner.plan_to_pose(
+        q_init, _PANDA_EE_SITE, target_pos, target_rotmat.reshape(3, 3)
+    )
     if not path:
         print("Planning failed")
         return
@@ -165,9 +137,7 @@ def main():
             viz.add_frame(viewer.user_scn, site.xpos, site.xmat.reshape(3, 3))
 
             # Visualize the target EE pose.
-            viz.add_frame(
-                viewer.user_scn, target_ee_pos, target_ee_rotmat.reshape(3, 3)
-            )
+            viz.add_frame(viewer.user_scn, target_pos, target_rotmat.reshape(3, 3))
 
             # Visualize the trajectory. The trajectory is of high resolution,
             # so plotting every other timestep should be sufficient.

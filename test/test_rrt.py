@@ -201,7 +201,7 @@ class TestRRT(unittest.TestCase):
         self.load_ball_with_obstacle_model()
 
         q_goal = np.array([0.35])
-        path = self.planner.plan(self.q_init, q_goal)
+        path = self.planner.plan_to_config(self.q_init, q_goal)
         self.assertGreater(len(path), 2)
 
         # The path should start at q_init and end at q_goal
@@ -217,7 +217,7 @@ class TestRRT(unittest.TestCase):
 
         # If we plan to a goal that is directly reachable, the planner should make the direct connection and exit
         q_goal = np.array([-0.05])
-        path = self.planner.plan(self.q_init, q_goal)
+        path = self.planner.plan_to_config(self.q_init, q_goal)
         self.assertEqual(len(path), 2)
         self.assertTrue(np.array_equal(path[0], self.q_init))
         self.assertTrue(np.array_equal(path[1], q_goal))
