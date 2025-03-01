@@ -38,9 +38,3 @@ def random_valid_config(
     while not is_valid_config(q_rand, jg, data, cr):
         q_rand = jg.random_config(rng)
     return q_rand
-
-
-def site_pose(site_name: str, data: mujoco.MjData):
-    pos = data.site(site_name).xpos
-    rot_mat = data.site(site_name).xmat.reshape(3, 3)
-    return pos, rot_mat

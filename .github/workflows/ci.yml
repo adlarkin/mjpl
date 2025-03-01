@@ -46,8 +46,8 @@ jobs:
             # These scripts use ruckig for trajectory generation.
             # Ruckig community version uses a cloud API for intermediate waypoints,
             # which may cause flakes in CI.
-            "python examples/rrt_trajectory.py -no-viz -s 5"
-            "python examples/rrt_trajectory.py -no-viz -obs -s 5"
+            "python examples/ur5_move_to_config.py -s 3 -no-viz"
+            "python examples/franka_move_to_pose.py -s 18 -no-viz"
           )
           # Run all scripts. If any of the scripts fail, report a failure in CI
           failed=0
