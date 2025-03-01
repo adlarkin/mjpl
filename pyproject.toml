@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "mj_maniPlan"
 version = "0.0.1"
 dependencies = [
+  "mink",
   "mujoco >= 3",
   "numpy",
   "ruckig",

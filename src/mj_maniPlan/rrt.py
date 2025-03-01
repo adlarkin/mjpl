@@ -6,6 +6,7 @@ import numpy as np
 
 from . import utils
 from .collision_ruleset import CollisionRuleset
+from .inverse_kinematics import IKOptions, solve_ik
 from .joint_group import JointGroup
 
 
@@ -112,7 +113,35 @@ class RRT:
         self.options = options
         self.rng = np.random.default_rng(seed=options.seed)
 
-    def plan(self, q_init_world: np.ndarray, q_goal: np.ndarray) -> list[np.ndarray]:
+    def plan_to_pose(
+        self,
+        q_init_world: np.ndarray,
+        site: str,
+        pos: np.ndarray,
+        rot: np.ndarray,
+        ik_opts: IKOptions = IKOptions(),
+    ) -> list[np.ndarray]:
+        q_goal = solve_ik(self.options.jg.model, site, pos, rot, ik_opts)
+        if q_goal is None:
+            print("Unable to find a configuration for the target pose.")
+            return []
+
+        # The IK solver gives a full world configuration, but we only care about joints in the JointGroup for planning.
+        self.data.qpos = q_goal.copy()
+        q_goal = self.options.jg.qpos(self.data)
+        if not utils.is_valid_config(
+            q_goal, self.options.jg, self.data, self.options.cr
+        ):
+            print(
+                "The configuration that satisfies the target pose violates allowed collisions."
+            )
+            return []
+
+        return self.plan_to_config(q_init_world, q_goal)
+
+    def plan_to_config(
+        self, q_init_world: np.ndarray, q_goal: np.ndarray
+    ) -> list[np.ndarray]:
         assert q_init_world.size == self.data.qpos.size
         assert q_goal.size == len(self.options.jg.joint_ids)
 
