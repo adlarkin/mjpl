@@ -53,6 +53,7 @@ def main():
         ]
     )
     cr = CollisionRuleset(model, allowed_collisions)
+
     # Set up the planner.
     epsilon = 0.05
     planner_options = RRTOptions(
@@ -98,8 +99,7 @@ def main():
     traj = generate_trajectory(shortcut_path, tr_limits, model.opt.timestep)
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
-    # Actuator indices in data.ctrl that correspond to the joints in
-    # the trajectory (planning_joints).
+    # Actuator indices in data.ctrl that correspond to the joints in the trajectory.
     actuators = [
         "actuator1",
         "actuator2",

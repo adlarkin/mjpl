@@ -33,8 +33,8 @@ class TestInverseKinematics(unittest.TestCase):
         self.assertIsNotNone(q_candidate)
 
         # Confirm that the IK solution gives a site pose within the specified error.
-        # We cannot rely on checking similarity between q_candidate and q_rand since
-        # there may be multiple solutions to the IK problem!
+        # We cannot rely on checking similarity between q_candidate and the randomly
+        # generated config since there may be multiple solutions to the IK problem!
         data.qpos = q_candidate.copy()
         mujoco.mj_kinematics(model, data)
         pos = site.xpos.copy()

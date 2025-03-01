@@ -93,8 +93,7 @@ def main():
     traj = generate_trajectory(shortcut_path, tr_limits, model.opt.timestep)
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
-    # Actuator indices in data.ctrl that correspond to the joints in
-    # the trajectory (planning_joints).
+    # Actuator indices in data.ctrl that correspond to the joints in the trajectory.
     actuators = [
         "shoulder_pan",
         "shoulder_lift",
