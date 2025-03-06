@@ -7,6 +7,7 @@ import numpy as np
 import mj_maniPlan.rrt as rrt
 from mj_maniPlan.collision_ruleset import CollisionRuleset
 from mj_maniPlan.joint_group import JointGroup
+from mj_maniPlan.utils import configuration_distance
 
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
@@ -208,9 +209,12 @@ class TestRRT(unittest.TestCase):
         self.assertTrue(np.array_equal(path[0], self.q_init))
         self.assertTrue(np.array_equal(path[-1], q_goal))
 
-        # The path should be strictly increasing to q_goal
+        self.planner.options.epsilon
         for i in range(1, len(path)):
-            self.assertGreater(path[i][0], path[i - 1][0])
+            self.assertLessEqual(
+                configuration_distance(path[i - 1], path[i]),
+                self.planner.options.epsilon,
+            )
 
     def test_trivial_rrt(self):
         self.load_ball_with_obstacle_model()
