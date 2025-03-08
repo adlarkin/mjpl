@@ -35,7 +35,7 @@ class IKOptions:
 
 def solve_ik(
     site: str,
-    q_init_world: np.ndarray,
+    q_init_guess: np.ndarray,
     target_pos: np.ndarray,
     target_rot: np.ndarray,
     opts: IKOptions = IKOptions(),
@@ -43,8 +43,8 @@ def solve_ik(
     """Solve inverse kinematics for a given pose.
 
     Args:
-        model: MuJoCo model.
         site: Name of the site for the target pose (i.e., the target frame).
+        q_init_guess: The initial guess for the joint configuration.
         target_pos: Desired position.
         target_rot: Desired orientation, expressed as a 3x3 rotation matrix.
         opts: Options for customizing IK solution behavior.
@@ -77,7 +77,7 @@ def solve_ik(
 
     for attempt_idx in range(opts.max_attempts):
         # Initialize the state for IK.
-        q_init = q_init_world
+        q_init = q_init_guess
         if attempt_idx > 0:
             q_init[opts.jg.joint_ids] = utils.random_valid_config(
                 rng,
