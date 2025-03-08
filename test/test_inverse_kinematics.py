@@ -5,8 +5,8 @@ import numpy as np
 from robot_descriptions.loaders.mujoco import load_robot_description
 
 from mj_maniPlan.collision_ruleset import CollisionRuleset
-from mj_maniPlan.joint_group import JointGroup
 import mj_maniPlan.inverse_kinematics as ik
+from mj_maniPlan.joint_group import JointGroup
 
 
 class TestInverseKinematics(unittest.TestCase):
