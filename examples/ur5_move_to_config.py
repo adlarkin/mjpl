@@ -55,11 +55,12 @@ def main():
     planner_options = RRTOptions(
         jg=arm_jg,
         cr=cr,
-        max_planning_time=10,
+        max_planning_time=10.0,
         epsilon=epsilon,
         shortcut_filler_epsilon=np.inf,
         seed=seed,
         goal_biasing_probability=0.1,
+        max_connection_distance=np.inf,
     )
     planner = RRT(planner_options)
 
@@ -115,7 +116,7 @@ def main():
 
     if visualize:
         with mujoco.viewer.launch_passive(
-            model=model, data=data, show_left_ui=False, show_right_ui=False
+            model=model, data=data, show_left_ui=False, show_right_ui=False,
         ) as viewer:
             # Update the viewer's orientation to capture the scene.
             viewer.cam.lookat = [0, 0, 0.35]

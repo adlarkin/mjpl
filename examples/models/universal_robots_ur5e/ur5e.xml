@@ -6,8 +6,8 @@
   <default>
     <default class="ur5e">
       <material specular="0.5" shininess="0.25"/>
-      <joint axis="0 1 0" range="-6.28319 6.28319" armature="0.1"/>
-      <general gaintype="fixed" biastype="affine" ctrlrange="-6.2831 6.2831" gainprm="2000" biasprm="0 -2000 -400"
+      <joint axis="0 1 0" range="-3.1415 3.1415" armature="0.1"/>
+      <general gaintype="fixed" biastype="affine" ctrlrange="-3.1415 3.1415" gainprm="2000" biasprm="0 -2000 -400"
         forcerange="-150 150"/>
       <default class="size3">
         <default class="size3_limited">

@@ -97,6 +97,8 @@ class RRTOptions:
     # How often to sample the goal state when building the tree.
     # This should be a value within [0.0, 1.0].
     goal_biasing_probability: float = 0.05
+    # The maximum distance for extending a tree using the RRT-Connect algorithm.
+    max_connection_distance: float = np.inf
 
 
 # Implementation of Bidirectional RRT-Connect:
@@ -212,10 +214,8 @@ class RRT:
         nearest_node: Node | None = None,
         eps: float | None = None,
     ) -> Node | None:
-        if not eps:
-            eps = self.options.epsilon
-        if not nearest_node:
-            nearest_node = tree.nearest_neighbor(q)
+        eps = eps or self.options.epsilon
+        nearest_node = nearest_node or tree.nearest_neighbor(q)
         if np.array_equal(nearest_node.q, q):
             return nearest_node
         q_extend = q.copy()
@@ -229,13 +229,21 @@ class RRT:
             return node_extend
         return None
 
-    def connect(self, q: np.ndarray, tree: Tree, eps: float | None = None) -> Node:
+    def connect(self, q: np.ndarray, tree: Tree, eps: float | None = None, max_connection_distance: float = None) -> Node:
+        eps = eps or self.options.epsilon
+        max_connection_distance = max_connection_distance or self.options.max_connection_distance
+
         nearest_node = tree.nearest_neighbor(q)
+        total_distance = 0.0
         while not np.array_equal(q, nearest_node.q):
-            next_node = self.extend(q, tree, nearest_node=nearest_node, eps=eps)
+            max_eps = min(eps, max_connection_distance - total_distance)
+            next_node = self.extend(q, tree, nearest_node=nearest_node, eps=max_eps)
             if not next_node:
                 break
             nearest_node = next_node
+            total_distance += max_eps
+            if total_distance >= max_connection_distance:
+                break
         return nearest_node
 
     def get_path(
