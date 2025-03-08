@@ -4,8 +4,9 @@ import mujoco
 import numpy as np
 from robot_descriptions.loaders.mujoco import load_robot_description
 
+from mj_maniPlan.collision_ruleset import CollisionRuleset
+from mj_maniPlan.joint_group import JointGroup
 import mj_maniPlan.inverse_kinematics as ik
-
 
 class TestInverseKinematics(unittest.TestCase):
     def test_ik(self):
@@ -14,6 +15,18 @@ class TestInverseKinematics(unittest.TestCase):
 
         data = mujoco.MjData(model)
         site = data.site(site_name)
+        arm_joints = [
+            "shoulder_pan_joint",
+            "shoulder_lift_joint",
+            "elbow_joint",
+            "wrist_1_joint",
+            "wrist_2_joint",
+            "wrist_3_joint",
+        ]
+        arm_joint_ids = [model.joint(joint).id for joint in arm_joints]
+        jg = JointGroup(model, arm_joint_ids)
+        cr = CollisionRuleset(model)
+        q_init_world = model.keyframe("home").qpos
 
         # Generate a pose for the IK problem by running FK on a
         # random configuration within joint limits.
@@ -26,9 +39,9 @@ class TestInverseKinematics(unittest.TestCase):
         mujoco.mju_mat2Quat(quat_target, target_rot)
 
         # Solve IK.
-        opts = ik.IKOptions(pos_tolerance=1e-3, ori_tolerance=1e-3)
+        opts = ik.IKOptions(jg=jg, cr=cr, pos_tolerance=1e-3, ori_tolerance=1e-3, seed=12345)
         q_candidate = ik.solve_ik(
-            model, site_name, target_pos, target_rot.reshape(3, 3), opts
+            site_name, q_init_world, target_pos, target_rot.reshape(3, 3), opts
         )
         self.assertIsNotNone(q_candidate)
 

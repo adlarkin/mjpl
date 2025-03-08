@@ -5,27 +5,36 @@ import mujoco
 import mujoco.viewer
 import numpy as np
 
+from . import utils
+from .collision_ruleset import CollisionRuleset
+from .joint_group import JointGroup
 
 @dataclass
 class IKOptions:
     """Options for solving inverse kinematics."""
 
+    # The joints to plan for.
+    jg: JointGroup | None = None
+    # The collision rules to enforce during planning.
+    cr: CollisionRuleset | None = None
+    # Seed used for the underlying sampler in the solver.
+    seed: int | None = None
     # Allowed position error.
     pos_tolerance: float = 1e-3
     # Allowed orientation error.
     ori_tolerance: float = 1e-3
     # Maximum iterations to run for the IK solver.
     iterations: int = 500
-    # Configuration used as the initial state for the IK solver.
-    q_init: np.ndarray | None = None
     # Solver to use. This comes from the qpsolvers package:
     # https://github.com/qpsolvers/qpsolvers
     solver: str = "quadprog"
+    # Maximum number of solve attempts.
+    max_attempts: int = 1
 
 
 def solve_ik(
-    model: mujoco.MjModel,
     site: str,
+    q_init_world: np.ndarray,
     target_pos: np.ndarray,
     target_rot: np.ndarray,
     opts: IKOptions = IKOptions(),
@@ -44,6 +53,12 @@ def solve_ik(
         `opts` for frame `site`. Returns None if a joint configuration is unable
         to be found.
     """
+    model = opts.jg.model
+    data = mujoco.MjData(model)
+    limits = [mink.ConfigurationLimit(model)]
+    rng = np.random.default_rng(seed=opts.seed)
+
+    configuration = mink.Configuration(model)    
     end_effector_task = mink.FrameTask(
         frame_name=site,
         frame_type="site",
@@ -59,24 +74,40 @@ def solve_ik(
     )
     tasks = [end_effector_task]
 
-    limits = [mink.ConfigurationLimit(model)]
+    for attempt_idx in range(opts.max_attempts):
+        # Initialize the state for IK.
+        q_init = q_init_world
+        if attempt_idx > 0:
+            q_init[opts.jg.joint_ids] = utils.random_valid_config(
+                rng, opts.jg, data, opts.cr,
+            )
+        configuration.update(q_init)
 
-    configuration = mink.Configuration(model)
-    configuration.update(opts.q_init)
+        # Attempt to solve IK.
+        for _ in range(opts.iterations):
+            err = end_effector_task.compute_error(configuration)
+            pos_achieved = np.linalg.norm(err[:3]) <= opts.pos_tolerance
+            ori_achieved = np.linalg.norm(err[3:]) <= opts.ori_tolerance
+            if pos_achieved and ori_achieved:
+                is_collision_free = utils.is_valid_config(
+                    configuration.q[opts.jg.joint_ids], opts.jg, data, opts.cr 
+                )
+                if not is_collision_free:
+                    print(f"IK solve attempt {attempt_idx+1}/{opts.max_attempts} in collision.")
+                    break
 
-    for _ in range(opts.iterations):
-        err = end_effector_task.compute_error(configuration)
-        pos_achieved = np.linalg.norm(err[:3]) <= opts.pos_tolerance
-        ori_achieved = np.linalg.norm(err[3:]) <= opts.ori_tolerance
-        if pos_achieved and ori_achieved:
-            return configuration.q
-        vel = mink.solve_ik(
-            configuration,
-            tasks,
-            model.opt.timestep,
-            solver=opts.solver,
-            damping=1e-3,
-            limits=limits,
-        )
-        configuration.integrate_inplace(vel, model.opt.timestep)
+                print(f"Solved IK on attempt {attempt_idx+1}.")
+                return configuration.q
+
+            vel = mink.solve_ik(
+                configuration,
+                tasks,
+                model.opt.timestep,
+                solver=opts.solver,
+                damping=1e-3,
+                limits=limits,
+            )
+            configuration.integrate_inplace(vel, model.opt.timestep)
+        print(f"IK solve attempt {attempt_idx+1} failed.")
+
     return None

@@ -121,7 +121,9 @@ class RRT:
         rot: np.ndarray,
         ik_opts: IKOptions = IKOptions(),
     ) -> list[np.ndarray]:
-        q_goal = solve_ik(self.options.jg.model, site, pos, rot, ik_opts)
+        ik_opts.jg = self.options.jg
+        ik_opts.cr = self.options.cr
+        q_goal = solve_ik(site, q_init_world, pos, rot, ik_opts)
         if q_goal is None:
             print("Unable to find a configuration for the target pose.")
             return []

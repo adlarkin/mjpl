@@ -8,6 +8,7 @@ from example_utils import parse_args
 
 import mj_maniPlan.visualization as viz
 from mj_maniPlan.collision_ruleset import CollisionRuleset
+from mj_maniPlan.inverse_kinematics import IKOptions
 from mj_maniPlan.joint_group import JointGroup
 from mj_maniPlan.rrt import RRT, RRTOptions
 from mj_maniPlan.trajectory import TrajectoryLimits, generate_trajectory
@@ -65,12 +66,17 @@ def main():
         seed=seed,
         goal_biasing_probability=0.1,
     )
+    ik_options = IKOptions(
+        jg=arm_jg,
+        cr=cr,
+        max_attempts=5,
+    )
     planner = RRT(planner_options)
 
     print("Planning...")
     start = time.time()
     path = planner.plan_to_pose(
-        q_init, _PANDA_EE_SITE, target_pos, target_rotmat.reshape(3, 3)
+        q_init, _PANDA_EE_SITE, target_pos, target_rotmat.reshape(3, 3), ik_options
     )
     if not path:
         print("Planning failed")
