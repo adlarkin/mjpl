@@ -209,7 +209,6 @@ class TestRRT(unittest.TestCase):
         self.assertTrue(np.array_equal(path[0], self.q_init))
         self.assertTrue(np.array_equal(path[-1], q_goal))
 
-        self.planner.options.epsilon
         for i in range(1, len(path)):
             self.assertLessEqual(
                 configuration_distance(path[i - 1], path[i]),
