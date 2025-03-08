@@ -8,6 +8,7 @@ from mj_maniPlan.collision_ruleset import CollisionRuleset
 from mj_maniPlan.joint_group import JointGroup
 import mj_maniPlan.inverse_kinematics as ik
 
+
 class TestInverseKinematics(unittest.TestCase):
     def test_ik(self):
         model = load_robot_description("ur5e_mj_description")
@@ -39,7 +40,9 @@ class TestInverseKinematics(unittest.TestCase):
         mujoco.mju_mat2Quat(quat_target, target_rot)
 
         # Solve IK.
-        opts = ik.IKOptions(jg=jg, cr=cr, pos_tolerance=1e-3, ori_tolerance=1e-3, seed=12345)
+        opts = ik.IKOptions(
+            jg=jg, cr=cr, pos_tolerance=1e-3, ori_tolerance=1e-3, seed=12345
+        )
         q_candidate = ik.solve_ik(
             site_name, q_init_world, target_pos, target_rot.reshape(3, 3), opts
         )

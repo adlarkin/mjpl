@@ -9,13 +9,14 @@ from . import utils
 from .collision_ruleset import CollisionRuleset
 from .joint_group import JointGroup
 
+
 @dataclass
 class IKOptions:
     """Options for solving inverse kinematics."""
 
-    # The joints to plan for.
+    # The joints to use when collision checking and generating retry states.
     jg: JointGroup | None = None
-    # The collision rules to enforce during planning.
+    # The collision rules to enforce..
     cr: CollisionRuleset | None = None
     # Seed used for the underlying sampler in the solver.
     seed: int | None = None
@@ -58,7 +59,7 @@ def solve_ik(
     limits = [mink.ConfigurationLimit(model)]
     rng = np.random.default_rng(seed=opts.seed)
 
-    configuration = mink.Configuration(model)    
+    configuration = mink.Configuration(model)
     end_effector_task = mink.FrameTask(
         frame_name=site,
         frame_type="site",
@@ -79,7 +80,10 @@ def solve_ik(
         q_init = q_init_world
         if attempt_idx > 0:
             q_init[opts.jg.joint_ids] = utils.random_valid_config(
-                rng, opts.jg, data, opts.cr,
+                rng,
+                opts.jg,
+                data,
+                opts.cr,
             )
         configuration.update(q_init)
 
@@ -90,13 +94,15 @@ def solve_ik(
             ori_achieved = np.linalg.norm(err[3:]) <= opts.ori_tolerance
             if pos_achieved and ori_achieved:
                 is_collision_free = utils.is_valid_config(
-                    configuration.q[opts.jg.joint_ids], opts.jg, data, opts.cr 
+                    configuration.q[opts.jg.joint_ids], opts.jg, data, opts.cr
                 )
                 if not is_collision_free:
-                    print(f"IK solve attempt {attempt_idx+1}/{opts.max_attempts} in collision.")
+                    print(
+                        f"IK solve attempt {attempt_idx + 1}/{opts.max_attempts} in collision."
+                    )
                     break
 
-                print(f"Solved IK on attempt {attempt_idx+1}.")
+                print(f"Solved IK on attempt {attempt_idx + 1}.")
                 return configuration.q
 
             vel = mink.solve_ik(
@@ -108,6 +114,6 @@ def solve_ik(
                 limits=limits,
             )
             configuration.integrate_inplace(vel, model.opt.timestep)
-        print(f"IK solve attempt {attempt_idx+1} failed.")
+        print(f"IK solve attempt {attempt_idx + 1} failed.")
 
     return None
