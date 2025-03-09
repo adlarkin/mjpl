@@ -30,16 +30,14 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = [
-  "black",
-  "pre-commit",
-  "ruff",
-]
 test = [
   "robot_descriptions",
 ]
-all = [
-  "mj_maniplan[dev,test]"
+dev = [
+  "black",
+  "mj_maniplan[test]",
+  "pre-commit",
+  "ruff",
 ]
 
 [project.urls]
