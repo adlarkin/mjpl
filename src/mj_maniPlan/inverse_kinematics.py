@@ -14,11 +14,11 @@ from .joint_group import JointGroup
 class IKOptions:
     """Options for solving inverse kinematics."""
 
-    # The joints to use when collision checking and generating retry states.
-    jg: JointGroup | None = None
-    # The collision rules to enforce..
+    # The joints to use when generating and validating configurations.
+    jg: JointGroup = None
+    # The collision rules to enforce. If `None`, this disables collision checks.
     cr: CollisionRuleset | None = None
-    # Seed used for the underlying sampler in the solver.
+    # Seed used for generating random samples in the case of retries.
     seed: int | None = None
     # Allowed position error.
     pos_tolerance: float = 1e-3
@@ -77,7 +77,7 @@ def solve_ik(
 
     for attempt_idx in range(opts.max_attempts):
         # Initialize the state for IK.
-        q_init = q_init_guess
+        q_init = q_init_guess.copy()
         if attempt_idx > 0:
             q_init[opts.jg.joint_ids] = utils.random_valid_config(
                 rng,
@@ -93,7 +93,7 @@ def solve_ik(
             pos_achieved = np.linalg.norm(err[:3]) <= opts.pos_tolerance
             ori_achieved = np.linalg.norm(err[3:]) <= opts.ori_tolerance
             if pos_achieved and ori_achieved:
-                is_collision_free = utils.is_valid_config(
+                is_collision_free = (opts.cr is not None) and utils.is_valid_config(
                     configuration.q[opts.jg.joint_ids], opts.jg, data, opts.cr
                 )
                 if not is_collision_free:
@@ -102,7 +102,6 @@ def solve_ik(
                     )
                     break
 
-                print(f"Solved IK on attempt {attempt_idx + 1}.")
                 return configuration.q
 
             vel = mink.solve_ik(
@@ -114,6 +113,5 @@ def solve_ik(
                 limits=limits,
             )
             configuration.integrate_inplace(vel, model.opt.timestep)
-        print(f"IK solve attempt {attempt_idx + 1} failed.")
 
     return None
