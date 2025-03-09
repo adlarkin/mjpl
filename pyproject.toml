@@ -11,7 +11,6 @@ dependencies = [
   "numpy",
   "ruckig",
 ]
-# TODO (#28): change to 3.9 if project supports it
 requires-python = ">=3.10"
 authors = [
   { name="Ashton Larkin", email="" },
@@ -47,7 +46,6 @@ all = [
 Homepage = "https://github.com/adlarkin/mj_maniPlan"
 
 [tool.ruff]
-# TODO (#28): change to 3.9 (py39) if project supports it
 target-version = "py310"
 
 [tool.ruff.lint]
