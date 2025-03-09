@@ -57,7 +57,6 @@ def main():
         cr=cr,
         max_planning_time=10.0,
         epsilon=epsilon,
-        shortcut_filler_epsilon=np.inf,
         seed=seed,
         goal_biasing_probability=0.1,
         max_connection_distance=np.inf,
@@ -74,7 +73,7 @@ def main():
 
     print("Shortcutting...")
     start = time.time()
-    shortcut_path = planner.shortcut(path, num_attempts=len(path))
+    shortcut_path = planner.shortcut(path, np.inf, num_attempts=len(path))
     print(f"Shortcutting took {(time.time() - start):.4f}s")
 
     # These values are for demonstration purposes only.

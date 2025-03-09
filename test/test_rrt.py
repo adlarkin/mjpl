@@ -31,7 +31,6 @@ class TestRRT(unittest.TestCase):
             cr=cr,
             max_planning_time=5.0,
             epsilon=0.1,
-            shortcut_filler_epsilon=0.1,
             seed=42,
         )
 
@@ -42,7 +41,7 @@ class TestRRT(unittest.TestCase):
 
         self.planner = rrt.RRT(options)
 
-    def load_ball_sliding_along_xy_model(self, epsilon, shortcut_filler_epsilon):
+    def load_ball_sliding_along_xy_model(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
 
         planning_joints = [
@@ -57,8 +56,7 @@ class TestRRT(unittest.TestCase):
             jg=jg,
             cr=cr,
             max_planning_time=5.0,
-            epsilon=epsilon,
-            shortcut_filler_epsilon=shortcut_filler_epsilon,
+            epsilon=0.1,
             seed=42,
         )
 
@@ -271,7 +269,7 @@ class TestRRT(unittest.TestCase):
         self.assertTrue(np.array_equal(path[1], q_goal))
 
     def test_shortcut(self):
-        self.load_ball_sliding_along_xy_model(0.1, 0.3)
+        self.load_ball_sliding_along_xy_model()
 
         """
         Suboptimal path that can benefit from shortcutting
@@ -303,6 +301,8 @@ class TestRRT(unittest.TestCase):
 
         original_path = path.copy()
 
+        filler_eps = 0.3
+
         # Test case where waypoints are removed but filler waypoints are not added.
         expected_shortcut_path = [
             n_0.q,
@@ -311,7 +311,7 @@ class TestRRT(unittest.TestCase):
             n_6.q,
             n_7.q,
         ]
-        shortcut_path = self.planner.shortcut(path, start_idx=2, end_idx=6)
+        shortcut_path = self.planner.shortcut(path, filler_eps, start_idx=2, end_idx=6)
         self.assertEqual(len(shortcut_path), len(expected_shortcut_path))
         for i in range(len(shortcut_path)):
             self.assertTrue(np.array_equal(shortcut_path[i], expected_shortcut_path[i]))
@@ -322,7 +322,7 @@ class TestRRT(unittest.TestCase):
             np.array([0.2, 0.0]),
             n_7.q,
         ]
-        shortcut_path = self.planner.shortcut(path, start_idx=0, end_idx=7)
+        shortcut_path = self.planner.shortcut(path, filler_eps, start_idx=0, end_idx=7)
         self.assertEqual(len(shortcut_path), len(expected_shortcut_path))
         # First and last waypoints of the shortcut path should match the first and last
         # waypoints of the original path.
@@ -330,21 +330,22 @@ class TestRRT(unittest.TestCase):
         self.assertTrue(np.array_equal(shortcut_path[-1], expected_shortcut_path[-1]))
         # Filler waypoint was added since the configuration distance between the first and
         # last waypoint in the shortcut path is greater than RRTOptions.epsilon.
-        self.assertTrue(
-            (abs(shortcut_path[1] - expected_shortcut_path[1]) <= 1e-9).all()
+        np.testing.assert_allclose(
+            shortcut_path[1], expected_shortcut_path[1], rtol=0, atol=1e-8
         )
 
         # Shortcutting two adjacent waypoints should keep all of the original path waypoints
         # since the filler epsilon is greater than the epsilon used for the original path.
-        unmodified_path = self.planner.shortcut(path, start_idx=6, end_idx=7)
+        unmodified_path = self.planner.shortcut(
+            path, filler_eps, start_idx=6, end_idx=7
+        )
         self.assertEqual(len(unmodified_path), len(path))
         for i in range(len(unmodified_path)):
             self.assertTrue(np.array_equal(unmodified_path[i], path[i]))
 
         # Test shortcutting with a filler epsilon of infinity.
         # This has the effect of performing no waypoint filling on the initial shortcut path.
-        self.load_ball_sliding_along_xy_model(0.1, float("inf"))
-        shortcut_path = self.planner.shortcut(path, start_idx=0, end_idx=7)
+        shortcut_path = self.planner.shortcut(path, np.inf, start_idx=0, end_idx=7)
         # Since no filling is performed, the shortcut path is just the initial and final waypoint
         # from the original path.
         self.assertEqual(len(shortcut_path), 2)
@@ -353,12 +354,14 @@ class TestRRT(unittest.TestCase):
 
         # make sure invalid kwargs are caught
         with self.assertRaisesRegex(ValueError, "Invalid kwargs"):
-            self.planner.shortcut(path)
-            self.planner.shortcut(path, num_attempts=1, start_idx=5, end_idx=6)
-            self.planner.shortcut(path, num_attempts=1, start_idx=5)
-            self.planner.shortcut(path, num_attempts=1, end_idx=5)
-            self.planner.shortcut(path, start_idx=5)
-            self.planner.shortcut(path, end_idx=5)
+            self.planner.shortcut(path, filler_eps)
+            self.planner.shortcut(
+                path, filler_eps, num_attempts=1, start_idx=5, end_idx=6
+            )
+            self.planner.shortcut(path, filler_eps, num_attempts=1, start_idx=5)
+            self.planner.shortcut(path, filler_eps, num_attempts=1, end_idx=5)
+            self.planner.shortcut(path, filler_eps, start_idx=5)
+            self.planner.shortcut(path, filler_eps, end_idx=5)
 
         # shortcutting should create a new path and not modify the original
         self.assertEqual(len(original_path), len(path))
