@@ -290,24 +290,23 @@ class RRT:
                                             `path` to attempt shortcutting on.
         """
         if len(kwargs) == 1 and "num_attempts" in kwargs:
-            shortened_path = path.copy()
+            # sanity check: can we shortcut directly between the start/end of the path?
+            shortened_path = self.__shortcut(path, np.inf, 0, len(path)-1)
             for _ in range(kwargs["num_attempts"]):
+                if len(shortened_path) == 2:
+                    # we can go directly from start to goal, so no more shortcutting can be done
+                    break
                 # randomly pick 2 waypoints
                 start, end = 0, 0
                 while start == end:
                     start, end = self.rng.integers(len(shortened_path), size=2)
                 if start > end:
                     start, end = end, start
-                shortened_path = self.__shortcut(
-                    shortened_path, filler_eps, False, start, end
-                )
-                if len(shortened_path) == 2:
-                    # we can go directly from start to goal, so no more shortcutting can be done
-                    break
+                shortened_path = self.__shortcut(shortened_path, np.inf, start, end)
             return self.__fill_path(shortened_path, filler_eps)
         elif len(kwargs) == 2 and ("start_idx" in kwargs and "end_idx" in kwargs):
             return self.__shortcut(
-                path, filler_eps, True, kwargs["start_idx"], kwargs["end_idx"]
+                path, filler_eps, kwargs["start_idx"], kwargs["end_idx"]
             )
         else:
             raise ValueError(
@@ -318,7 +317,6 @@ class RRT:
         self,
         path: list[np.ndarray],
         filler_eps: float,
-        fill: bool,
         start: int,
         end: int,
     ) -> list[np.ndarray]:
@@ -327,8 +325,6 @@ class RRT:
         Args:
             path: The path to shortcut.
             filler_eps: See the documentation for `filler_eps` in self.shortcut.
-                        This is only used if `fill` is True.
-            fill: Whether or not waypoint filling should be performed after shortcutting.
             start: The index of the first waypoint candidate to shortcut.
             end: The index of the second waypoint candidate to shortcut.
 
@@ -344,8 +340,7 @@ class RRT:
         connected_node = self.connect(q_end, tree)
         if np.array_equal(connected_node.q, q_end):
             shortened_path = path[: start + 1] + path[end:]
-            if fill:
-                shortened_path = self.__fill_path(shortened_path, filler_eps)
+            shortened_path = self.__fill_path(shortened_path, filler_eps)
             return shortened_path
         return path
 
