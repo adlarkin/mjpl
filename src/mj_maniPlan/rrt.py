@@ -234,7 +234,7 @@ class RRT:
         q: np.ndarray,
         tree: Tree,
         eps: float | None = None,
-        max_connection_distance: float = None,
+        max_connection_distance: float | None = None,
     ) -> Node:
         eps = eps or self.options.epsilon
         max_connection_distance = (
