@@ -64,6 +64,7 @@ def main():
         shortcut_filler_epsilon=np.inf,
         seed=seed,
         goal_biasing_probability=0.1,
+        max_connection_distance=np.inf,
     )
     planner = RRT(planner_options)
 

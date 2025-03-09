@@ -97,7 +97,7 @@ class RRTOptions:
     # How often to sample the goal state when building the tree.
     # This should be a value within [0.0, 1.0].
     goal_biasing_probability: float = 0.05
-    # The maximum distance for extending a tree using the RRT-Connect algorithm.
+    # The maximum distance for extending a tree using CONNECT.
     max_connection_distance: float = np.inf
 
 
