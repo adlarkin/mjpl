@@ -73,27 +73,13 @@ class RRTOptions:
     # Maximum planning time, in seconds.
     # If this value is <= 0, the planner will run until a solution is found.
     # A value <= 0 may lead to infinite run time, since sampling-based planners are probabilistically complete!
-    max_planning_time: float
+    max_planning_time: float = 10
     # The RRT "growth factor".
     # This is the maximum distance between nodes in the tree.
     # This number should be > 0.
-    epsilon: float
-    # After shortcutting, the path may have adjacent waypoints that have a configuration distance > epsilon
-    # (i.e., the original shortcut path is a "sparse" path).
-    # To maintain path structure, intermediate configurations are added between pairs of distant adjacent waypoints
-    # (i.e., the "sparse" path is turned into a "dense" path).
-    #
-    # For two adjacent waypoints in the "sparse" path, q_1 and q_2, if configuration_distance(q_1, q_2) > shortcut_filler_epsilon,
-    # then filler waypoints are added between q_1 and q_2, spaced at a configuration distance of shortcut_filler_epsilon,
-    # starting from q_1.
-    #
-    # shortcut_filler_epsilon should be >= epsilon since adjacent waypoints in the "sparse" path can be connected directly.
-    #
-    # If the user does not want waypoint filling after the initial path shortcutting is performed, this value should be
-    # set to infinity.
-    shortcut_filler_epsilon: float
+    epsilon: float = 0.05
     # Seed used for the underlying sampler in the planner.
-    seed: int | None
+    seed: int | None = None
     # How often to sample the goal state when building the tree.
     # This should be a value within [0.0, 1.0].
     goal_biasing_probability: float = 0.05
@@ -279,13 +265,30 @@ class RRT:
             path_start.pop()
         return path_start + path_end
 
-    # This method can be called the following ways:
-    #   shortcut(path, num_tries=)
-    #       - This will randomly pick a set of points within `path` and try to shortcut them.
-    #         This process repeats `num_tries` times
-    #   shortcut(path, start_idx=, end_idx=)
-    #       - This will try to shortcut `path` between points at indices `start_idx` and `end_idx`, assuming start_idx < end_idx
-    def shortcut(self, path: list[np.ndarray], **kwargs) -> list[np.ndarray]:
+    def shortcut(
+        self, path: list[np.ndarray], filler_eps: float, **kwargs
+    ) -> list[np.ndarray]:
+        """Perform shortcutting on a path.
+
+        This can be called in several ways:
+            shortcut_path = rrt.shortcut(path, num_tries=100)
+
+            # assumes that `path` is of at least length 10
+            shortcut_path = rrt.shortcut(path, start_idx=5, end_idx=9)
+
+        Args:
+            path: The path to shortcut.
+            filler_eps: The maximum distance allowed between waypoints in the shortcut path.
+                        If shortcutting is performed between two waypoints (w1, w2) and the
+                        distance between (w1, w2) is > filler_eps, intermediate waypoints
+                        spaced at filler_eps will be added between (w1, w2).
+                        To disable waypoint filling after shortcutting, set this to np.inf.
+            kwargs: Arguments that define shortcutting behavior. Options include:
+                      - num_attempts: The number of shortcut attempts. Each attempt will
+                                      randomly select two waypoints in the path.
+                      - start_idx, end_idx: The indices of the specific waypoints in
+                                            `path` to attempt shortcutting on.
+        """
         if len(kwargs) == 1 and "num_attempts" in kwargs:
             shortened_path = path.copy()
             for _ in range(kwargs["num_attempts"]):
@@ -295,22 +298,44 @@ class RRT:
                     start, end = self.rng.integers(len(shortened_path), size=2)
                 if start > end:
                     start, end = end, start
-                shortened_path = self.__shortcut(shortened_path, start, end, False)
+                shortened_path = self.__shortcut(
+                    shortened_path, filler_eps, False, start, end
+                )
                 if len(shortened_path) == 2:
                     # we can go directly from start to goal, so no more shortcutting can be done
                     break
-            return self.__make_dense_path(shortened_path)
+            return self.__fill_path(shortened_path, filler_eps)
         elif len(kwargs) == 2 and ("start_idx" in kwargs and "end_idx" in kwargs):
-            return self.__shortcut(path, kwargs["start_idx"], kwargs["end_idx"], True)
+            return self.__shortcut(
+                path, filler_eps, True, kwargs["start_idx"], kwargs["end_idx"]
+            )
         else:
             raise ValueError(
                 f"Invalid kwargs combination. Expected ['num_attempts'] or ['start_idx', 'end_idx'], but received {list(kwargs.keys())}"
             )
 
-    # Helper function for performing the actual shortcutting - see the `shortcut` method
     def __shortcut(
-        self, path: list[np.ndarray], start: int, end: int, make_dense: bool
+        self,
+        path: list[np.ndarray],
+        filler_eps: float,
+        fill: bool,
+        start: int,
+        end: int,
     ) -> list[np.ndarray]:
+        """Helper function for performing shortcutting between two specific waypoints.
+
+        Args:
+            path: The path to shortcut.
+            filler_eps: See the documentation for `filler_eps` in self.shortcut.
+                        This is only used if `fill` is True.
+            fill: Whether or not waypoint filling should be performed after shortcutting.
+            start: The index of the first waypoint candidate to shortcut.
+            end: The index of the second waypoint candidate to shortcut.
+
+        Returns:
+            A path with shortcutting between the waypoints at indices (start, end) if
+            the waypoints at these indices can be connected.
+        """
         q_start = path[start]
         q_end = path[end]
         # see if these 2 waypoints can make a valid path
@@ -319,33 +344,37 @@ class RRT:
         connected_node = self.connect(q_end, tree)
         if np.array_equal(connected_node.q, q_end):
             shortened_path = path[: start + 1] + path[end:]
-            if make_dense:
-                shortened_path = self.__make_dense_path(shortened_path)
+            if fill:
+                shortened_path = self.__fill_path(shortened_path, filler_eps)
             return shortened_path
         return path
 
-    # Make a "sparse" path "dense" by adding intermediate waypoints between
-    # adjacent waypoints that have a configuration distance > shortcut_filler_epsilon.
-    # Adding filler waypoints to the "sparse" path helps maintain path structure.
-    def __make_dense_path(self, path: list[np.ndarray]) -> list[np.ndarray]:
-        dense_path = []
+    def __fill_path(
+        self, path: list[np.ndarray], filler_eps: float
+    ) -> list[np.ndarray]:
+        """Perform waypoint filling on a path.
+
+        Args:
+            path: The path to fill.
+            filler_eps: See the documentation for `filler_eps` in self.shortcut.
+
+        Returns:
+            A path with intermediate waypoints spaced at `filler_eps` in between waypoints
+            in `path` that are further than `filler_eps` apart.
+        """
+        filled_path = []
         for i in range(len(path) - 1):
             q_curr = path[i]
             q_next = path[i + 1]
-            dense_path.append(q_curr)
-            if (
-                utils.configuration_distance(q_curr, q_next)
-                > self.options.shortcut_filler_epsilon
-            ):
+            filled_path.append(q_curr)
+            if utils.configuration_distance(q_curr, q_next) > filler_eps:
                 tree = Tree()
                 tree.add_node(Node(q_curr, None))
-                connected_node = self.connect(
-                    q_next, tree, eps=self.options.shortcut_filler_epsilon
-                )
+                connected_node = self.connect(q_next, tree, eps=filler_eps)
                 intermediate_configs = tree.get_path(connected_node)
                 intermediate_configs.reverse()
                 # don't add the first (q_curr) or last (q_next) elements since that
                 # is already being done in the for loop
-                dense_path += intermediate_configs[1:-1]
-        dense_path.append(path[-1])
-        return dense_path
+                filled_path += intermediate_configs[1:-1]
+        filled_path.append(path[-1])
+        return filled_path
