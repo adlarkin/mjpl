@@ -17,3 +17,16 @@ repos:
         entry: python3 -m unittest -v
         language: system
         pass_filenames: false  # We don't pass filenames to unittest
+
+
+# Configures automatic testing with pre-commit.ci
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit.com hooks
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: ['run-tests']
+  submodules: false
