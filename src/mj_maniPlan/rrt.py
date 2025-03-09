@@ -158,20 +158,14 @@ class RRT:
             print("q_goal is not a valid configuration")
             return []
 
+        # Is there a direct connection to q_goal from q_init?
+        if utils.configuration_distance(q_init, q_goal) < self.options.epsilon:
+            return [q_init, q_goal]
+
         start_tree = Tree()
         start_tree.add_node(Node(q_init, None))
         goal_tree = Tree()
         goal_tree.add_node(Node(q_goal, None))
-
-        # Is there a direct connection to q_goal from q_init?
-        potential_goal_node = self.connect(q_goal, start_tree)
-        if np.array_equal(potential_goal_node.q, q_goal):
-            return self.get_path(
-                start_tree,
-                potential_goal_node,
-                goal_tree,
-                goal_tree.nearest_neighbor(q_goal),
-            )
 
         max_planning_time = self.options.max_planning_time
         if max_planning_time <= 0:
@@ -183,12 +177,24 @@ class RRT:
                 q_rand = q_goal
             else:
                 q_rand = self.options.jg.random_config(self.rng)
+
             new_start_tree_node = self.connect(q_rand, start_tree)
-            if new_start_tree_node:
-                new_goal_tree_node = self.connect(new_start_tree_node.q, goal_tree)
+            new_goal_tree_node = self.connect(new_start_tree_node.q, goal_tree)
+            if (
+                utils.configuration_distance(
+                    new_start_tree_node.q, new_goal_tree_node.q
+                )
+                < self.options.epsilon
+            ):
+                return self.get_path(
+                    start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
+                )
+
+            if not np.array_equal(new_start_tree_node.q, q_rand):
+                new_goal_tree_node = self.connect(q_rand, goal_tree)
+                new_start_tree_node = self.connect(new_goal_tree_node.q, start_tree)
                 if (
-                    new_goal_tree_node
-                    and utils.configuration_distance(
+                    utils.configuration_distance(
                         new_start_tree_node.q, new_goal_tree_node.q
                     )
                     < self.options.epsilon
@@ -196,6 +202,7 @@ class RRT:
                     return self.get_path(
                         start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
                     )
+
         return []
 
     def extend(
