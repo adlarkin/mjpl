@@ -116,7 +116,10 @@ def main():
 
     if visualize:
         with mujoco.viewer.launch_passive(
-            model=model, data=data, show_left_ui=False, show_right_ui=False,
+            model=model,
+            data=data,
+            show_left_ui=False,
+            show_right_ui=False,
         ) as viewer:
             # Update the viewer's orientation to capture the scene.
             viewer.cam.lookat = [0, 0, 0.35]

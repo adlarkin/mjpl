@@ -229,9 +229,17 @@ class RRT:
             return node_extend
         return None
 
-    def connect(self, q: np.ndarray, tree: Tree, eps: float | None = None, max_connection_distance: float = None) -> Node:
+    def connect(
+        self,
+        q: np.ndarray,
+        tree: Tree,
+        eps: float | None = None,
+        max_connection_distance: float = None,
+    ) -> Node:
         eps = eps or self.options.epsilon
-        max_connection_distance = max_connection_distance or self.options.max_connection_distance
+        max_connection_distance = (
+            max_connection_distance or self.options.max_connection_distance
+        )
 
         nearest_node = tree.nearest_neighbor(q)
         total_distance = 0.0
