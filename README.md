@@ -48,7 +48,7 @@ pre-commit install
 
 To trigger the hooks manually:
 ```
-pre-commmit run --all-files
+pre-commit run --all-files
 ```
 
 To bypass installed pre-commit hooks on commit:
