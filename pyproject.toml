@@ -11,7 +11,6 @@ dependencies = [
   "numpy",
   "ruckig",
 ]
-# TODO (#28): change to 3.9 if project supports it
 requires-python = ">=3.10"
 authors = [
   { name="Ashton Larkin", email="" },
@@ -31,23 +30,20 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = [
-  "black",
-  "pre-commit",
-  "ruff",
-]
 test = [
   "robot_descriptions",
 ]
-all = [
-  "mj_maniplan[dev,test]"
+dev = [
+  "black",
+  "mj_maniplan[test]",
+  "pre-commit",
+  "ruff",
 ]
 
 [project.urls]
 Homepage = "https://github.com/adlarkin/mj_maniPlan"
 
 [tool.ruff]
-# TODO (#28): change to 3.9 (py39) if project supports it
 target-version = "py310"
 
 [tool.ruff.lint]
