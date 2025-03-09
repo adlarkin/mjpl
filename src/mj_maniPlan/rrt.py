@@ -73,7 +73,7 @@ class RRTOptions:
     # Maximum planning time, in seconds.
     # If this value is <= 0, the planner will run until a solution is found.
     # A value <= 0 may lead to infinite run time, since sampling-based planners are probabilistically complete!
-    max_planning_time: float = 10
+    max_planning_time: float = 10.0
     # The RRT "growth factor".
     # This is the maximum distance between nodes in the tree.
     # This number should be > 0.
@@ -291,7 +291,7 @@ class RRT:
         """
         if len(kwargs) == 1 and "num_attempts" in kwargs:
             # sanity check: can we shortcut directly between the start/end of the path?
-            shortened_path = self.__shortcut(path, np.inf, 0, len(path)-1)
+            shortened_path = self.__shortcut(path, np.inf, 0, len(path) - 1)
             for _ in range(kwargs["num_attempts"]):
                 if len(shortened_path) == 2:
                     # we can go directly from start to goal, so no more shortcutting can be done
