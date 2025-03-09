@@ -9,12 +9,6 @@
       <joint axis="0 1 0" range="-3.1415 3.1415" armature="0.1"/>
       <general gaintype="fixed" biastype="affine" ctrlrange="-3.1415 3.1415" gainprm="2000" biasprm="0 -2000 -400"
         forcerange="-150 150"/>
-      <default class="size3">
-        <default class="size3_limited">
-          <joint range="-3.1415 3.1415"/>
-          <general ctrlrange="-3.1415 3.1415"/>
-        </default>
-      </default>
       <default class="size1">
         <general gainprm="500" biasprm="0 -500 -100" forcerange="-28 28"/>
       </default>
@@ -67,14 +61,14 @@
       <geom mesh="base_1" material="jointgray" class="visual"/>
       <body name="shoulder_link" pos="0 0 0.163">
         <inertial mass="3.7" pos="0 0 0" diaginertia="0.0102675 0.0102675 0.00666"/>
-        <joint name="shoulder_pan_joint" class="size3" axis="0 0 1"/>
+        <joint name="shoulder_pan_joint" axis="0 0 1"/>
         <geom mesh="shoulder_0" material="urblue" class="visual"/>
         <geom mesh="shoulder_1" material="black" class="visual"/>
         <geom mesh="shoulder_2" material="jointgray" class="visual"/>
         <geom class="collision" size="0.06 0.06" pos="0 0 -0.04"/>
         <body name="upper_arm_link" pos="0 0.138 0" quat="1 0 1 0">
           <inertial mass="8.393" pos="0 0 0.2125" diaginertia="0.133886 0.133886 0.0151074"/>
-          <joint name="shoulder_lift_joint" class="size3"/>
+          <joint name="shoulder_lift_joint"/>
           <geom mesh="upperarm_0" material="linkgray" class="visual"/>
           <geom mesh="upperarm_1" material="black" class="visual"/>
           <geom mesh="upperarm_2" material="jointgray" class="visual"/>
@@ -83,7 +77,7 @@
           <geom class="collision" size="0.05 0.2" pos="0 0 0.2"/>
           <body name="forearm_link" pos="0 -0.131 0.425">
             <inertial mass="2.275" pos="0 0 0.196" diaginertia="0.0311796 0.0311796 0.004095"/>
-            <joint name="elbow_joint" class="size3_limited"/>
+            <joint name="elbow_joint"/>
             <geom mesh="forearm_0" material="urblue" class="visual"/>
             <geom mesh="forearm_1" material="linkgray" class="visual"/>
             <geom mesh="forearm_2" material="black" class="visual"/>
@@ -122,9 +116,9 @@
   </worldbody>
 
   <actuator>
-    <general class="size3" name="shoulder_pan" joint="shoulder_pan_joint"/>
-    <general class="size3" name="shoulder_lift" joint="shoulder_lift_joint"/>
-    <general class="size3_limited" name="elbow" joint="elbow_joint"/>
+    <general class="ur5e" name="shoulder_pan" joint="shoulder_pan_joint"/>
+    <general class="ur5e" name="shoulder_lift" joint="shoulder_lift_joint"/>
+    <general class="ur5e" name="elbow" joint="elbow_joint"/>
     <general class="size1" name="wrist_1" joint="wrist_1_joint"/>
     <general class="size1" name="wrist_2" joint="wrist_2_joint"/>
     <general class="size1" name="wrist_3" joint="wrist_3_joint"/>
