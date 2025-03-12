@@ -14,7 +14,7 @@ from .joint_group import JointGroup
 class IKOptions:
     """Options for solving inverse kinematics."""
 
-    # The joints to use when generating and validating configurations.
+    # The joints to use when generating initial states for new solve attempts and validating configurations.
     jg: JointGroup = None
     # The collision rules to enforce. If `None`, this disables collision checks.
     cr: CollisionRuleset | None = None
