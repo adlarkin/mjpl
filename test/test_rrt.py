@@ -7,6 +7,7 @@ import numpy as np
 import mj_maniPlan.rrt as rrt
 from mj_maniPlan.collision_ruleset import CollisionRuleset
 from mj_maniPlan.joint_group import JointGroup
+from mj_maniPlan.utils import configuration_distance
 
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
@@ -146,6 +147,51 @@ class TestRRT(unittest.TestCase):
         # step further to ensure that same_extended_node and extended_node are the same object.
         self.assertIs(same_connected_node, goal_node)
 
+    def test_connect_max_distance(self):
+        self.load_ball_with_obstacle_model()
+
+        tree = rrt.Tree()
+        tree.add_node(rrt.Node(self.q_init, None))
+        q_goal = np.array([0.15])
+
+        # Run one connect operation to a max distance.
+        goal_node = self.planner.connect(
+            q_goal, tree, eps=0.05, max_connection_distance=0.075
+        )
+
+        expected_qs_in_tree = [
+            self.q_init,
+            np.array([-0.05]),  # Moves one "eps"
+            np.array([-0.025]),  # Moves to max connection distance
+        ]
+        for q_tree in expected_qs_in_tree:
+            n = tree.nearest_neighbor(q_tree)
+            self.assertAlmostEqual(n.q[0], q_tree[0], places=9)
+
+        # Run a second and third connect which should still not get to the goal.
+        for _ in range(2):
+            goal_node = self.planner.connect(
+                q_goal, tree, eps=0.05, max_connection_distance=0.075
+            )
+
+        expected_qs_in_tree.extend(
+            [
+                np.array([0.025]),  # Moves one "eps"
+                np.array([0.05]),  # Moves to max connection distance
+                np.array([0.1]),  # Moves one more "eps"
+                np.array([0.125]),  # Moves to max connection distance
+            ]
+        )
+        for q_tree in expected_qs_in_tree:
+            n = tree.nearest_neighbor(q_tree)
+            self.assertAlmostEqual(n.q[0], q_tree[0], places=9)
+
+        # The final connect should finally reach the goal!
+        goal_node = self.planner.connect(
+            q_goal, tree, eps=0.05, max_connection_distance=0.075
+        )
+        self.assertAlmostEqual(goal_node.q[0], q_goal[0], places=9)
+
     def test_extend_and_connect_into_obstacle(self):
         self.load_ball_with_obstacle_model()
 
@@ -208,9 +254,11 @@ class TestRRT(unittest.TestCase):
         self.assertTrue(np.array_equal(path[0], self.q_init))
         self.assertTrue(np.array_equal(path[-1], q_goal))
 
-        # The path should be strictly increasing to q_goal
         for i in range(1, len(path)):
-            self.assertGreater(path[i][0], path[i - 1][0])
+            self.assertLessEqual(
+                configuration_distance(path[i - 1], path[i]),
+                self.planner.options.epsilon,
+            )
 
     def test_trivial_rrt(self):
         self.load_ball_with_obstacle_model()

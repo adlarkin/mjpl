@@ -97,6 +97,8 @@ class RRTOptions:
     # How often to sample the goal state when building the tree.
     # This should be a value within [0.0, 1.0].
     goal_biasing_probability: float = 0.05
+    # The maximum distance for extending a tree using CONNECT.
+    max_connection_distance: float = np.inf
 
 
 # Implementation of Bidirectional RRT-Connect:
@@ -165,20 +167,14 @@ class RRT:
             print("q_goal is not a valid configuration")
             return []
 
+        # Is there a direct connection to q_goal from q_init?
+        if utils.configuration_distance(q_init, q_goal) < self.options.epsilon:
+            return [q_init, q_goal]
+
         start_tree = Tree()
         start_tree.add_node(Node(q_init, None))
         goal_tree = Tree()
         goal_tree.add_node(Node(q_goal, None))
-
-        # Is there a direct connection to q_goal from q_init?
-        potential_goal_node = self.connect(q_goal, start_tree)
-        if np.array_equal(potential_goal_node.q, q_goal):
-            return self.get_path(
-                start_tree,
-                potential_goal_node,
-                goal_tree,
-                goal_tree.nearest_neighbor(q_goal),
-            )
 
         max_planning_time = self.options.max_planning_time
         if max_planning_time <= 0:
@@ -190,12 +186,24 @@ class RRT:
                 q_rand = q_goal
             else:
                 q_rand = self.options.jg.random_config(self.rng)
+
             new_start_tree_node = self.connect(q_rand, start_tree)
-            if new_start_tree_node:
-                new_goal_tree_node = self.connect(new_start_tree_node.q, goal_tree)
+            new_goal_tree_node = self.connect(new_start_tree_node.q, goal_tree)
+            if (
+                utils.configuration_distance(
+                    new_start_tree_node.q, new_goal_tree_node.q
+                )
+                < self.options.epsilon
+            ):
+                return self.get_path(
+                    start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
+                )
+
+            if not np.array_equal(new_start_tree_node.q, q_rand):
+                new_goal_tree_node = self.connect(q_rand, goal_tree)
+                new_start_tree_node = self.connect(new_goal_tree_node.q, start_tree)
                 if (
-                    new_goal_tree_node
-                    and utils.configuration_distance(
+                    utils.configuration_distance(
                         new_start_tree_node.q, new_goal_tree_node.q
                     )
                     < self.options.epsilon
@@ -203,6 +211,7 @@ class RRT:
                     return self.get_path(
                         start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
                     )
+
         return []
 
     def extend(
@@ -212,10 +221,8 @@ class RRT:
         nearest_node: Node | None = None,
         eps: float | None = None,
     ) -> Node | None:
-        if not eps:
-            eps = self.options.epsilon
-        if not nearest_node:
-            nearest_node = tree.nearest_neighbor(q)
+        eps = eps or self.options.epsilon
+        nearest_node = nearest_node or tree.nearest_neighbor(q)
         if np.array_equal(nearest_node.q, q):
             return nearest_node
         q_extend = q.copy()
@@ -229,13 +236,29 @@ class RRT:
             return node_extend
         return None
 
-    def connect(self, q: np.ndarray, tree: Tree, eps: float | None = None) -> Node:
+    def connect(
+        self,
+        q: np.ndarray,
+        tree: Tree,
+        eps: float | None = None,
+        max_connection_distance: float | None = None,
+    ) -> Node:
+        eps = eps or self.options.epsilon
+        max_connection_distance = (
+            max_connection_distance or self.options.max_connection_distance
+        )
+
         nearest_node = tree.nearest_neighbor(q)
+        total_distance = 0.0
         while not np.array_equal(q, nearest_node.q):
-            next_node = self.extend(q, tree, nearest_node=nearest_node, eps=eps)
+            max_eps = min(eps, max_connection_distance - total_distance)
+            next_node = self.extend(q, tree, nearest_node=nearest_node, eps=max_eps)
             if not next_node:
                 break
             nearest_node = next_node
+            total_distance += max_eps
+            if total_distance >= max_connection_distance:
+                break
         return nearest_node
 
     def get_path(
