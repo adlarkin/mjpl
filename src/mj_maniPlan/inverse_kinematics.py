@@ -16,7 +16,8 @@ class IKOptions:
 
     # The joints to use when generating initial states for new solve attempts and validating configurations.
     jg: JointGroup = None
-    # The collision rules to enforce. If `None`, this disables collision checks.
+    # The collision rules to enforce. If specified, IK solutions within pose thresholds
+    # will be additionally validated by collision checking within this ruleset.
     cr: CollisionRuleset | None = None
     # Seed used for generating random samples in the case of retries.
     seed: int | None = None
@@ -79,7 +80,7 @@ def solve_ik(
         # Initialize the state for IK.
         q_init = q_init_guess.copy()
         if attempt_idx > 0:
-            q_init[opts.jg.joint_ids] = utils.random_valid_config(
+            q_init[opts.jg.qpos_addrs] = utils.random_valid_config(
                 rng,
                 opts.jg,
                 data,
@@ -94,7 +95,7 @@ def solve_ik(
             ori_achieved = np.linalg.norm(err[3:]) <= opts.ori_tolerance
             if pos_achieved and ori_achieved:
                 is_collision_free = (opts.cr is not None) and utils.is_valid_config(
-                    configuration.q[opts.jg.joint_ids], opts.jg, data, opts.cr
+                    configuration.q[opts.jg.qpos_addrs], opts.jg, data, opts.cr
                 )
                 if not is_collision_free:
                     print(
