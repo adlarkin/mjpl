@@ -121,9 +121,16 @@ class RRT:
         site: str,
         pos: np.ndarray,
         rot: np.ndarray,
-        ik_opts: IKOptions = IKOptions(),
+        ik_opts: IKOptions,
     ) -> list[np.ndarray]:
-        q_goal = solve_ik(self.options.jg.model, site, pos, rot, ik_opts)
+        if ik_opts.jg != self.options.jg:
+            raise RuntimeError("Joint groups must be the same in IK and RRT options.")
+        if ik_opts.cr != self.options.cr:
+            raise RuntimeError(
+                "Collision rulesets must be the same in IK and RRT options."
+            )
+
+        q_goal = solve_ik(site, q_init_world, pos, rot, ik_opts)
         if q_goal is None:
             print("Unable to find a configuration for the target pose.")
             return []
