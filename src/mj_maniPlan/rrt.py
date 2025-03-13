@@ -121,7 +121,7 @@ class RRT:
         site: str,
         pos: np.ndarray,
         rot: np.ndarray,
-        ik_opts: IKOptions = IKOptions(),
+        ik_opts: IKOptions,
     ) -> list[np.ndarray]:
         if ik_opts.jg != self.options.jg:
             raise RuntimeError("Joint groups must be the same in IK and RRT options.")

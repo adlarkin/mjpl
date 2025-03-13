@@ -15,7 +15,7 @@ class IKOptions:
     """Options for solving inverse kinematics."""
 
     # The joints to use when generating initial states for new solve attempts and validating configurations.
-    jg: JointGroup = None
+    jg: JointGroup
     # The collision rules to enforce. If specified, IK solutions within pose thresholds
     # will be additionally validated by collision checking within this ruleset.
     cr: CollisionRuleset | None = None
@@ -39,7 +39,7 @@ def solve_ik(
     q_init_guess: np.ndarray,
     target_pos: np.ndarray,
     target_rot: np.ndarray,
-    opts: IKOptions = IKOptions(),
+    opts: IKOptions,
 ) -> np.ndarray | None:
     """Solve inverse kinematics for a given pose.
 
@@ -94,7 +94,7 @@ def solve_ik(
             pos_achieved = np.linalg.norm(err[:3]) <= opts.pos_tolerance
             ori_achieved = np.linalg.norm(err[3:]) <= opts.ori_tolerance
             if pos_achieved and ori_achieved:
-                is_collision_free = (opts.cr is not None) and utils.is_valid_config(
+                is_collision_free = (opts.cr is None) or utils.is_valid_config(
                     configuration.q[opts.jg.qpos_addrs], opts.jg, data, opts.cr
                 )
                 if not is_collision_free:
