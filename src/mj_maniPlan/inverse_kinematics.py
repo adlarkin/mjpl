@@ -94,16 +94,14 @@ def solve_ik(
             pos_achieved = np.linalg.norm(err[:3]) <= opts.pos_tolerance
             ori_achieved = np.linalg.norm(err[3:]) <= opts.ori_tolerance
             if pos_achieved and ori_achieved:
-                is_collision_free = (opts.cr is None) or utils.is_valid_config(
+                if utils.is_valid_config(
                     configuration.q[opts.jg.qpos_addrs], opts.jg, data, opts.cr
+                ):
+                    return configuration.q
+                print(
+                    f"IK solve attempt {attempt_idx + 1}/{opts.max_attempts} gave an invalid configuration."
                 )
-                if not is_collision_free:
-                    print(
-                        f"IK solve attempt {attempt_idx + 1}/{opts.max_attempts} in collision."
-                    )
-                    break
-
-                return configuration.q
+                break
 
             vel = mink.solve_ik(
                 configuration,
