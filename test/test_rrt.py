@@ -249,8 +249,8 @@ class TestRRT(unittest.TestCase):
         self.assertGreater(len(path), 2)
 
         # The path should start at q_init and end at q_goal
-        self.assertTrue(np.array_equal(path[0], self.q_init))
-        self.assertTrue(np.array_equal(path[-1], q_goal))
+        np.testing.assert_equal(path[0], self.q_init)
+        np.testing.assert_equal(path[-1], q_goal)
 
         for i in range(1, len(path)):
             self.assertLessEqual(
@@ -265,8 +265,8 @@ class TestRRT(unittest.TestCase):
         q_goal = np.array([-0.05])
         path = self.planner.plan_to_config(self.q_init, q_goal)
         self.assertEqual(len(path), 2)
-        self.assertTrue(np.array_equal(path[0], self.q_init))
-        self.assertTrue(np.array_equal(path[1], q_goal))
+        np.testing.assert_equal(path[0], self.q_init)
+        np.testing.assert_equal(path[1], q_goal)
 
     def test_shortcut(self):
         self.load_ball_sliding_along_xy_model()
@@ -302,7 +302,7 @@ class TestRRT(unittest.TestCase):
         shortcut_path = self.planner.shortcut(path, start_idx=2, end_idx=6)
         self.assertEqual(len(shortcut_path), len(expected_shortcut_path))
         for i in range(len(shortcut_path)):
-            self.assertTrue(np.array_equal(shortcut_path[i], expected_shortcut_path[i]))
+            np.testing.assert_equal(shortcut_path[i], expected_shortcut_path[i])
 
         expected_shortcut_path = [
             path[0],

@@ -277,10 +277,10 @@ class RRT:
         Args:
             path: The path to shortcut.
             kwargs: Arguments that define shortcutting behavior. Options include:
-                      - num_attempts: The number of shortcut attempts. Each attempt will
-                                      randomly select two waypoints in the path.
-                      - start_idx, end_idx: The indices of the specific waypoints in
-                                            `path` to attempt shortcutting on.
+                - num_attempts: The number of shortcut attempts. Each attempt will
+                                randomly select two waypoints in the path.
+                - start_idx, end_idx: The indices of the specific waypoints in
+                                      `path` to attempt shortcutting on.
         """
         if len(kwargs) == 1 and "num_attempts" in kwargs:
             # sanity check: can we shortcut directly between the start/end of the path?
