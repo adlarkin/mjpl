@@ -87,7 +87,7 @@ def main():
     start = time.time()
     shortcut_path = planner.shortcut(path, num_attempts=len(path))
     if len(shortcut_path) > 2:
-        shortcut_path = utils.fill(shortcut_path, 10, planner_options.epsilon)
+        shortcut_path = utils.fill(shortcut_path, 5, planner_options.epsilon)
     print(f"Shortcutting took {(time.time() - start):.4f}s")
 
     # These values are for demonstration purposes only.
