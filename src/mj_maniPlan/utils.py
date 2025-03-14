@@ -43,15 +43,15 @@ def random_valid_config(
     return q_rand
 
 
-def fill(
-    path: list[np.ndarray], intermediate_points: int, threshold: float
+def fill_path(
+    path: list[np.ndarray], num_intermediate_points: int, threshold: float
 ) -> list[np.ndarray]:
     """Perform waypoint filling on a path.
 
     Args:
         path: The path to fill.
-        intermediate_points: The number of intermediate waypoints to place in
-            between neighbording waypoints in `path` that have a configuration
+        num_intermediate_points: The number of intermediate waypoints to place in
+            between adjacent waypoints in `path` that have a configuration
             distance greater than `threshold`.
         threshold: The distance threshold that determines whether or not
             intermediate waypoints will be used in between adjacent waypoints.
@@ -60,8 +60,8 @@ def fill(
         A path with intermediate waypoints between adjacent waypoints that are
         further than `threshold` apart.
     """
-    if intermediate_points <= 0:
-        raise ValueError("intermediate_points must be > 0.")
+    if num_intermediate_points <= 0:
+        raise ValueError("num_intermediate_points must be > 0.")
     filled_path = []
     for i in range(len(path) - 1):
         q_curr = path[i]
@@ -70,9 +70,9 @@ def fill(
         dist = configuration_distance(q_curr, q_next)
         if dist > threshold:
             direction = (q_next - q_curr) / dist
-            for _ in range(intermediate_points):
+            for _ in range(num_intermediate_points):
                 q_fill = filled_path[-1] + (
-                    direction * (dist / (intermediate_points + 1))
+                    direction * (dist / (num_intermediate_points + 1))
                 )
                 filled_path.append(q_fill)
     filled_path.append(path[-1])

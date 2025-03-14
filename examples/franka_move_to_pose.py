@@ -85,9 +85,15 @@ def main():
 
     print("Shortcutting...")
     start = time.time()
-    shortcut_path = planner.shortcut(path, num_attempts=len(path))
+    shortcut_path = planner.shortcut(path, max_attempts=len(path))
+    # If the path is not a straight line in c-space, add more waypoints to the path.
+    # This helps reduce the chance of collisions when executing the trajectory,
+    # since trajectory generation only operates on waypoints and does not know
+    # anything about the environment.
     if len(shortcut_path) > 2:
-        shortcut_path = utils.fill(shortcut_path, 5, planner_options.epsilon)
+        shortcut_path = utils.fill_path(
+            shortcut_path, num_intermediate_points=5, threshold=planner_options.epsilon
+        )
     print(f"Shortcutting took {(time.time() - start):.4f}s")
 
     # These values are for demonstration purposes only.

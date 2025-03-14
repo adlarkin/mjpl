@@ -321,9 +321,9 @@ class TestRRT(unittest.TestCase):
         # make sure invalid kwargs are caught
         with self.assertRaisesRegex(ValueError, "Invalid kwargs"):
             self.planner.shortcut(path)
-            self.planner.shortcut(path, num_attempts=1, start_idx=5, end_idx=6)
-            self.planner.shortcut(path, num_attempts=1, start_idx=5)
-            self.planner.shortcut(path, num_attempts=1, end_idx=5)
+            self.planner.shortcut(path, max_attempts=1, start_idx=5, end_idx=6)
+            self.planner.shortcut(path, max_attempts=1, start_idx=5)
+            self.planner.shortcut(path, max_attempts=1, end_idx=5)
             self.planner.shortcut(path, start_idx=5)
             self.planner.shortcut(path, end_idx=5)
 
