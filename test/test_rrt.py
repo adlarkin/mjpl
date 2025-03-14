@@ -5,9 +5,9 @@ import mujoco
 import numpy as np
 
 import mj_maniPlan.rrt as rrt
+import mj_maniPlan.utils as utils
 from mj_maniPlan.collision_ruleset import CollisionRuleset
 from mj_maniPlan.joint_group import JointGroup
-from mj_maniPlan.utils import configuration_distance
 
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
@@ -56,7 +56,7 @@ class TestRRT(unittest.TestCase):
             jg=jg,
             cr=cr,
             max_planning_time=5.0,
-            epsilon=0.1,
+            epsilon=0.15,
             seed=42,
         )
 
@@ -254,7 +254,7 @@ class TestRRT(unittest.TestCase):
 
         for i in range(1, len(path)):
             self.assertLessEqual(
-                configuration_distance(path[i - 1], path[i]),
+                utils.configuration_distance(path[i - 1], path[i]),
                 self.planner.options.epsilon,
             )
 
@@ -280,93 +280,57 @@ class TestRRT(unittest.TestCase):
                            |             v
             n_0 -> n_1 -> n_2           n_6 -> n_7
         """
-        tree = rrt.Tree()
-        n_0 = rrt.Node(self.q_init, None)
-        n_1 = rrt.Node(np.array([0.0, 0.0]), n_0)
-        n_2 = rrt.Node(np.array([0.1, 0.0]), n_1)
-        n_3 = rrt.Node(np.array([0.1, 0.1]), n_2)
-        n_4 = rrt.Node(np.array([0.2, 0.1]), n_3)
-        n_5 = rrt.Node(np.array([0.3, 0.1]), n_4)
-        n_6 = rrt.Node(np.array([0.3, 0.0]), n_5)
-        n_7 = rrt.Node(np.array([0.4, 0.0]), n_6)
-        nodes = [n_0, n_1, n_2, n_3, n_4, n_5, n_6, n_7]
-        for n in nodes:
-            tree.add_node(n)
-
-        path = tree.get_path(n_7)
-        path.reverse()
-        self.assertEqual(len(path), len(nodes))
-        for i in range(len(path)):
-            self.assertTrue(np.array_equal(path[i], nodes[i].q))
-
+        path = [
+            np.array([-0.1, 0.0]),
+            np.array([0.0, 0.0]),
+            np.array([0.1, 0.0]),
+            np.array([0.1, 0.1]),
+            np.array([0.2, 0.1]),
+            np.array([0.3, 0.1]),
+            np.array([0.3, 0.0]),
+            np.array([0.4, 0.0]),
+        ]
         original_path = path.copy()
 
-        filler_eps = 0.3
-
-        # Test case where waypoints are removed but filler waypoints are not added.
         expected_shortcut_path = [
-            n_0.q,
-            n_1.q,
-            n_2.q,
-            n_6.q,
-            n_7.q,
+            path[0],
+            path[1],
+            path[2],
+            path[6],
+            path[7],
         ]
-        shortcut_path = self.planner.shortcut(path, filler_eps, start_idx=2, end_idx=6)
+        shortcut_path = self.planner.shortcut(path, start_idx=2, end_idx=6)
         self.assertEqual(len(shortcut_path), len(expected_shortcut_path))
         for i in range(len(shortcut_path)):
             self.assertTrue(np.array_equal(shortcut_path[i], expected_shortcut_path[i]))
 
-        # Test case where waypoints are removed and filler waypoints are added.
         expected_shortcut_path = [
-            n_0.q,
-            np.array([0.2, 0.0]),
-            n_7.q,
+            path[0],
+            path[7],
         ]
-        shortcut_path = self.planner.shortcut(path, filler_eps, start_idx=0, end_idx=7)
-        self.assertEqual(len(shortcut_path), len(expected_shortcut_path))
-        # First and last waypoints of the shortcut path should match the first and last
-        # waypoints of the original path.
-        self.assertTrue(np.array_equal(shortcut_path[0], expected_shortcut_path[0]))
-        self.assertTrue(np.array_equal(shortcut_path[-1], expected_shortcut_path[-1]))
-        # Filler waypoint was added since the configuration distance between the first and
-        # last waypoint in the shortcut path is greater than RRTOptions.epsilon.
-        np.testing.assert_allclose(
-            shortcut_path[1], expected_shortcut_path[1], rtol=0, atol=1e-8
-        )
+        shortcut_path = self.planner.shortcut(path, start_idx=0, end_idx=7)
+        self.assertEqual(len(shortcut_path), 2)
+        np.testing.assert_equal(shortcut_path[0], expected_shortcut_path[0])
+        np.testing.assert_equal(shortcut_path[-1], expected_shortcut_path[-1])
 
-        # Shortcutting two adjacent waypoints should keep all of the original path waypoints
-        # since the filler epsilon is greater than the epsilon used for the original path.
-        unmodified_path = self.planner.shortcut(
-            path, filler_eps, start_idx=6, end_idx=7
-        )
+        unmodified_path = self.planner.shortcut(path, start_idx=6, end_idx=7)
         self.assertEqual(len(unmodified_path), len(path))
         for i in range(len(unmodified_path)):
-            self.assertTrue(np.array_equal(unmodified_path[i], path[i]))
-
-        # Test shortcutting with a filler epsilon of infinity.
-        # This has the effect of performing no waypoint filling on the initial shortcut path.
-        shortcut_path = self.planner.shortcut(path, np.inf, start_idx=0, end_idx=7)
-        # Since no filling is performed, the shortcut path is just the initial and final waypoint
-        # from the original path.
-        self.assertEqual(len(shortcut_path), 2)
-        self.assertTrue(np.array_equal(shortcut_path[0], path[0]))
-        self.assertTrue(np.array_equal(shortcut_path[-1], path[-1]))
+            np.testing.assert_equal(unmodified_path[i], path[i])
 
         # make sure invalid kwargs are caught
         with self.assertRaisesRegex(ValueError, "Invalid kwargs"):
-            self.planner.shortcut(path, filler_eps)
-            self.planner.shortcut(
-                path, filler_eps, num_attempts=1, start_idx=5, end_idx=6
-            )
-            self.planner.shortcut(path, filler_eps, num_attempts=1, start_idx=5)
-            self.planner.shortcut(path, filler_eps, num_attempts=1, end_idx=5)
-            self.planner.shortcut(path, filler_eps, start_idx=5)
-            self.planner.shortcut(path, filler_eps, end_idx=5)
+            self.planner.shortcut(path)
+            self.planner.shortcut(path, num_attempts=1, start_idx=5, end_idx=6)
+            self.planner.shortcut(path, num_attempts=1, start_idx=5)
+            self.planner.shortcut(path, num_attempts=1, end_idx=5)
+            self.planner.shortcut(path, start_idx=5)
+            self.planner.shortcut(path, end_idx=5)
 
         # shortcutting should create a new path and not modify the original
         self.assertEqual(len(original_path), len(path))
         for i in range(len(original_path)):
-            self.assertTrue(np.array_equal(original_path[i], path[i]))
+            np.testing.assert_equal(original_path[i], path[i])
 
 
 if __name__ == "__main__":

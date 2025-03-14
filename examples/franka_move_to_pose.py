@@ -6,13 +6,13 @@ import mujoco.viewer
 import numpy as np
 from example_utils import parse_args
 
+import mj_maniPlan.utils as utils
 import mj_maniPlan.visualization as viz
 from mj_maniPlan.collision_ruleset import CollisionRuleset
 from mj_maniPlan.inverse_kinematics import IKOptions
 from mj_maniPlan.joint_group import JointGroup
 from mj_maniPlan.rrt import RRT, RRTOptions
 from mj_maniPlan.trajectory import TrajectoryLimits, generate_trajectory
-from mj_maniPlan.utils import random_valid_config
 
 _HERE = Path(__file__).parent
 _PANDA_XML = _HERE / "models" / "franka_emika_panda" / "scene_with_obstacles.xml"
@@ -43,7 +43,7 @@ def main():
     # Generate a valid target pose that's derived from a valid joint configuration.
     rng = np.random.default_rng(seed=seed)
     data = mujoco.MjData(model)
-    q_rand = random_valid_config(rng, arm_jg, data, CollisionRuleset(model))
+    q_rand = utils.random_valid_config(rng, arm_jg, data, CollisionRuleset(model))
     arm_jg.fk(q_rand, data)
     target_pos = data.site(_PANDA_EE_SITE).xpos.copy()
     target_rotmat = data.site(_PANDA_EE_SITE).xmat.copy()
@@ -56,12 +56,11 @@ def main():
     cr = CollisionRuleset(model, allowed_collisions)
 
     # Set up the planner.
-    epsilon = 0.05
     planner_options = RRTOptions(
         jg=arm_jg,
         cr=cr,
         max_planning_time=10,
-        epsilon=epsilon,
+        epsilon=0.05,
         seed=seed,
         goal_biasing_probability=0.1,
         max_connection_distance=np.inf,
@@ -86,7 +85,9 @@ def main():
 
     print("Shortcutting...")
     start = time.time()
-    shortcut_path = planner.shortcut(path, np.inf, num_attempts=len(path))
+    shortcut_path = planner.shortcut(path, num_attempts=len(path))
+    if len(shortcut_path) > 2:
+        shortcut_path = utils.fill(shortcut_path, 10, planner_options.epsilon)
     print(f"Shortcutting took {(time.time() - start):.4f}s")
 
     # These values are for demonstration purposes only.

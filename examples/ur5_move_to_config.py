@@ -73,7 +73,7 @@ def main():
 
     print("Shortcutting...")
     start = time.time()
-    shortcut_path = planner.shortcut(path, np.inf, num_attempts=len(path))
+    shortcut_path = planner.shortcut(path, num_attempts=len(path))
     print(f"Shortcutting took {(time.time() - start):.4f}s")
 
     # These values are for demonstration purposes only.
