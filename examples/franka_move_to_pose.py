@@ -70,6 +70,7 @@ def main():
     ik_options = IKOptions(
         jg=arm_jg,
         cr=cr,
+        seed=seed,
         max_attempts=5,
     )
     planner = RRT(planner_options)
