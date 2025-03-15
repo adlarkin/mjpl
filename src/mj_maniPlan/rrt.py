@@ -247,7 +247,6 @@ class RRT:
                 break
         return nearest_node
 
-    # TODO: move this out, doesn't need to be part of RRT
     def get_path(
         self,
         start_tree: Tree,

@@ -137,7 +137,7 @@ def shortcut(
     Args:
         path: The path to shortcut.
         jg: The JointGroup to apply validation checks on when shortcutting.
-        data: MuJoCo MjData. Used for validation checking.
+        data: MuJoCo data. Used for validation checking.
         cr: The CollisionRuleset to enforce (if any) for validation checks.
         validation_dist: The distance between each validation check,
             which occurs between a pair of waypoints that are trying to be

@@ -72,8 +72,6 @@ def main():
 
     print("Shortcutting...")
     start = time.time()
-    # TODO: debug. When using previous code and -s 7, path goes from 191 -> 2 after shortcutting
-    print(len(path))
     shortcut_path = utils.shortcut(
         path,
         arm_jg,
@@ -83,7 +81,6 @@ def main():
         max_attempts=len(path),
         seed=seed,
     )
-    print(len(shortcut_path))
     print(f"Shortcutting took {(time.time() - start):.4f}s")
 
     # These values are for demonstration purposes only.

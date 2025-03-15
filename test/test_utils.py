@@ -52,7 +52,7 @@ class TestUtils(unittest.TestCase):
             start=0,
             end=2,
             fill=False,
-            dist=1.0,
+            dist=0.7,
             jg=jg,
             data=mujoco.MjData(model),
             cr=cr,
@@ -208,10 +208,10 @@ class TestUtils(unittest.TestCase):
         np.testing.assert_equal(shortcut_path[0], path[0])
         np.testing.assert_equal(shortcut_path[-1], path[-1])
         # (must convert numpy arrays to tuples to make them hashable)
-        reference_intermediate_qs = {tuple(q) for q in path[1:-1]}
+        original_intermediate_qs = {tuple(q) for q in path[1:-1]}
         for i in range(1, len(shortcut_path) - 1):
             intermediate_q = shortcut_path[i]
-            self.assertIn(tuple(intermediate_q), reference_intermediate_qs)
+            self.assertIn(tuple(intermediate_q), original_intermediate_qs)
 
     def test_fill_path(self):
         path = [
