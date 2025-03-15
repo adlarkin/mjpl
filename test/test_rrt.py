@@ -12,7 +12,6 @@ from mj_maniPlan.joint_group import JointGroup
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
 _BALL_XML = _MODEL_DIR / "ball.xml"
-_BALL_XY_PLANE_XML = _MODEL_DIR / "ball_xy_plane.xml"
 
 
 class TestRRT(unittest.TestCase):
@@ -38,30 +37,6 @@ class TestRRT(unittest.TestCase):
         # We're testing with a simple model: a ball that can slide along the x-axis.
         # So there's only one value in data.qpos (the ball's x position)
         self.q_init = np.array([-0.1])
-
-        self.planner = rrt.RRT(options)
-
-    def load_ball_sliding_along_xy_model(self):
-        model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
-
-        planning_joints = [
-            model.joint("ball_slide_x").id,
-            model.joint("ball_slide_y").id,
-        ]
-        jg = JointGroup(model, planning_joints)
-
-        cr = CollisionRuleset(model)
-
-        options = rrt.RRTOptions(
-            jg=jg,
-            cr=cr,
-            max_planning_time=5.0,
-            epsilon=0.15,
-            seed=42,
-        )
-
-        # Initial joint configuration.
-        self.q_init = np.array([-0.1, 0.0])
 
         self.planner = rrt.RRT(options)
 
@@ -267,70 +242,6 @@ class TestRRT(unittest.TestCase):
         self.assertEqual(len(path), 2)
         np.testing.assert_equal(path[0], self.q_init)
         np.testing.assert_equal(path[1], q_goal)
-
-    def test_shortcut(self):
-        self.load_ball_sliding_along_xy_model()
-
-        """
-        Suboptimal path that can benefit from shortcutting
-        (waypoints in this path have a distance of the corresponding RRTOptions.epsilon)
-
-                          n_3 -> n_4 -> n_5
-                           ^             |
-                           |             v
-            n_0 -> n_1 -> n_2           n_6 -> n_7
-        """
-        path = [
-            np.array([-0.1, 0.0]),
-            np.array([0.0, 0.0]),
-            np.array([0.1, 0.0]),
-            np.array([0.1, 0.1]),
-            np.array([0.2, 0.1]),
-            np.array([0.3, 0.1]),
-            np.array([0.3, 0.0]),
-            np.array([0.4, 0.0]),
-        ]
-        original_path = path.copy()
-
-        expected_shortcut_path = [
-            path[0],
-            path[1],
-            path[2],
-            path[6],
-            path[7],
-        ]
-        shortcut_path = self.planner.shortcut(path, start_idx=2, end_idx=6)
-        self.assertEqual(len(shortcut_path), len(expected_shortcut_path))
-        for i in range(len(shortcut_path)):
-            np.testing.assert_equal(shortcut_path[i], expected_shortcut_path[i])
-
-        expected_shortcut_path = [
-            path[0],
-            path[7],
-        ]
-        shortcut_path = self.planner.shortcut(path, start_idx=0, end_idx=7)
-        self.assertEqual(len(shortcut_path), 2)
-        np.testing.assert_equal(shortcut_path[0], expected_shortcut_path[0])
-        np.testing.assert_equal(shortcut_path[-1], expected_shortcut_path[-1])
-
-        unmodified_path = self.planner.shortcut(path, start_idx=6, end_idx=7)
-        self.assertEqual(len(unmodified_path), len(path))
-        for i in range(len(unmodified_path)):
-            np.testing.assert_equal(unmodified_path[i], path[i])
-
-        # make sure invalid kwargs are caught
-        with self.assertRaisesRegex(ValueError, "Invalid kwargs"):
-            self.planner.shortcut(path)
-            self.planner.shortcut(path, max_attempts=1, start_idx=5, end_idx=6)
-            self.planner.shortcut(path, max_attempts=1, start_idx=5)
-            self.planner.shortcut(path, max_attempts=1, end_idx=5)
-            self.planner.shortcut(path, start_idx=5)
-            self.planner.shortcut(path, end_idx=5)
-
-        # shortcutting should create a new path and not modify the original
-        self.assertEqual(len(original_path), len(path))
-        for i in range(len(original_path)):
-            np.testing.assert_equal(original_path[i], path[i])
 
 
 if __name__ == "__main__":

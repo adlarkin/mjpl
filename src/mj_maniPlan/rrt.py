@@ -247,6 +247,7 @@ class RRT:
                 break
         return nearest_node
 
+    # TODO: move this out, doesn't need to be part of RRT
     def get_path(
         self,
         start_tree: Tree,
@@ -264,71 +265,3 @@ class RRT:
         if np.array_equal(path_start[-1], path_end[0]):
             path_start.pop()
         return path_start + path_end
-
-    def shortcut(self, path: list[np.ndarray], **kwargs) -> list[np.ndarray]:
-        """Perform shortcutting on a path.
-
-        This can be called in several ways:
-            shortcut_path = rrt.shortcut(path, max_attempts=100)
-
-            # assumes that `path` is of at least length 10
-            shortcut_path = rrt.shortcut(path, start_idx=5, end_idx=9)
-
-        Args:
-            path: The path to shortcut.
-            kwargs: Arguments that define shortcutting behavior. Options include:
-                - max_attempts: The maximum number of shortcut attempts. Each attempt
-                                will randomly select two waypoints in the path.
-                                If the path has exactly two waypoints, no more attempts
-                                will be ran.
-                - start_idx, end_idx: The indices of the specific waypoints in
-                                      `path` to attempt shortcutting on.
-        """
-        if len(kwargs) == 1 and "max_attempts" in kwargs:
-            # sanity check: can we shortcut directly between the start/end of the path?
-            shortened_path = self.__shortcut(path, 0, len(path) - 1)
-            for _ in range(kwargs["max_attempts"]):
-                if len(shortened_path) == 2:
-                    # we can go directly from start to goal, so no more shortcutting can be done
-                    break
-                # randomly pick 2 waypoints
-                start, end = 0, 0
-                while start == end:
-                    start, end = self.rng.integers(len(shortened_path), size=2)
-                if start > end:
-                    start, end = end, start
-                shortened_path = self.__shortcut(shortened_path, start, end)
-            return shortened_path
-        elif len(kwargs) == 2 and ("start_idx" in kwargs and "end_idx" in kwargs):
-            return self.__shortcut(path, kwargs["start_idx"], kwargs["end_idx"])
-        else:
-            raise ValueError(
-                f"Invalid kwargs combination. Expected ['max_attempts'] or ['start_idx', 'end_idx'], but received {list(kwargs.keys())}"
-            )
-
-    def __shortcut(
-        self,
-        path: list[np.ndarray],
-        start: int,
-        end: int,
-    ) -> list[np.ndarray]:
-        """Helper function for performing shortcutting between two specific waypoints.
-
-        Args:
-            path: The path to shortcut.
-            start: The index of the first waypoint candidate to shortcut.
-            end: The index of the second waypoint candidate to shortcut.
-
-        Returns:
-            A path with direct connections between the waypoints at indices (start, end)
-            if the waypoints at these indices can be connected.
-        """
-        q_start = path[start]
-        q_end = path[end]
-        # see if these 2 waypoints can make a valid path
-        tree = Tree()
-        tree.add_node(Node(q_start, None))
-        connected_node = self.connect(q_end, tree)
-        if np.array_equal(connected_node.q, q_end):
-            return path[: start + 1] + path[end:]
-        return path

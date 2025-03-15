@@ -51,12 +51,11 @@ def main():
     q_goal = utils.random_valid_config(rng, arm_jg, data, cr)
 
     # Set up the planner.
-    epsilon = 0.05
     planner_options = RRTOptions(
         jg=arm_jg,
         cr=cr,
         max_planning_time=10.0,
-        epsilon=epsilon,
+        epsilon=0.05,
         seed=seed,
         goal_biasing_probability=0.1,
         max_connection_distance=np.inf,
@@ -73,7 +72,18 @@ def main():
 
     print("Shortcutting...")
     start = time.time()
-    shortcut_path = planner.shortcut(path, max_attempts=len(path))
+    # TODO: debug. When using previous code and -s 7, path goes from 191 -> 2 after shortcutting
+    print(len(path))
+    shortcut_path = utils.shortcut(
+        path,
+        arm_jg,
+        data,
+        cr,
+        validation_dist=planner_options.epsilon,
+        max_attempts=len(path),
+        seed=seed,
+    )
+    print(len(shortcut_path))
     print(f"Shortcutting took {(time.time() - start):.4f}s")
 
     # These values are for demonstration purposes only.
