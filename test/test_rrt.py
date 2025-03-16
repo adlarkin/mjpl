@@ -8,6 +8,9 @@ import mj_maniPlan.rrt as rrt
 import mj_maniPlan.utils as utils
 from mj_maniPlan.collision_ruleset import CollisionRuleset
 from mj_maniPlan.joint_group import JointGroup
+from mj_maniPlan.node import Node
+from mj_maniPlan.rrt import RRTOptions
+from mj_maniPlan.tree import Tree
 
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
@@ -25,7 +28,7 @@ class TestRRT(unittest.TestCase):
 
         cr = CollisionRuleset(model)
 
-        options = rrt.RRTOptions(
+        options = RRTOptions(
             jg=jg,
             cr=cr,
             max_planning_time=5.0,
@@ -43,8 +46,8 @@ class TestRRT(unittest.TestCase):
     def test_extend(self):
         self.load_ball_with_obstacle_model()
 
-        tree = rrt.Tree()
-        tree.add_node(rrt.Node(self.q_init, None))
+        tree = Tree()
+        tree.add_node(Node(self.q_init, None))
 
         q_goal = np.array([0.5])
         expected_q_extended = np.array([0.0])
@@ -75,10 +78,10 @@ class TestRRT(unittest.TestCase):
         self.assertIs(same_extended_node, extended_node)
 
         # Test extend where the "nearest node" is already given
-        tree = rrt.Tree()
-        root_node = rrt.Node(np.array([0.0]), None)
+        tree = Tree()
+        root_node = Node(np.array([0.0]), None)
         tree.add_node(root_node)
-        tree.add_node(rrt.Node(np.array([2.0]), root_node))
+        tree.add_node(Node(np.array([2.0]), root_node))
         extended_node = self.planner.extend(np.array([3.0]), tree, root_node)
         self.assertIsNotNone(extended_node)
         self.assertIs(extended_node.parent, root_node)
@@ -87,8 +90,8 @@ class TestRRT(unittest.TestCase):
     def test_connect(self):
         self.load_ball_with_obstacle_model()
 
-        tree = rrt.Tree()
-        tree.add_node(rrt.Node(self.q_init, None))
+        tree = Tree()
+        tree.add_node(Node(self.q_init, None))
 
         q_goal = np.array([0.15])
         goal_node = self.planner.connect(q_goal, tree)
@@ -123,8 +126,8 @@ class TestRRT(unittest.TestCase):
     def test_connect_max_distance(self):
         self.load_ball_with_obstacle_model()
 
-        tree = rrt.Tree()
-        tree.add_node(rrt.Node(self.q_init, None))
+        tree = Tree()
+        tree.add_node(Node(self.q_init, None))
         q_goal = np.array([0.15])
 
         # Run one connect operation to a max distance.
@@ -168,8 +171,8 @@ class TestRRT(unittest.TestCase):
     def test_extend_and_connect_into_obstacle(self):
         self.load_ball_with_obstacle_model()
 
-        tree = rrt.Tree()
-        tree.add_node(rrt.Node(self.q_init, None))
+        tree = Tree()
+        tree.add_node(Node(self.q_init, None))
 
         # Try to connect to the maximum joint value for the ball.
         # There is an obstacle in the way, so the final connection should be just before
@@ -186,20 +189,20 @@ class TestRRT(unittest.TestCase):
         self.assertIsNone(extended_node)
         self.assertSetEqual(tree.nodes, existing_nodes)
 
-    def test_get_path(self):
+    def test_combine_paths(self):
         self.load_ball_with_obstacle_model()
 
         q_new = np.array([0.15])
 
-        start_tree = rrt.Tree()
-        start_tree.add_node(rrt.Node(self.q_init, None))
+        start_tree = Tree()
+        start_tree.add_node(Node(self.q_init, None))
         connected_node_a = self.planner.connect(q_new, start_tree)
 
-        goal_tree = rrt.Tree()
-        goal_tree.add_node(rrt.Node(np.array([0.5]), None))
+        goal_tree = Tree()
+        goal_tree.add_node(Node(np.array([0.5]), None))
         connected_node_b = self.planner.connect(q_new, goal_tree)
 
-        path = self.planner.get_path(
+        path = self.planner._combine_paths(
             start_tree, connected_node_a, goal_tree, connected_node_b
         )
         expected_path = [

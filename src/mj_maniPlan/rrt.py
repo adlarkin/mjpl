@@ -8,60 +8,8 @@ from . import utils
 from .collision_ruleset import CollisionRuleset
 from .inverse_kinematics import IKOptions, solve_ik
 from .joint_group import JointGroup
-
-
-class Node:
-    def __init__(self, q: np.ndarray, parent) -> None:
-        self.q = q
-        self.parent = parent
-
-    def __hash__(self) -> int:
-        return hash(self.q.tobytes())
-
-    # Define node equality as having the same jont config value.
-    # TODO: update this? Might want to check for the same parent.
-    # There is also the chance that two nodes can have the same config value,
-    # but belong to different trees (maybe enforcing a parent check will help resolve this).
-    def __eq__(self, other) -> bool:
-        return np.array_equal(self.q, other.q)
-
-
-class Tree:
-    def __init__(self) -> None:
-        # For now, the tree is represented as a set of unique nodes.
-        # TODO: use something like a kd-tree to improve nearest neighbor lookup times?
-        self.nodes = set()
-
-    def add_node(self, node: Node):
-        self.nodes.add(node)
-
-    def nearest_neighbor(self, q: np.ndarray) -> Node:
-        closest_node = None
-        min_dist = np.inf
-        for n in self.nodes:
-            if np.array_equal(n.q, q):
-                return n
-            neighboring_dist = utils.configuration_distance(n.q, q)
-            if neighboring_dist < min_dist:
-                closest_node = n
-                min_dist = neighboring_dist
-        if not closest_node:
-            raise ValueError(
-                f"No nearest neighbor found for {q}. Did you call this method before adding any nodes to the tree?"
-            )
-        return closest_node
-
-    def get_path(self, node: Node) -> list[np.ndarray]:
-        if node not in self.nodes:
-            raise ValueError(
-                "Called get_path starting from a node that is not in the tree."
-            )
-        path = []
-        curr_node = node
-        while curr_node is not None:
-            path.append(curr_node.q)
-            curr_node = curr_node.parent
-        return path
+from .node import Node
+from .tree import Tree
 
 
 @dataclass
@@ -182,7 +130,7 @@ class RRT:
                 )
                 < self.options.epsilon
             ):
-                return self.get_path(
+                return self._combine_paths(
                     start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
                 )
 
@@ -195,7 +143,7 @@ class RRT:
                     )
                     < self.options.epsilon
                 ):
-                    return self.get_path(
+                    return self._combine_paths(
                         start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
                     )
 
@@ -248,13 +196,27 @@ class RRT:
                 break
         return nearest_node
 
-    def get_path(
+    def _combine_paths(
         self,
         start_tree: Tree,
         start_tree_node: Node,
         goal_tree: Tree,
         goal_tree_node: Node,
     ) -> list[np.ndarray]:
+        """Combine paths from a start and goal tree.
+
+        Args:
+            start_tree: The tree whose root is the start of the combined path.
+            start_tree_node: The node in `start_tree` that marks the end of the
+                path that begins at the root of `start_tree`.
+            goal_tree: The tree whose root is the end of the combined path.
+            goal_tree_node: The node in `goal_tree` that marks the beginning of
+                the path that ends at the root of `goal_tree`.
+
+        Returns:
+            A path that starts at the root of `start_tree` and ends at `goal_tree`,
+            with a connecting edge between `start_tree_node` and `goal_tree_node`.
+        """
         # The path generated from start_tree ends at q_init, but we want it to start at q_init. So we must reverse it.
         path_start = start_tree.get_path(start_tree_node)
         path_start.reverse()

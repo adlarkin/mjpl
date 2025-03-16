@@ -2,7 +2,8 @@ import unittest
 
 import numpy as np
 
-from mj_maniPlan.rrt import Node, Tree
+from mj_maniPlan.node import Node
+from mj_maniPlan.tree import Tree
 
 
 class TestTree(unittest.TestCase):

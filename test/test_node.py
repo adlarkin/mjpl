@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from mj_maniPlan.rrt import Node
+from mj_maniPlan.node import Node
 
 
 class TestNode(unittest.TestCase):
