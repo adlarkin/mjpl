@@ -123,7 +123,7 @@ def main():
         # https://github.com/adlarkin/mj_maniPlan/issues/54
         if not cr.obeys_ruleset(data.contact.geom):
             print("Invalid collision occurred during trajectory execution.")
-            return ()
+            return
         q_t.append(arm_jg.qpos(data))
 
     if visualize:
