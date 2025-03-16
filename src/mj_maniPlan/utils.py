@@ -196,6 +196,7 @@ def shortcut(
     return shortened_path
 
 
+# TODO: consider removing this method if it's not needed
 def fill_path(
     path: list[np.ndarray], max_dist_between_points: float
 ) -> list[np.ndarray]:

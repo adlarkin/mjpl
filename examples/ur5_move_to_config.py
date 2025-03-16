@@ -118,6 +118,12 @@ def main():
     for q_ref in traj.configurations:
         data.ctrl[actuator_ids] = q_ref
         mujoco.mj_step(model, data)
+        # While the planner gives a sequence of waypoints are collision free, the
+        # generated trajectory may not. For more info, see:
+        # https://github.com/adlarkin/mj_maniPlan/issues/54
+        if not cr.obeys_ruleset(data.contact.geom):
+            print("Invalid collision occurred during trajectory execution.")
+            return ()
         q_t.append(arm_jg.qpos(data))
 
     if visualize:

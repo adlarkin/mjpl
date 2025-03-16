@@ -94,14 +94,6 @@ def main():
         max_attempts=len(path),
         seed=seed,
     )
-    # If the path is not a straight line in c-space, add more waypoints to the path.
-    # This helps reduce the chance of collisions when executing the trajectory,
-    # since trajectory generation only operates on waypoints and does not know
-    # anything about the environment.
-    if len(shortcut_path) > 2:
-        shortcut_path = utils.fill_path(
-            shortcut_path, max_dist_between_points=10 * planner_options.epsilon
-        )
     print(f"Shortcutting took {(time.time() - start):.4f}s")
 
     # These values are for demonstration purposes only.
@@ -140,6 +132,12 @@ def main():
     for q_ref in traj.configurations:
         data.ctrl[actuator_ids] = q_ref
         mujoco.mj_step(model, data)
+        # While the planner gives a sequence of waypoints are collision free, the
+        # generated trajectory may not. For more info, see:
+        # https://github.com/adlarkin/mj_maniPlan/issues/54
+        if not cr.obeys_ruleset(data.contact.geom):
+            print("Invalid collision occurred during trajectory execution.")
+            return ()
         q_t.append(arm_jg.qpos(data))
 
     if visualize:
