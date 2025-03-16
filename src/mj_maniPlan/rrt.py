@@ -79,6 +79,7 @@ class RRTOptions:
     # This number should be > 0.
     epsilon: float = 0.05
     # Seed used for the underlying sampler in the planner.
+    # `None` means the algorithm is nondeterministic.
     seed: int | None = None
     # How often to sample the goal state when building the tree.
     # This should be a value within [0.0, 1.0].

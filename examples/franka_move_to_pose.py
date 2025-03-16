@@ -88,7 +88,7 @@ def main():
     shortcut_path = utils.shortcut(
         path,
         arm_jg,
-        data,
+        model,
         cr,
         validation_dist=planner_options.epsilon,
         max_attempts=len(path),
@@ -100,7 +100,7 @@ def main():
     # anything about the environment.
     if len(shortcut_path) > 2:
         shortcut_path = utils.fill_path(
-            shortcut_path, dist=10 * planner_options.epsilon
+            shortcut_path, max_dist_between_points=10 * planner_options.epsilon
         )
     print(f"Shortcutting took {(time.time() - start):.4f}s")
 

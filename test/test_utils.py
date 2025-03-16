@@ -19,15 +19,15 @@ class TestUtils(unittest.TestCase):
         start = np.array([0.0, 0.0])
         target = np.array([0.5, 0.0])
 
-        q_next = utils.step(start, target, max_amount=5.0)
+        q_next = utils.step(start, target, max_step_dist=5.0)
         np.testing.assert_equal(q_next, target)
 
-        q_next = utils.step(start, target, max_amount=0.1)
+        q_next = utils.step(start, target, max_step_dist=0.1)
         np.testing.assert_allclose(q_next, np.array([0.1, 0.0]), rtol=0, atol=1e-8)
 
-        with self.assertRaisesRegex(ValueError, "`max_amount` must be > 0.0"):
-            utils.step(start, target, max_amount=0.0)
-            utils.step(start, target, max_amount=-1.0)
+        with self.assertRaisesRegex(ValueError, "`max_step_dist` must be > 0.0"):
+            utils.step(start, target, max_step_dist=0.0)
+            utils.step(start, target, max_step_dist=-1.0)
 
     def test_connect_waypoints(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
@@ -47,12 +47,12 @@ class TestUtils(unittest.TestCase):
         ]
 
         # connect with validation checking and no filling
-        connected_path = utils.connect_waypoints(
+        connected_path = utils._connect_waypoints(
             path,
-            start=0,
-            end=2,
+            start_idx=0,
+            end_idx=2,
             fill=False,
-            dist=0.7,
+            min_fill_dist=0.7,
             jg=jg,
             data=mujoco.MjData(model),
             cr=cr,
@@ -63,12 +63,12 @@ class TestUtils(unittest.TestCase):
         np.testing.assert_equal(connected_path[2], path[3])
 
         # connect with validation checking and filling
-        connected_path = utils.connect_waypoints(
+        connected_path = utils._connect_waypoints(
             path,
-            start=0,
-            end=2,
+            start_idx=0,
+            end_idx=2,
             fill=True,
-            dist=0.7,
+            min_fill_dist=0.7,
             jg=jg,
             data=mujoco.MjData(model),
             cr=cr,
@@ -88,12 +88,12 @@ class TestUtils(unittest.TestCase):
         # corresponds to a waypoint that violates the joint limits, this
         # should fail (i.e., the returned path is an unmodified copy of
         # the original)
-        connected_path = utils.connect_waypoints(
+        connected_path = utils._connect_waypoints(
             path,
-            start=1,
-            end=3,
+            start_idx=1,
+            end_idx=3,
             fill=True,
-            dist=0.7,
+            min_fill_dist=0.7,
             jg=jg,
             data=mujoco.MjData(model),
             cr=cr,
@@ -106,8 +106,14 @@ class TestUtils(unittest.TestCase):
 
         # connect without validation checking on the waypoint that violates
         # joint limits
-        connected_path = utils.connect_waypoints(
-            path, start=1, end=3, fill=False, dist=0.1, jg=None, data=None
+        connected_path = utils._connect_waypoints(
+            path,
+            start_idx=1,
+            end_idx=3,
+            fill=False,
+            min_fill_dist=0.1,
+            jg=None,
+            data=None,
         )
         self.assertEqual(len(connected_path), 3)
         np.testing.assert_equal(connected_path[0], path[0])
@@ -117,14 +123,25 @@ class TestUtils(unittest.TestCase):
         with self.assertRaisesRegex(
             ValueError, "`jg` and `data` must either be None or not None"
         ):
-            utils.connect_waypoints(
-                path, start=0, end=2, fill=False, jg=None, data=mujoco.MjData(model)
+            utils._connect_waypoints(
+                path,
+                start_idx=0,
+                end_idx=2,
+                fill=False,
+                jg=None,
+                data=mujoco.MjData(model),
             )
-            utils.connect_waypoints(path, start=0, end=2, fill=False, jg=jg, data=None)
+            utils._connect_waypoints(
+                path, start_idx=0, end_idx=2, fill=False, jg=jg, data=None
+            )
 
-        with self.assertRaisesRegex(ValueError, "`dist` must be > 0"):
-            utils.connect_waypoints(path, start=0, end=2, fill=False, dist=0.0)
-            utils.connect_waypoints(path, start=0, end=2, fill=False, dist=-1.0)
+        with self.assertRaisesRegex(ValueError, "`min_fill_dist` must be > 0"):
+            utils._connect_waypoints(
+                path, start_idx=0, end_idx=2, fill=False, min_fill_dist=0.0
+            )
+            utils._connect_waypoints(
+                path, start_idx=0, end_idx=2, fill=False, min_fill_dist=-1.0
+            )
 
     def test_shortcut(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
@@ -157,7 +174,7 @@ class TestUtils(unittest.TestCase):
 
         # all waypoints in the path are valid and directly connectable, so this
         # should result in a direct connection between path[0] and path[-1]
-        shortened_path = utils.shortcut(path, jg, mujoco.MjData(model), cr, seed=5)
+        shortened_path = utils.shortcut(path, jg, model, cr, seed=5)
         self.assertTrue(len(shortened_path), 2)
         np.testing.assert_equal(shortened_path[0], path[0])
         np.testing.assert_equal(shortened_path[1], path[-1])
@@ -167,7 +184,7 @@ class TestUtils(unittest.TestCase):
         # (i.e., last valid) waypoints can be directly connected
         invalid_path = path + [np.array([3.0, -5.0])]
         shortened_path = utils.shortcut(
-            invalid_path, jg, mujoco.MjData(model), cr, max_attempts=20, seed=42
+            invalid_path, jg, model, cr, max_attempts=20, seed=42
         )
         self.assertTrue(len(shortened_path), 3)
         np.testing.assert_equal(shortened_path[0], invalid_path[0])
@@ -202,7 +219,7 @@ class TestUtils(unittest.TestCase):
 
         # Perform shortcutting. The path should now be shorter, but still start
         # and end at the same waypoints.
-        shortcut_path = utils.shortcut(path, jg, data, cr, seed=seed)
+        shortcut_path = utils.shortcut(path, jg, model, cr, seed=seed)
         self.assertLess(len(shortcut_path), len(path))
         self.assertGreaterEqual(len(shortcut_path), 2)
         np.testing.assert_equal(shortcut_path[0], path[0])
@@ -221,7 +238,7 @@ class TestUtils(unittest.TestCase):
         ]
 
         # perform a fill that adds one intermediate waypoint
-        filled_path = utils.fill_path(path, dist=0.3)
+        filled_path = utils.fill_path(path, max_dist_between_points=0.3)
         self.assertEqual(len(filled_path), 4)
         np.testing.assert_equal(filled_path[0], path[0])
         np.testing.assert_allclose(
@@ -232,14 +249,14 @@ class TestUtils(unittest.TestCase):
 
         # perform a fill that adds no intermediate waypoints
         # (dist > adjacent waypoint distance)
-        filled_path = utils.fill_path(path, dist=0.75)
+        filled_path = utils.fill_path(path, max_dist_between_points=0.75)
         self.assertEqual(len(filled_path), len(path))
         np.testing.assert_equal(filled_path[0], path[0])
         np.testing.assert_equal(filled_path[1], path[1])
         np.testing.assert_equal(filled_path[2], path[2])
 
         # perform a fill that adds multiple intermediate waypoints
-        filled_path = utils.fill_path(path, dist=0.1)
+        filled_path = utils.fill_path(path, max_dist_between_points=0.1)
         self.assertEqual(len(filled_path), 8)
         np.testing.assert_equal(filled_path[0], path[0])
         np.testing.assert_allclose(

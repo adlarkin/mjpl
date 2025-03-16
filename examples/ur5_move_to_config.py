@@ -75,7 +75,7 @@ def main():
     shortcut_path = utils.shortcut(
         path,
         arm_jg,
-        data,
+        model,
         cr,
         validation_dist=planner_options.epsilon,
         max_attempts=len(path),

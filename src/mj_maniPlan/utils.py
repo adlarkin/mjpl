@@ -9,25 +9,25 @@ def configuration_distance(q_from: np.ndarray, q_to: np.ndarray):
     return np.linalg.norm(q_to - q_from)
 
 
-def step(start: np.ndarray, target: np.ndarray, max_amount: float) -> np.ndarray:
+def step(start: np.ndarray, target: np.ndarray, max_step_dist: float) -> np.ndarray:
     """Step a vector towards a target.
 
     Args:
         start: The start vector.
         target: The target.
-        max_amount: Maximum amount to step towards `target`.
+        max_step_dist: Maximum amount to step towards `target`.
 
     Return:
         A vector that has taken a step towards `target` from `start`.
     """
-    if max_amount <= 0.0:
-        raise ValueError("`max_amount` must be > 0.0")
+    if max_step_dist <= 0.0:
+        raise ValueError("`max_step_dist` must be > 0.0")
     if np.array_equal(start, target):
         return target.copy()
     direction = target - start
     magnitude = np.linalg.norm(direction)
     unit_vec = direction / magnitude
-    return start + (unit_vec * min(max_amount, magnitude))
+    return start + (unit_vec * min(max_step_dist, magnitude))
 
 
 def is_valid_config(
@@ -62,27 +62,31 @@ def random_valid_config(
     return q_rand
 
 
-def connect_waypoints(
+def _connect_waypoints(
     path: list[np.ndarray],
-    start: int,
-    end: int,
+    start_idx: int,
+    end_idx: int,
     fill: bool,
-    dist: float = 0.05,
+    min_fill_dist: float = 0.05,
     jg: JointGroup | None = None,
     data: mujoco.MjData | None = None,
     cr: CollisionRuleset | None = None,
 ) -> list[np.ndarray]:
     """If possible, directly connect two specific waypoints from a path.
 
+    This is meant to be a helper function for things like `shortcut` and
+    `fill_path`.
+
     Args:
         path: The path with waypoints to connect.
-        start: The index of the first waypoint.
-        end: The index of the second waypoint.
+        start_idx: The index of the first waypoint.
+        end_idx: The index of the second waypoint.
         fill: Whether or not filler waypoints should be added in between the
-            `start` and `end` waypoints (if they can be directly connected).
-        dist: The distance increment that is used for adding filler waypoints
-            and performing intermediate validation checks (see `jg`, `data`,
-            and `cr`). This must be > 0.
+            `start_idx` and `end_idx` waypoints (if they can be directly
+            connected).
+        min_fill_dist: The distance increment that is used for adding filler
+            waypoints and performing intermediate validation checks (see `jg`,
+            `data`, and `cr`). This must be > 0.
         jg: The JointGroup to apply validation checks on.
             To disable validation checking, set this to None.
         data: MuJoCo MjData. Used for validation checking.
@@ -90,16 +94,16 @@ def connect_waypoints(
         cr: The CollisionRuleset to enforce (if any) for validation checks.
 
     Returns:
-        A path with a direct connection between the waypoints at indices (start, end)
-        with optional intermediate waypoints if the waypoints at these indices can
-        be connected.
+        A path with a direct connection between the waypoints at indices
+        (`start_idx`, `end_idx`) with optional intermediate waypoints if the waypoints
+        at these indices can be connected.
 
     Notes:
         `jg` and `data` must either be None (which disables validation checks)
         or not None (which enables validation checks).
     """
-    if dist <= 0.0:
-        raise ValueError("`dist` must be > 0")
+    if min_fill_dist <= 0.0:
+        raise ValueError("`min_fill_dist` must be > 0")
 
     variables = [jg, data]
     if any(var is not None for var in variables) and any(
@@ -108,25 +112,24 @@ def connect_waypoints(
         raise ValueError("Both `jg` and `data` must either be None or not None.")
     validate = all(var is not None for var in variables)
 
-    q_start = path[start]
-    q_target = path[end]
+    q_start_idx = path[start_idx]
+    q_target = path[end_idx]
 
     intermediate_waypoints = []
-    q_curr = step(q_start, q_target, dist)
+    q_curr = step(q_start_idx, q_target, min_fill_dist)
     while not np.array_equal(q_curr, q_target):
-        if validate:
-            if not is_valid_config(q_curr, jg, data, cr):
-                return path
+        if validate and not is_valid_config(q_curr, jg, data, cr):
+            return path
         if fill and not np.array_equal(q_curr, q_target):
             intermediate_waypoints.append(q_curr.copy())
-        q_curr = step(q_curr, q_target, dist)
-    return path[: start + 1] + intermediate_waypoints + path[end:]
+        q_curr = step(q_curr, q_target, min_fill_dist)
+    return path[: start_idx + 1] + intermediate_waypoints + path[end_idx:]
 
 
 def shortcut(
     path: list[np.ndarray],
     jg: JointGroup,
-    data: mujoco.MjData,
+    model: mujoco.MjModel,
     cr: CollisionRuleset | None,
     validation_dist: float = 0.05,
     max_attempts: int = 100,
@@ -137,7 +140,7 @@ def shortcut(
     Args:
         path: The path to shortcut.
         jg: The JointGroup to apply validation checks on when shortcutting.
-        data: MuJoCo data. Used for validation checking.
+        model: MuJoCo model.
         cr: The CollisionRuleset to enforce (if any) for validation checks.
         validation_dist: The distance between each validation check,
             which occurs between a pair of waypoints that are trying to be
@@ -155,15 +158,16 @@ def shortcut(
     Notes:
         Shortuctting does not perform waypoint filling. See `fill_path`.
     """
+    data = mujoco.MjData(model)
     rng = np.random.default_rng(seed=seed)
 
     # sanity check: can we shortcut directly between the start/end of the path?
-    shortened_path = connect_waypoints(
+    shortened_path = _connect_waypoints(
         path=path,
-        start=0,
-        end=len(path) - 1,
+        start_idx=0,
+        end_idx=len(path) - 1,
         fill=False,
-        dist=validation_dist,
+        min_fill_dist=validation_dist,
         jg=jg,
         data=data,
         cr=cr,
@@ -178,12 +182,12 @@ def shortcut(
             start, end = rng.integers(len(shortened_path), size=2)
         if start > end:
             start, end = end, start
-        shortened_path = connect_waypoints(
+        shortened_path = _connect_waypoints(
             path=shortened_path,
-            start=start,
-            end=end,
+            start_idx=start,
+            end_idx=end,
             fill=False,
-            dist=validation_dist,
+            min_fill_dist=validation_dist,
             jg=jg,
             data=data,
             cr=cr,
@@ -192,21 +196,27 @@ def shortcut(
     return shortened_path
 
 
-def fill_path(path: list[np.ndarray], dist: float) -> list[np.ndarray]:
+def fill_path(
+    path: list[np.ndarray], max_dist_between_points: float
+) -> list[np.ndarray]:
     """Perform waypoint filling on a path.
 
     Args:
         path: The path to fill.
-        dist: The distance between filler waypoints.
+        max_dist_between_points: The distance between filler waypoints.
 
     Returns:
         A path with intermediate waypoints between adjacent waypoints in
-        `path` that are further than `dist` apart.
+        `path` that are further than `max_dist_between_points` apart.
     """
     filled_path = [path[0]]
     for i in range(len(path) - 1):
-        filled_segment = connect_waypoints(
-            path=[path[i], path[i + 1]], start=0, end=1, fill=True, dist=dist
+        filled_segment = _connect_waypoints(
+            path=[path[i], path[i + 1]],
+            start_idx=0,
+            end_idx=1,
+            fill=True,
+            min_fill_dist=max_dist_between_points,
         )
         filled_path.extend(filled_segment[1:])
 
