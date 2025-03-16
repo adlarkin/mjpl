@@ -65,7 +65,6 @@ if __name__ == "__main__":
             cr=cr,
             max_planning_time=max_planning_time,
             epsilon=epsilon,
-            shortcut_filler_epsilon=epsilon,
             seed=seed,
             goal_biasing_probability=goal_biasing_probability,
         )

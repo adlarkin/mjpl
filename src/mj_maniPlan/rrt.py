@@ -73,27 +73,14 @@ class RRTOptions:
     # Maximum planning time, in seconds.
     # If this value is <= 0, the planner will run until a solution is found.
     # A value <= 0 may lead to infinite run time, since sampling-based planners are probabilistically complete!
-    max_planning_time: float
+    max_planning_time: float = 10.0
     # The RRT "growth factor".
     # This is the maximum distance between nodes in the tree.
     # This number should be > 0.
-    epsilon: float
-    # After shortcutting, the path may have adjacent waypoints that have a configuration distance > epsilon
-    # (i.e., the original shortcut path is a "sparse" path).
-    # To maintain path structure, intermediate configurations are added between pairs of distant adjacent waypoints
-    # (i.e., the "sparse" path is turned into a "dense" path).
-    #
-    # For two adjacent waypoints in the "sparse" path, q_1 and q_2, if configuration_distance(q_1, q_2) > shortcut_filler_epsilon,
-    # then filler waypoints are added between q_1 and q_2, spaced at a configuration distance of shortcut_filler_epsilon,
-    # starting from q_1.
-    #
-    # shortcut_filler_epsilon should be >= epsilon since adjacent waypoints in the "sparse" path can be connected directly.
-    #
-    # If the user does not want waypoint filling after the initial path shortcutting is performed, this value should be
-    # set to infinity.
-    shortcut_filler_epsilon: float
+    epsilon: float = 0.05
     # Seed used for the underlying sampler in the planner.
-    seed: int | None
+    # `None` means the algorithm is nondeterministic.
+    seed: int | None = None
     # How often to sample the goal state when building the tree.
     # This should be a value within [0.0, 1.0].
     goal_biasing_probability: float = 0.05
@@ -278,74 +265,3 @@ class RRT:
         if np.array_equal(path_start[-1], path_end[0]):
             path_start.pop()
         return path_start + path_end
-
-    # This method can be called the following ways:
-    #   shortcut(path, num_tries=)
-    #       - This will randomly pick a set of points within `path` and try to shortcut them.
-    #         This process repeats `num_tries` times
-    #   shortcut(path, start_idx=, end_idx=)
-    #       - This will try to shortcut `path` between points at indices `start_idx` and `end_idx`, assuming start_idx < end_idx
-    def shortcut(self, path: list[np.ndarray], **kwargs) -> list[np.ndarray]:
-        if len(kwargs) == 1 and "num_attempts" in kwargs:
-            shortened_path = path.copy()
-            for _ in range(kwargs["num_attempts"]):
-                # randomly pick 2 waypoints
-                start, end = 0, 0
-                while start == end:
-                    start, end = self.rng.integers(len(shortened_path), size=2)
-                if start > end:
-                    start, end = end, start
-                shortened_path = self.__shortcut(shortened_path, start, end, False)
-                if len(shortened_path) == 2:
-                    # we can go directly from start to goal, so no more shortcutting can be done
-                    break
-            return self.__make_dense_path(shortened_path)
-        elif len(kwargs) == 2 and ("start_idx" in kwargs and "end_idx" in kwargs):
-            return self.__shortcut(path, kwargs["start_idx"], kwargs["end_idx"], True)
-        else:
-            raise ValueError(
-                f"Invalid kwargs combination. Expected ['num_attempts'] or ['start_idx', 'end_idx'], but received {list(kwargs.keys())}"
-            )
-
-    # Helper function for performing the actual shortcutting - see the `shortcut` method
-    def __shortcut(
-        self, path: list[np.ndarray], start: int, end: int, make_dense: bool
-    ) -> list[np.ndarray]:
-        q_start = path[start]
-        q_end = path[end]
-        # see if these 2 waypoints can make a valid path
-        tree = Tree()
-        tree.add_node(Node(q_start, None))
-        connected_node = self.connect(q_end, tree)
-        if np.array_equal(connected_node.q, q_end):
-            shortened_path = path[: start + 1] + path[end:]
-            if make_dense:
-                shortened_path = self.__make_dense_path(shortened_path)
-            return shortened_path
-        return path
-
-    # Make a "sparse" path "dense" by adding intermediate waypoints between
-    # adjacent waypoints that have a configuration distance > shortcut_filler_epsilon.
-    # Adding filler waypoints to the "sparse" path helps maintain path structure.
-    def __make_dense_path(self, path: list[np.ndarray]) -> list[np.ndarray]:
-        dense_path = []
-        for i in range(len(path) - 1):
-            q_curr = path[i]
-            q_next = path[i + 1]
-            dense_path.append(q_curr)
-            if (
-                utils.configuration_distance(q_curr, q_next)
-                > self.options.shortcut_filler_epsilon
-            ):
-                tree = Tree()
-                tree.add_node(Node(q_curr, None))
-                connected_node = self.connect(
-                    q_next, tree, eps=self.options.shortcut_filler_epsilon
-                )
-                intermediate_configs = tree.get_path(connected_node)
-                intermediate_configs.reverse()
-                # don't add the first (q_curr) or last (q_next) elements since that
-                # is already being done in the for loop
-                dense_path += intermediate_configs[1:-1]
-        dense_path.append(path[-1])
-        return dense_path

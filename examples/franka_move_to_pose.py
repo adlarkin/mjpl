@@ -6,13 +6,13 @@ import mujoco.viewer
 import numpy as np
 from example_utils import parse_args
 
+import mj_maniPlan.utils as utils
 import mj_maniPlan.visualization as viz
 from mj_maniPlan.collision_ruleset import CollisionRuleset
 from mj_maniPlan.inverse_kinematics import IKOptions
 from mj_maniPlan.joint_group import JointGroup
 from mj_maniPlan.rrt import RRT, RRTOptions
 from mj_maniPlan.trajectory import TrajectoryLimits, generate_trajectory
-from mj_maniPlan.utils import random_valid_config
 
 _HERE = Path(__file__).parent
 _PANDA_XML = _HERE / "models" / "franka_emika_panda" / "scene_with_obstacles.xml"
@@ -43,7 +43,7 @@ def main():
     # Generate a valid target pose that's derived from a valid joint configuration.
     rng = np.random.default_rng(seed=seed)
     data = mujoco.MjData(model)
-    q_rand = random_valid_config(rng, arm_jg, data, CollisionRuleset(model))
+    q_rand = utils.random_valid_config(rng, arm_jg, data, CollisionRuleset(model))
     arm_jg.fk(q_rand, data)
     target_pos = data.site(_PANDA_EE_SITE).xpos.copy()
     target_rotmat = data.site(_PANDA_EE_SITE).xmat.copy()
@@ -56,13 +56,11 @@ def main():
     cr = CollisionRuleset(model, allowed_collisions)
 
     # Set up the planner.
-    epsilon = 0.05
     planner_options = RRTOptions(
         jg=arm_jg,
         cr=cr,
         max_planning_time=10,
-        epsilon=epsilon,
-        shortcut_filler_epsilon=np.inf,
+        epsilon=0.05,
         seed=seed,
         goal_biasing_probability=0.1,
         max_connection_distance=np.inf,
@@ -87,7 +85,15 @@ def main():
 
     print("Shortcutting...")
     start = time.time()
-    shortcut_path = planner.shortcut(path, num_attempts=len(path))
+    shortcut_path = utils.shortcut(
+        path,
+        arm_jg,
+        model,
+        cr,
+        validation_dist=planner_options.epsilon,
+        max_attempts=len(path),
+        seed=seed,
+    )
     print(f"Shortcutting took {(time.time() - start):.4f}s")
 
     # These values are for demonstration purposes only.
@@ -126,6 +132,12 @@ def main():
     for q_ref in traj.configurations:
         data.ctrl[actuator_ids] = q_ref
         mujoco.mj_step(model, data)
+        # While the planner gives a sequence of waypoints are collision free, the
+        # generated trajectory may not. For more info, see:
+        # https://github.com/adlarkin/mj_maniPlan/issues/54
+        if not cr.obeys_ruleset(data.contact.geom):
+            print("Invalid collision occurred during trajectory execution.")
+            return
         q_t.append(arm_jg.qpos(data))
 
     if visualize:
