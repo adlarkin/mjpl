@@ -203,43 +203,78 @@ class RRT:
 
     def extend(
         self,
-        q: np.ndarray,
+        q_target: np.ndarray,
         tree: Tree,
-        nearest_node: Node | None = None,
+        start_node: Node | None = None,
         eps: float | None = None,
     ) -> Node | None:
+        """Extend a node in a tree towards a target configuration.
+
+        Args:
+            q_target: The target configuration.
+            tree: The tree with a node to extend towards `q_target`.
+            start_node: The node in `tree` to extend towards `q_target`.
+                If this isn't defined, the node closest to `q_target` in
+                `tree` will be used.
+            eps: The maximum distance `start_node` will extend towards
+                `q_target`. If this isn't defined, the planner's epsilon
+                parameter will be used (see `RRTOptions.epsilon`).
+
+        Returns:
+            The node that was the result of extending `start_node` towards
+            `q_target`, or None if extension wasn't possible. This node also
+            belongs to `tree`.
+        """
         eps = eps or self.options.epsilon
-        nearest_node = nearest_node or tree.nearest_neighbor(q)
-        if np.array_equal(nearest_node.q, q):
-            return nearest_node
-        q_extend = q.copy()
-        q_dist = utils.configuration_distance(nearest_node.q, q)
-        if q_dist > eps:
-            q_increment = eps * ((q - nearest_node.q) / q_dist)
-            q_extend = nearest_node.q + q_increment
+        start_node = start_node or tree.nearest_neighbor(q_target)
+        if np.array_equal(start_node.q, q_target):
+            return start_node
+        q_extend = utils.step(start_node.q, q_target, eps)
         if utils.is_valid_config(q_extend, self.options.jg, self.data, self.options.cr):
-            node_extend = Node(q_extend, nearest_node)
+            node_extend = Node(q_extend, start_node)
             tree.add_node(node_extend)
             return node_extend
         return None
 
     def connect(
         self,
-        q: np.ndarray,
+        q_target: np.ndarray,
         tree: Tree,
         eps: float | None = None,
         max_connection_distance: float | None = None,
     ) -> Node:
+        """Attempt to connect a node in a tree to a target configuration.
+
+        Args:
+            q_target: The target configuration.
+            tree: The tree with a node that serves as the basis of the connection
+                to `q_target`.
+            eps: The maximum distance between nodes added to `tree`. If the
+                distance between the start node in `tree` and `q_target` is greater
+                than `eps`, multiple nodes will be added to `tree`. If this isn't
+                defined, the planner's epsilon parameter will be used
+                (see `RRTOptions.epsilon`).
+            max_connection_distance: The maximum distance to cover before
+                terminating the connect operation. If this isn't defined, the
+                planner's max_connection_distance parameter will be used (see
+                `RRTOptions.max_connection_distance`).
+
+        Returns:
+            The node that is the result of connecting a node from `tree` towards
+            `q_target`.
+        """
         eps = eps or self.options.epsilon
         max_connection_distance = (
             max_connection_distance or self.options.max_connection_distance
         )
 
-        nearest_node = tree.nearest_neighbor(q)
+        nearest_node = tree.nearest_neighbor(q_target)
         total_distance = 0.0
-        while not np.array_equal(q, nearest_node.q):
+        while not np.array_equal(nearest_node.q, q_target):
             max_eps = min(eps, max_connection_distance - total_distance)
-            next_node = self.extend(q, tree, nearest_node=nearest_node, eps=max_eps)
+            next_node = self.extend(
+                q_target, tree, start_node=nearest_node, eps=max_eps
+            )
             if not next_node:
                 break
             nearest_node = next_node
