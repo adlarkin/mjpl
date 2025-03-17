@@ -261,7 +261,7 @@ class RRT:
 
         Returns:
             The node that is the result of connecting a node from `tree` towards
-            `q_target`.
+            `q_target`. This node also belongs to `tree`.
         """
         eps = eps or self.options.epsilon
         max_connection_distance = (
