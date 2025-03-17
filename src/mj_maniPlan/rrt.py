@@ -8,8 +8,7 @@ from . import utils
 from .collision_ruleset import CollisionRuleset
 from .inverse_kinematics import IKOptions, solve_ik
 from .joint_group import JointGroup
-from .node import Node
-from .tree import Tree
+from .tree import Node, Tree
 
 
 @dataclass
