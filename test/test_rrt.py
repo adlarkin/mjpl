@@ -48,7 +48,7 @@ class TestRRT(unittest.TestCase):
 
         q_goal = np.array([0.5])
         expected_q_extended = np.array([0.0])
-        extended_node = self.planner.extend(q_goal, tree)
+        extended_node = self.planner._extend(q_goal, tree)
         self.assertIsNotNone(extended_node)
         self.assertEqual(len(tree.nodes), 2)
         self.assertAlmostEqual(extended_node.q, expected_q_extended, places=9)
@@ -66,7 +66,7 @@ class TestRRT(unittest.TestCase):
 
         # extending towards a q that is already in the tree should do nothing
         existing_nodes = tree.nodes.copy()
-        same_extended_node = self.planner.extend(extended_node.q, tree)
+        same_extended_node = self.planner._extend(extended_node.q, tree)
         self.assertIsNotNone(same_extended_node)
         self.assertSetEqual(tree.nodes, existing_nodes)
         # The assertSetEqual above runs the equality operator on all elements of the set.
@@ -79,7 +79,7 @@ class TestRRT(unittest.TestCase):
         root_node = rrt.Node(np.array([0.0]), None)
         tree.add_node(root_node)
         tree.add_node(rrt.Node(np.array([2.0]), root_node))
-        extended_node = self.planner.extend(np.array([3.0]), tree, root_node)
+        extended_node = self.planner._extend(np.array([3.0]), tree, root_node)
         self.assertIsNotNone(extended_node)
         self.assertIs(extended_node.parent, root_node)
         self.assertAlmostEqual(extended_node.q[0], 0.1, places=9)
@@ -91,7 +91,7 @@ class TestRRT(unittest.TestCase):
         tree.add_node(rrt.Node(self.q_init, None))
 
         q_goal = np.array([0.15])
-        goal_node = self.planner.connect(q_goal, tree)
+        goal_node = self.planner._connect(q_goal, tree)
 
         expected_qs_in_tree = [
             self.q_init,
@@ -113,7 +113,7 @@ class TestRRT(unittest.TestCase):
 
         # connecting towards a q that is already in the tree should do nothing
         existing_nodes = tree.nodes.copy()
-        same_connected_node = self.planner.connect(goal_node.q, tree)
+        same_connected_node = self.planner._connect(goal_node.q, tree)
         self.assertSetEqual(tree.nodes, existing_nodes)
         # The assertSetEqual above runs the equality operator on all elements of the set.
         # Since node equality is defined as having the same q, we should take the check a
@@ -128,7 +128,7 @@ class TestRRT(unittest.TestCase):
         q_goal = np.array([0.15])
 
         # Run one connect operation to a max distance.
-        goal_node = self.planner.connect(
+        goal_node = self.planner._connect(
             q_goal, tree, eps=0.05, max_connection_distance=0.075
         )
 
@@ -143,7 +143,7 @@ class TestRRT(unittest.TestCase):
 
         # Run a second and third connect which should still not get to the goal.
         for _ in range(2):
-            goal_node = self.planner.connect(
+            goal_node = self.planner._connect(
                 q_goal, tree, eps=0.05, max_connection_distance=0.075
             )
 
@@ -160,7 +160,7 @@ class TestRRT(unittest.TestCase):
             self.assertAlmostEqual(n.q[0], q_tree[0], places=9)
 
         # The final connect should finally reach the goal!
-        goal_node = self.planner.connect(
+        goal_node = self.planner._connect(
             q_goal, tree, eps=0.05, max_connection_distance=0.075
         )
         self.assertAlmostEqual(goal_node.q[0], q_goal[0], places=9)
@@ -175,14 +175,14 @@ class TestRRT(unittest.TestCase):
         # There is an obstacle in the way, so the final connection should be just before
         # where the obstacle lies.
         q_goal = np.array([1.0])
-        connected_node = self.planner.connect(q_goal, tree)
+        connected_node = self.planner._connect(q_goal, tree)
         obstacle_min_x = self.obstacle.pos[0] - self.obstacle.size[0]
         self.assertLess(connected_node.q[0], obstacle_min_x)
 
         # Try to extend towards the goal.
         # This should not work since the extension is in collision.
         existing_nodes = tree.nodes.copy()
-        extended_node = self.planner.extend(q_goal, tree)
+        extended_node = self.planner._extend(q_goal, tree)
         self.assertIsNone(extended_node)
         self.assertSetEqual(tree.nodes, existing_nodes)
 
@@ -193,11 +193,11 @@ class TestRRT(unittest.TestCase):
 
         start_tree = rrt.Tree()
         start_tree.add_node(rrt.Node(self.q_init, None))
-        connected_node_a = self.planner.connect(q_new, start_tree)
+        connected_node_a = self.planner._connect(q_new, start_tree)
 
         goal_tree = rrt.Tree()
         goal_tree.add_node(rrt.Node(np.array([0.5]), None))
-        connected_node_b = self.planner.connect(q_new, goal_tree)
+        connected_node_b = self.planner._connect(q_new, goal_tree)
 
         path = self.planner.get_path(
             start_tree, connected_node_a, goal_tree, connected_node_b
