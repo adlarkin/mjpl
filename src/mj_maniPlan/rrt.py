@@ -174,8 +174,8 @@ class RRT:
             else:
                 q_rand = self.options.jg.random_config(self.rng)
 
-            new_start_tree_node = self.connect(q_rand, start_tree)
-            new_goal_tree_node = self.connect(new_start_tree_node.q, goal_tree)
+            new_start_tree_node = self._connect(q_rand, start_tree)
+            new_goal_tree_node = self._connect(new_start_tree_node.q, goal_tree)
             if (
                 utils.configuration_distance(
                     new_start_tree_node.q, new_goal_tree_node.q
@@ -187,8 +187,8 @@ class RRT:
                 )
 
             if not np.array_equal(new_start_tree_node.q, q_rand):
-                new_goal_tree_node = self.connect(q_rand, goal_tree)
-                new_start_tree_node = self.connect(new_goal_tree_node.q, start_tree)
+                new_goal_tree_node = self._connect(q_rand, goal_tree)
+                new_start_tree_node = self._connect(new_goal_tree_node.q, start_tree)
                 if (
                     utils.configuration_distance(
                         new_start_tree_node.q, new_goal_tree_node.q
@@ -201,7 +201,7 @@ class RRT:
 
         return []
 
-    def extend(
+    def _extend(
         self,
         q_target: np.ndarray,
         tree: Tree,
@@ -236,7 +236,7 @@ class RRT:
             return node_extend
         return None
 
-    def connect(
+    def _connect(
         self,
         q_target: np.ndarray,
         tree: Tree,
@@ -272,7 +272,7 @@ class RRT:
         total_distance = 0.0
         while not np.array_equal(nearest_node.q, q_target):
             max_eps = min(eps, max_connection_distance - total_distance)
-            next_node = self.extend(
+            next_node = self._extend(
                 q_target, tree, start_node=nearest_node, eps=max_eps
             )
             if not next_node:
