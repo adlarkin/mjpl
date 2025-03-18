@@ -21,7 +21,7 @@ class TestNode(unittest.TestCase):
 class TestTree(unittest.TestCase):
     def build_tree(self) -> Tree:
         tree = Tree(self.root)
-        nodes = {self.n_1, self.n_2, self.n_3}
+        nodes = [self.n_1, self.n_2, self.n_3]
         for n in nodes:
             tree.add_node(n)
         self.assertEqual(len(tree.nodes), 4)
