@@ -105,10 +105,8 @@ class RRT:
         if utils.configuration_distance(q_init, q_goal) < self.options.epsilon:
             return [q_init, q_goal]
 
-        start_tree = Tree()
-        start_tree.add_node(q_init)
-        goal_tree = Tree()
-        goal_tree.add_node(q_goal)
+        start_tree = Tree(Node(q_init))
+        goal_tree = Tree(Node(q_goal))
 
         max_planning_time = self.options.max_planning_time
         if max_planning_time <= 0:
@@ -178,7 +176,9 @@ class RRT:
             return start_node
         q_extend = utils.step(start_node.q, q_target, eps)
         if utils.is_valid_config(q_extend, self.options.jg, self.data, self.options.cr):
-            return tree.add_node(q_extend, start_node)
+            extended_node = Node(q_extend, start_node)
+            tree.add_node(extended_node)
+            return extended_node
         return None
 
     def _connect(
@@ -250,10 +250,10 @@ class RRT:
             with a connecting edge between `start_tree_node` and `goal_tree_node`.
         """
         # The path generated from start_tree ends at q_init, but we want it to start at q_init. So we must reverse it.
-        path_start = start_tree.get_path(start_tree_node)
+        path_start = [n.q for n in start_tree.get_path(start_tree_node)]
         path_start.reverse()
         # The path generated from goal_tree ends at q_goal, which is what we want.
-        path_end = goal_tree.get_path(goal_tree_node)
+        path_end = [n.q for n in goal_tree.get_path(goal_tree_node)]
         # The last value in path_start might be the same as the first value in path_end.
         # If this is the case, remove the duplicate value.
         if np.array_equal(path_start[-1], path_end[0]):

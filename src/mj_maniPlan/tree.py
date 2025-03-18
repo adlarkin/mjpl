@@ -12,8 +12,7 @@ class Node:
 
     def __hash__(self):
         """Hash based only on q to ensure uniqueness per tree."""
-        # Convert q to a tuple for hashing
-        return hash(tuple(self.q))
+        return hash(self.q.tobytes())
 
     def __eq__(self, other):
         """Nodes are equal if their q values are equal (ignores parent)."""
@@ -25,35 +24,29 @@ class Node:
 class Tree:
     """Tree of nodes."""
 
-    def __init__(self):
-        """Constructor."""
-        self.nodes = set()
-        self.q_to_node = {}
+    def __init__(self, root: Node):
+        """Constructor.
 
-    def add_node(self, q: np.ndarray, parent: Node | None = None) -> Node:
+        Args:
+            root: The tree's root node, which should have no parent.
+        """
+        if root.parent:
+            raise ValueError("The root node should have no parent.")
+        self.nodes = {root}
+
+    def add_node(self, node: Node):
         """Add a node to a tree.
 
         Args:
-            q: The node's q value.
-            parent: The node's parent.
-
-        Return:
-            The node from the tree.
-
-        Notes:
-            If there's already a node in the tree that has the specified `q`,
-            a new node will not be added to the tree and this pre-existing
-            node is what is returned.
+            node: The node to add.
         """
-        q_tuple = tuple(q)
-
-        if q_tuple in self.q_to_node:
-            return self.q_to_node[q_tuple]
-
-        new_node = Node(q, parent)
-        self.nodes.add(new_node)
-        self.q_to_node[q_tuple] = new_node
-        return new_node
+        if not node.parent:
+            raise ValueError("Node does not have a parent.")
+        if node in self.nodes:
+            raise ValueError(f"A node with q={node.q} already exists in the tree.")
+        if node.parent not in self.nodes:
+            raise ValueError("Node's parent is not in the tree.")
+        self.nodes.add(node)
 
     def __contains__(self, node: Node) -> bool:
         """Check if a node is in the tree."""
@@ -67,22 +60,16 @@ class Tree:
 
         Returns: The node from the tree that's closest to `q`.
         """
-        if not self.nodes:
-            raise ValueError("Tree is empty, cannot find nearest neighbor.")
-
-        q_tuple = tuple(q)
-        if q_tuple in self.q_to_node:
-            return self.q_to_node[q_tuple]
         return min(self.nodes, key=lambda node: np.linalg.norm(node.q - q))
 
-    def get_path(self, node: Node) -> list[np.ndarray]:
-        """Get the path of q's from the node to the root of the tree.
+    def get_path(self, node: Node) -> list[Node]:
+        """Get the path from the given node to the root.
 
         Args:
             node: The node that defines the start of the path.
 
         Returns:
-            A list of each node's q from `node` to the root of the tree.
+            A list of nodes to the root, starting from `node`.
         """
         if node not in self.nodes:
             raise ValueError("Node is not in the tree.")
@@ -90,6 +77,6 @@ class Tree:
         path = []
         curr_node = node
         while curr_node is not None:
-            path.append(curr_node.q)
+            path.append(curr_node)
             curr_node = curr_node.parent
         return path
