@@ -44,7 +44,7 @@ class TestRRT(unittest.TestCase):
         self.load_ball_with_obstacle_model()
 
         tree = rrt.Tree()
-        tree.add_node(rrt.Node(self.q_init, None))
+        tree.add_node(self.q_init)
 
         q_goal = np.array([0.5])
         expected_q_extended = np.array([0.0])
@@ -76,9 +76,8 @@ class TestRRT(unittest.TestCase):
 
         # Test extend where the "nearest node" is already given
         tree = rrt.Tree()
-        root_node = rrt.Node(np.array([0.0]), None)
-        tree.add_node(root_node)
-        tree.add_node(rrt.Node(np.array([2.0]), root_node))
+        root_node = tree.add_node(np.array([0.0]))
+        tree.add_node(np.array([2.0]), root_node)
         extended_node = self.planner._extend(np.array([3.0]), tree, root_node)
         self.assertIsNotNone(extended_node)
         self.assertIs(extended_node.parent, root_node)
@@ -88,7 +87,7 @@ class TestRRT(unittest.TestCase):
         self.load_ball_with_obstacle_model()
 
         tree = rrt.Tree()
-        tree.add_node(rrt.Node(self.q_init, None))
+        tree.add_node(self.q_init)
 
         q_goal = np.array([0.15])
         goal_node = self.planner._connect(q_goal, tree)
@@ -124,7 +123,7 @@ class TestRRT(unittest.TestCase):
         self.load_ball_with_obstacle_model()
 
         tree = rrt.Tree()
-        tree.add_node(rrt.Node(self.q_init, None))
+        tree.add_node(self.q_init)
         q_goal = np.array([0.15])
 
         # Run one connect operation to a max distance.
@@ -169,7 +168,7 @@ class TestRRT(unittest.TestCase):
         self.load_ball_with_obstacle_model()
 
         tree = rrt.Tree()
-        tree.add_node(rrt.Node(self.q_init, None))
+        tree.add_node(self.q_init)
 
         # Try to connect to the maximum joint value for the ball.
         # There is an obstacle in the way, so the final connection should be just before
@@ -192,11 +191,11 @@ class TestRRT(unittest.TestCase):
         q_new = np.array([0.15])
 
         start_tree = rrt.Tree()
-        start_tree.add_node(rrt.Node(self.q_init, None))
+        start_tree.add_node(self.q_init)
         connected_node_a = self.planner._connect(q_new, start_tree)
 
         goal_tree = rrt.Tree()
-        goal_tree.add_node(rrt.Node(np.array([0.5]), None))
+        goal_tree.add_node(np.array([0.5]))
         connected_node_b = self.planner._connect(q_new, goal_tree)
 
         path = self.planner._combine_paths(

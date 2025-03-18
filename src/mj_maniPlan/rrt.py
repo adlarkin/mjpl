@@ -106,9 +106,9 @@ class RRT:
             return [q_init, q_goal]
 
         start_tree = Tree()
-        start_tree.add_node(Node(q_init, None))
+        start_tree.add_node(q_init)
         goal_tree = Tree()
-        goal_tree.add_node(Node(q_goal, None))
+        goal_tree.add_node(q_goal)
 
         max_planning_time = self.options.max_planning_time
         if max_planning_time <= 0:
@@ -178,9 +178,7 @@ class RRT:
             return start_node
         q_extend = utils.step(start_node.q, q_target, eps)
         if utils.is_valid_config(q_extend, self.options.jg, self.data, self.options.cr):
-            node_extend = Node(q_extend, start_node)
-            tree.add_node(node_extend)
-            return node_extend
+            return tree.add_node(q_extend, start_node)
         return None
 
     def _connect(

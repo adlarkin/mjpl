@@ -22,7 +22,7 @@ class TestTree(unittest.TestCase):
     def build_tree(self):
         nodes = {self.n_0, self.n_1, self.n_2, self.n_3}
         for n in nodes:
-            self.tree.add_node(n)
+            self.tree.add_node(n.q, n.parent)
         self.assertSetEqual(self.tree.nodes, nodes)
 
     def setUp(self):
@@ -45,22 +45,23 @@ class TestTree(unittest.TestCase):
 
         # Ignore adding a node that's already in the tree
         num_nodes = len(self.tree.nodes)
-        duplicate_node = Node(np.array([0, 0]), None)
-        self.assertTrue(duplicate_node in self.tree.nodes)
-        self.tree.add_node(duplicate_node)
+        q_existing = self.n_0.q.copy()
+        self.assertTrue(Node(q_existing) in self.tree)
+        existing_node = self.tree.add_node(q_existing)
+        self.assertEqual(existing_node, self.n_0)
         self.assertEqual(num_nodes, len(self.tree.nodes))
 
         # Add a node that's not already in the tree
-        new_node = Node(np.array([-1, -1]), self.n_0)
-        self.assertFalse(new_node in self.tree.nodes)
-        self.tree.add_node(new_node)
-        self.assertTrue(new_node in self.tree.nodes)
+        q_new = np.array([-1, -1])
+        self.assertFalse(Node(q_new) in self.tree)
+        new_node = self.tree.add_node(q_new, None)
+        np.testing.assert_equal(new_node.q, q_new)
+        self.assertTrue(new_node in self.tree)
 
     def test_nearest_neighbor(self):
         q = np.array([2, 1])
 
-        # error should occur if nearest_neighbor is called before any nodes have been added to the tree
-        with self.assertRaisesRegex(ValueError, "call this method before adding"):
+        with self.assertRaisesRegex(ValueError, "Tree is empty"):
             self.tree.nearest_neighbor(q)
 
         self.build_tree()
@@ -81,16 +82,14 @@ class TestTree(unittest.TestCase):
 
         # error should occur if the path root node is not a part of the Tree
         orphan_node = Node(np.array([5, 5]), None)
-        with self.assertRaisesRegex(
-            ValueError, "Called get_path starting from a node that is not in the tree"
-        ):
+        with self.assertRaisesRegex(ValueError, "Node is not in the tree"):
             self.tree.get_path(orphan_node)
 
         path = self.tree.get_path(self.n_3)
-        self.assertTrue(np.array_equal(path, [self.n_3.q, self.n_1.q, self.n_0.q]))
+        np.testing.assert_equal(path, [self.n_3.q, self.n_1.q, self.n_0.q])
 
         path = self.tree.get_path(self.n_0)
-        self.assertTrue(np.array_equal(path, [self.n_0.q]))
+        np.testing.assert_equal(path, [self.n_0.q])
 
 
 if __name__ == "__main__":
