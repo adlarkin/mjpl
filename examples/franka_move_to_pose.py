@@ -9,7 +9,6 @@ from example_utils import parse_args
 import mj_maniPlan.utils as utils
 import mj_maniPlan.visualization as viz
 from mj_maniPlan.collision_ruleset import CollisionRuleset
-from mj_maniPlan.inverse_kinematics import IKOptions
 from mj_maniPlan.joint_group import JointGroup
 from mj_maniPlan.rrt import RRT, RRTOptions
 from mj_maniPlan.trajectory import TrajectoryLimits, generate_trajectory
@@ -45,8 +44,7 @@ def main():
     data = mujoco.MjData(model)
     q_rand = utils.random_valid_config(rng, arm_jg, data, CollisionRuleset(model))
     arm_jg.fk(q_rand, data)
-    target_pos = data.site(_PANDA_EE_SITE).xpos.copy()
-    target_rotmat = data.site(_PANDA_EE_SITE).xmat.copy()
+    target_pose = utils.site_pose(data, _PANDA_EE_SITE)
 
     allowed_collisions = np.array(
         [
@@ -65,18 +63,14 @@ def main():
         goal_biasing_probability=0.1,
         max_connection_distance=np.inf,
     )
-    ik_options = IKOptions(
-        jg=arm_jg,
-        cr=cr,
-        seed=seed,
-        max_attempts=5,
-    )
     planner = RRT(planner_options)
 
     print("Planning...")
     start = time.time()
     path = planner.plan_to_pose(
-        q_init, _PANDA_EE_SITE, target_pos, target_rotmat.reshape(3, 3), ik_options
+        pose=target_pose,
+        site=_PANDA_EE_SITE,
+        q_init_world=q_init,
     )
     if not path:
         print("Planning failed")
@@ -157,7 +151,11 @@ def main():
             viz.add_frame(viewer.user_scn, site.xpos, site.xmat.reshape(3, 3))
 
             # Visualize the target EE pose.
-            viz.add_frame(viewer.user_scn, target_pos, target_rotmat.reshape(3, 3))
+            viz.add_frame(
+                viewer.user_scn,
+                target_pose.translation(),
+                target_pose.rotation().as_matrix(),
+            )
 
             # Visualize the trajectory. The trajectory is of high resolution,
             # so plotting every other timestep should be sufficient.
