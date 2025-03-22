@@ -16,7 +16,8 @@ class MinkIKSolver(IKSolver):
         model: mujoco.MjModel,
         jg: JointGroup,
         cr: CollisionRuleset | None = None,
-        q_init_guess: np.ndarray | None = None,
+        pos_tolerance: float = 1e-3,
+        ori_tolerance: float = 1e-3,
         seed: int | None = None,
         max_attempts: int = 1,
         iterations: int = 500,
@@ -30,7 +31,8 @@ class MinkIKSolver(IKSolver):
                 attempts and validating configurations.
             cr: The collision rules to enforce. If defined, IK solutions must
                 also obey this ruleset.
-            q_init_guess: Initial guess for the joint configuration.
+            pos_tolerance: Allowed position error.
+            ori_tolerance: Allowed orientation error.
             seed: Seed used for generating random samples in the case of retries
                 (see `max_attempts`).
             max_attempts: Maximum number of solve attempts.
@@ -46,14 +48,15 @@ class MinkIKSolver(IKSolver):
         self.data = mujoco.MjData(model)
         self.jg = jg
         self.cr = cr
-        self.q_init_guess = q_init_guess
+        self.pos_tolerance = pos_tolerance
+        self.ori_tolerance = ori_tolerance
         self.rng = np.random.default_rng(seed=seed)
         self.max_attempts = max_attempts
         self.iterations = iterations
         self.solver = solver
 
-    def _solve_ik_impl(
-        self, pose: mink.lie.SE3, site: str, pos_tolerance: float, ori_tolerance: float
+    def solve_ik(
+        self, pose: mink.lie.SE3, site: str, q_init_guess: np.ndarray | None
     ) -> np.ndarray | None:
         end_effector_task = mink.FrameTask(
             frame_name=site,
@@ -68,13 +71,13 @@ class MinkIKSolver(IKSolver):
         limits = [mink.ConfigurationLimit(self.model)]
 
         configuration = mink.Configuration(self.model)
-        configuration.update(self.q_init_guess)
+        configuration.update(q_init_guess)
 
         for _ in range(self.max_attempts):
             for _ in range(self.iterations):
                 err = end_effector_task.compute_error(configuration)
-                pos_achieved = np.linalg.norm(err[:3]) <= pos_tolerance
-                ori_achieved = np.linalg.norm(err[3:]) <= ori_tolerance
+                pos_achieved = np.linalg.norm(err[:3]) <= self.pos_tolerance
+                ori_achieved = np.linalg.norm(err[3:]) <= self.ori_tolerance
                 if pos_achieved and ori_achieved:
                     if utils.is_valid_config(
                         configuration.q[self.jg.qpos_addrs], self.jg, self.data, self.cr

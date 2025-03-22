@@ -36,38 +36,52 @@ class TestInverseKinematics(unittest.TestCase):
         mujoco.mj_kinematics(model, data)
         target_pose = site_pose(data, site_name)
 
-        # Solve IK.
+        # Construct IK solver.
         pos_tolerance = 1e-3
         ori_tolerance = 1e-3
         solver = MinkIKSolver(
             model=model,
             jg=jg,
             cr=cr,
-            q_init_guess=q_init_world,
-            seed=12345,
-        )
-        q_candidate = solver.solve_ik(
-            pose=target_pose,
-            site=site_name,
             pos_tolerance=pos_tolerance,
             ori_tolerance=ori_tolerance,
+            seed=12345,
+            max_attempts=5,
         )
-        self.assertIsNotNone(q_candidate)
+
+        # Solve IK (test both with/without an initial guess config)
+        ik_solutions = [
+            solver.solve_ik(
+                pose=target_pose,
+                site=site_name,
+                q_init_guess=q_init_world,
+            ),
+            solver.solve_ik(
+                pose=target_pose,
+                site=site_name,
+                q_init_guess=None,
+            ),
+        ]
+        self.assertIsNotNone(ik_solutions[0])
+        self.assertIsNotNone(ik_solutions[1])
 
         # Confirm that the IK solution gives a site pose within the specified error.
         # We cannot rely on checking similarity between q_candidate and the randomly
         # generated config since there may be multiple solutions to the IK problem!
-        data.qpos = q_candidate
-        mujoco.mj_kinematics(model, data)
-        site = data.site(site_name)
-        pos_error = np.linalg.norm(site.xpos - target_pose.translation())
-        self.assertLessEqual(pos_error, pos_tolerance)
-        quat = np.zeros(4)
-        mujoco.mju_mat2Quat(quat, site.xmat)
-        ori_error = np.zeros(3)
-        mujoco.mju_subQuat(ori_error, quat, target_pose.rotation().wxyz)
-        ori_error = np.linalg.norm(ori_error)
-        self.assertLessEqual(ori_error, ori_tolerance)
+        for solution in ik_solutions:
+            data.qpos = solution.copy()
+            mujoco.mj_kinematics(model, data)
+            site = data.site(site_name)
+            # position error
+            pos_error = np.linalg.norm(site.xpos - target_pose.translation())
+            self.assertLessEqual(pos_error, pos_tolerance)
+            # orientation error
+            quat = np.zeros(4)
+            mujoco.mju_mat2Quat(quat, site.xmat)
+            ori_error = np.zeros(3)
+            mujoco.mju_subQuat(ori_error, quat, target_pose.rotation().wxyz)
+            ori_error = np.linalg.norm(ori_error)
+            self.assertLessEqual(ori_error, ori_tolerance)
 
 
 if __name__ == "__main__":

@@ -63,11 +63,10 @@ class RRT:
                 model=self.options.jg.model,
                 jg=self.options.jg,
                 cr=self.options.cr,
-                q_init_guess=q_init_world,
                 seed=self.options.seed,
                 max_attempts=5,
             )
-        q_goal = solver.solve_ik(pose, site)
+        q_goal = solver.solve_ik(pose, site, q_init_guess=q_init_world)
         if q_goal is None:
             print("Unable to find a configuration for the target pose.")
             return []
