@@ -1,0 +1,119 @@
+import unittest
+
+import mujoco
+import numpy as np
+from robot_descriptions.loaders.mujoco import load_robot_description
+
+from mj_maniPlan.collision_ruleset import CollisionRuleset
+from mj_maniPlan.inverse_kinematics.mink_ik_solver import MinkIKSolver
+from mj_maniPlan.joint_group import JointGroup
+from mj_maniPlan.utils import site_pose
+
+
+class TestInverseKinematics(unittest.TestCase):
+    def setUp(self):
+        self.model = load_robot_description("ur5e_mj_description")
+        self.site_name = "attachment_site"
+
+        arm_joints = [
+            "shoulder_pan_joint",
+            "shoulder_lift_joint",
+            "elbow_joint",
+            "wrist_1_joint",
+            "wrist_2_joint",
+            "wrist_3_joint",
+        ]
+        arm_joint_ids = [self.model.joint(joint).id for joint in arm_joints]
+        self.jg = JointGroup(self.model, arm_joint_ids)
+        self.cr = CollisionRuleset(self.model)
+
+    def test_ik(self):
+        q_init_world = self.model.keyframe("home").qpos.copy()
+
+        # Generate a pose for the IK problem by running FK on a
+        # random configuration within joint limits.
+        data = mujoco.MjData(self.model)
+        rng = np.random.default_rng(seed=12345)
+        data.qpos = rng.uniform(*self.model.jnt_range.T)
+        mujoco.mj_kinematics(self.model, data)
+        target_pose = site_pose(data, self.site_name)
+
+        # Construct IK solver.
+        pos_tolerance = 1e-3
+        ori_tolerance = 1e-3
+        solver = MinkIKSolver(
+            model=self.model,
+            jg=self.jg,
+            cr=self.cr,
+            pos_tolerance=pos_tolerance,
+            ori_tolerance=ori_tolerance,
+            seed=12345,
+            max_attempts=5,
+        )
+
+        # Solve IK (test both with/without an initial guess config)
+        ik_solutions = [
+            solver.solve_ik(
+                pose=target_pose,
+                site=self.site_name,
+                q_init_guess=q_init_world,
+            ),
+            solver.solve_ik(
+                pose=target_pose,
+                site=self.site_name,
+                q_init_guess=None,
+            ),
+        ]
+        self.assertIsNotNone(ik_solutions[0])
+        self.assertIsNotNone(ik_solutions[1])
+
+        # Confirm that the IK solution gives a site pose within the specified error.
+        # We cannot rely on checking similarity between q_candidate and the randomly
+        # generated config since there may be multiple solutions to the IK problem!
+        for solution in ik_solutions:
+            data.qpos = solution.copy()
+            mujoco.mj_kinematics(self.model, data)
+            site = data.site(self.site_name)
+            # position error
+            pos_error = np.linalg.norm(site.xpos - target_pose.translation())
+            self.assertLessEqual(pos_error, pos_tolerance)
+            # orientation error
+            quat = np.zeros(4)
+            mujoco.mju_mat2Quat(quat, site.xmat)
+            ori_error = np.zeros(3)
+            mujoco.mju_subQuat(ori_error, quat, target_pose.rotation().wxyz)
+            ori_error = np.linalg.norm(ori_error)
+            self.assertLessEqual(ori_error, ori_tolerance)
+
+    def test_invalid_args(self):
+        with self.assertRaisesRegex(ValueError, "`max_attempts` must be > 0"):
+            MinkIKSolver(
+                model=self.model,
+                jg=self.jg,
+                cr=self.cr,
+                max_attempts=-2,
+            )
+            MinkIKSolver(
+                model=self.model,
+                jg=self.jg,
+                cr=self.cr,
+                max_attempts=0,
+            )
+
+        with self.assertRaisesRegex(ValueError, "`iterations` must be > 0"):
+            MinkIKSolver(
+                model=self.model,
+                jg=self.jg,
+                cr=self.cr,
+                iterations=-2,
+            )
+            MinkIKSolver(
+                model=self.model,
+                jg=self.jg,
+                cr=self.cr,
+                iterations=0,
+            )
+
+
+if __name__ == "__main__":
+    unittest.main()

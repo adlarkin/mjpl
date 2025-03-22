@@ -43,7 +43,7 @@ def main():
     cr = CollisionRuleset(model)
 
     # Use the 'home' keyframe position as q_init.
-    q_init_world = model.keyframe("home").qpos
+    q_init_world = model.keyframe("home").qpos.copy()
 
     # Generate valid goal configuration.
     rng = np.random.default_rng(seed=seed)
@@ -142,13 +142,21 @@ def main():
             # Visualize the initial EE pose.
             data.qpos = q_init_world
             mujoco.mj_kinematics(model, data)
-            site = data.site(_UR5_EE_SITE)
-            viz.add_frame(viewer.user_scn, site.xpos, site.xmat.reshape(3, 3))
+            initial_pose = utils.site_pose(data, _UR5_EE_SITE)
+            viz.add_frame(
+                viewer.user_scn,
+                initial_pose.translation(),
+                initial_pose.rotation().as_matrix(),
+            )
 
             # Visualize the target EE pose.
             arm_jg.fk(q_goal, data)
-            site = data.site(_UR5_EE_SITE)
-            viz.add_frame(viewer.user_scn, site.xpos, site.xmat.reshape(3, 3))
+            goal_pose = utils.site_pose(data, _UR5_EE_SITE)
+            viz.add_frame(
+                viewer.user_scn,
+                goal_pose.translation(),
+                goal_pose.rotation().as_matrix(),
+            )
 
             # Visualize the trajectory. The trajectory is of high resolution,
             # so plotting every other timestep should be sufficient.

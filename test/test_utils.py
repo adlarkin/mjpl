@@ -29,6 +29,22 @@ class TestUtils(unittest.TestCase):
             utils.step(start, target, max_step_dist=0.0)
             utils.step(start, target, max_step_dist=-1.0)
 
+    def test_site_pose(self):
+        model = load_robot_description("ur5e_mj_description")
+        data = mujoco.MjData(model)
+
+        mujoco.mj_resetDataKeyframe(model, data, model.keyframe("home").id)
+        mujoco.mj_kinematics(model, data)
+
+        site_name = "attachment_site"
+        pose = utils.site_pose(data, site_name)
+
+        site = data.site(site_name)
+        np.testing.assert_allclose(site.xpos, pose.translation(), rtol=0, atol=1e-12)
+        np.testing.assert_allclose(
+            site.xmat.reshape(3, 3), pose.rotation().as_matrix(), rtol=0, atol=1e-12
+        )
+
     def test_connect_waypoints(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
         planning_joints = [

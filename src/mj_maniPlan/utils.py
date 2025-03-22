@@ -1,5 +1,6 @@
 import mujoco
 import numpy as np
+from mink.lie import SE3, SO3
 
 from .collision_ruleset import CollisionRuleset
 from .joint_group import JointGroup
@@ -28,6 +29,24 @@ def step(start: np.ndarray, target: np.ndarray, max_step_dist: float) -> np.ndar
     magnitude = np.linalg.norm(direction)
     unit_vec = direction / magnitude
     return start + (unit_vec * min(max_step_dist, magnitude))
+
+
+def site_pose(data: mujoco.MjData, site_name: str) -> SE3:
+    """Get the pose of a site in the world frame.
+
+    Args:
+        data: MuJoCo data.
+        site_name: The name of the site.
+
+    Returns:
+        The pose of the site in the world frame.
+    """
+    position = data.site(site_name).xpos.copy()
+    rotation = data.site(site_name).xmat.copy()
+    return SE3.from_rotation_and_translation(
+        SO3.from_matrix(rotation.reshape(3, 3)),
+        position,
+    )
 
 
 def is_valid_config(
