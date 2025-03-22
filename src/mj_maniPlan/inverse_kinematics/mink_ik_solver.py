@@ -64,7 +64,7 @@ class MinkIKSolver(IKSolver):
             frame_type="site",
             position_cost=1.0,
             orientation_cost=1.0,
-            lm_damping=1.0,
+            lm_damping=0.1,
         )
         end_effector_task.set_target(pose)
         tasks = [end_effector_task]

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
+import mink
 import numpy as np
-from mink.lie.se3 import SE3
 
 
 class IKSolver(ABC):
@@ -10,7 +10,7 @@ class IKSolver(ABC):
     @abstractmethod
     def solve_ik(
         self,
-        pose: SE3,
+        pose: mink.lie.SE3,
         site: str,
         q_init_guess: np.ndarray | None,
     ) -> np.ndarray | None:
