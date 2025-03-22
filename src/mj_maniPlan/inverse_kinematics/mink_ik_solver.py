@@ -45,7 +45,6 @@ class MinkIKSolver(IKSolver):
         if iterations < 1:
             raise ValueError("`iterations` must be > 0.")
         self.model = model
-        self.data = mujoco.MjData(model)
         self.jg = jg
         self.cr = cr
         self.pos_tolerance = pos_tolerance
@@ -58,6 +57,8 @@ class MinkIKSolver(IKSolver):
     def solve_ik(
         self, pose: mink.lie.SE3, site: str, q_init_guess: np.ndarray | None
     ) -> np.ndarray | None:
+        data = mujoco.MjData(self.model)
+
         end_effector_task = mink.FrameTask(
             frame_name=site,
             frame_type="site",
@@ -80,7 +81,7 @@ class MinkIKSolver(IKSolver):
                 ori_achieved = np.linalg.norm(err[3:]) <= self.ori_tolerance
                 if pos_achieved and ori_achieved:
                     if utils.is_valid_config(
-                        configuration.q[self.jg.qpos_addrs], self.jg, self.data, self.cr
+                        configuration.q[self.jg.qpos_addrs], self.jg, data, self.cr
                     ):
                         return configuration.q
                     break
@@ -96,7 +97,7 @@ class MinkIKSolver(IKSolver):
 
             next_guess = configuration.q
             next_guess[self.jg.qpos_addrs] = utils.random_valid_config(
-                self.rng, self.jg, self.data, self.cr
+                self.rng, self.jg, data, self.cr
             )
             configuration.update(next_guess)
         return None
