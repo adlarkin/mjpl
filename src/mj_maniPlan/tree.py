@@ -24,15 +24,19 @@ class Node:
 class Tree:
     """Tree of nodes."""
 
-    def __init__(self, root: Node):
+    def __init__(self, root: Node, is_sink: bool = False):
         """Constructor.
 
         Args:
             root: The tree's root node, which should have no parent.
+            is_sink: Whether or not the root node is a sink node. Sink nodes
+                are considered part of the tree, but are ignored in nearest
+                neighbor.
         """
         if root.parent:
             raise ValueError("The root node should have no parent.")
         self.nodes = {root}
+        self.sink_node = root if is_sink else None
 
     def add_node(self, node: Node):
         """Add a node to a tree.
@@ -60,7 +64,20 @@ class Tree:
 
         Returns: The node from the tree that's closest to `q`.
         """
-        return min(self.nodes, key=lambda node: np.linalg.norm(node.q - q))
+        min_dist = np.inf
+        closest_node = None
+        for n in self.nodes:
+            if self.sink_node and self.sink_node == n:
+                continue
+            dist = np.linalg.norm(q - n.q)
+            if dist < min_dist:
+                min_dist = dist
+                closest_node = n
+        if not closest_node:
+            raise RuntimeError(
+                "Tree contains no valid nodes for nearest neighbor search."
+            )
+        return closest_node
 
     def get_path(self, node: Node) -> list[Node]:
         """Get the path from the given node to the root.

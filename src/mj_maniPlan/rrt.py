@@ -51,13 +51,29 @@ class RRT:
         self.options = options
         self.rng = np.random.default_rng(seed=options.seed)
 
-    def plan_to_pose(
+    def plan_to_poses(
         self,
-        pose: SE3,
-        site: str,
         q_init_world: np.ndarray,
+        poses: list[SE3],
+        site: str,
         solver: IKSolver | None = None,
     ) -> list[np.ndarray]:
+        """Plan to a list of poses.
+
+        Args:
+            q_init_world: Initial joint configuration of the world.
+            poses: Target poses.
+            site: The site (i.e., frame) for `poses`.
+            solver: Solver used to compute IK for each pose in `poses`.
+
+        Returns:
+            A path to a pose in `poses`. The planner will return the first
+            path that is found. If a path cannot be found to any of the poses,
+            an empty list is returned.
+
+            A path is defined as a list of configurations that correspond to the
+            joints in the planner's JointGroup (see `RRTOptions.jg`).
+        """
         if solver is None:
             solver = MinkIKSolver(
                 model=self.options.jg.model,
@@ -66,18 +82,38 @@ class RRT:
                 seed=self.options.seed,
                 max_attempts=5,
             )
-        q_goal = solver.solve_ik(pose, site, q_init_guess=q_init_world)
-        if q_goal is None:
-            print("Unable to find a configuration for the target pose.")
+        potential_solutions = [
+            solver.solve_ik(p, site, q_init_guess=q_init_world) for p in poses
+        ]
+        valid_solutions = [q for q in potential_solutions if q is not None]
+        if not valid_solutions:
+            print("Unable to find at least one configuration from the target poses.")
             return []
 
-        return self.plan_to_config(q_init_world, q_goal[self.options.jg.qpos_addrs])
+        goal_configs = [q[self.options.jg.qpos_addrs] for q in valid_solutions]
+        return self.plan_to_configs(q_init_world, goal_configs)
 
-    def plan_to_config(
-        self, q_init_world: np.ndarray, q_goal: np.ndarray
+    def plan_to_configs(
+        self, q_init_world: np.ndarray, q_goals: list[np.ndarray]
     ) -> list[np.ndarray]:
+        """Plan to a list of configurations.
+
+        Args:
+            q_init_world: Initial joint configuration of the world.
+            q_goals: Goal joint configurations, which should specify values for
+            each joint in the planner's JointGroup (see `RRTOptions.jg`).
+
+        Returns:
+            A path to a configuration in `q_goals`. The planner will return the
+            first path that is found. If a path cannot be found to any of the
+            configurations, an empty list is returned.
+
+            A path is defined as a list of configurations that correspond to the
+            joints in the planner's joint group (see `RRTOptions.jg`).
+        """
         assert q_init_world.size == self.data.qpos.size
-        assert q_goal.size == len(self.options.jg.joint_ids)
+        for q in q_goals:
+            assert q.size == len(self.options.jg.joint_ids)
 
         self.data.qpos = q_init_world
         q_init = self.options.jg.qpos(self.data)
@@ -86,18 +122,27 @@ class RRT:
         ):
             print("q_init is not a valid configuration")
             return []
-        if not utils.is_valid_config(
-            q_goal, self.options.jg, self.data, self.options.cr
-        ):
-            print("q_goal is not a valid configuration")
-            return []
+        for q in q_goals:
+            if not utils.is_valid_config(
+                q, self.options.jg, self.data, self.options.cr
+            ):
+                print(f"The following goal config is not a valid configuration: {q}")
+                return []
 
-        # Is there a direct connection to q_goal from q_init?
-        if utils.configuration_distance(q_init, q_goal) < self.options.epsilon:
-            return [q_init, q_goal]
+        # Is there a direct connection to any of the goals from q_init?
+        for q in q_goals:
+            if utils.configuration_distance(q_init, q) <= self.options.epsilon:
+                return [q_init, q]
 
         start_tree = Tree(Node(q_init))
-        goal_tree = Tree(Node(q_goal))
+        # To support multiple goals, the root of the goal tree is a sink node
+        # (i.e., a node with an empty numpy array) and all goal configs are
+        # children of this sink node.
+        sink_node = Node(np.array([]))
+        goal_nodes = [Node(q, sink_node) for q in q_goals]
+        goal_tree = Tree(sink_node, is_sink=True)
+        for n in goal_nodes:
+            goal_tree.add_node(n)
 
         max_planning_time = self.options.max_planning_time
         if max_planning_time <= 0:
@@ -106,7 +151,8 @@ class RRT:
         start_time = time.time()
         while time.time() - start_time < max_planning_time:
             if self.rng.random() <= self.options.goal_biasing_probability:
-                q_rand = q_goal
+                random_goal_idx = self.rng.integers(0, len(goal_nodes))
+                q_rand = goal_nodes[random_goal_idx].q
             else:
                 q_rand = self.options.jg.random_config(self.rng)
 
@@ -240,13 +286,16 @@ class RRT:
             A path that starts at the root of `start_tree` and ends at `goal_tree`,
             with a connecting edge between `start_tree_node` and `goal_tree_node`.
         """
-        # The path generated from start_tree ends at q_init, but we want it to start at q_init. So we must reverse it.
+        # The path generated from start_tree ends at q_init, but we want it to
+        # start at q_init. So we must reverse it.
         path_start = [n.q for n in start_tree.get_path(start_tree_node)]
         path_start.reverse()
-        # The path generated from goal_tree ends at q_goal, which is what we want.
+        # The path generated from goal_tree ends at the sink node, which must
+        # be removed.
         path_end = [n.q for n in goal_tree.get_path(goal_tree_node)]
-        # The last value in path_start might be the same as the first value in path_end.
-        # If this is the case, remove the duplicate value.
+        path_end.pop()
+        # The last value in path_start might be the same as the first value in
+        # path_end. If this is the case, remove the duplicate value.
         if np.array_equal(path_start[-1], path_end[0]):
             path_start.pop()
         return path_start + path_end

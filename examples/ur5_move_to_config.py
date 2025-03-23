@@ -1,7 +1,3 @@
-"""
-Example of the planning -> trajectory generation -> trajectory following pipeline.
-"""
-
 import time
 from pathlib import Path
 
@@ -20,6 +16,8 @@ from mj_maniPlan.trajectory import TrajectoryLimits, generate_trajectory
 _HERE = Path(__file__).parent
 _UR5_XML = _HERE / "models" / "universal_robots_ur5e" / "scene.xml"
 _UR5_EE_SITE = "attachment_site"
+
+_NUM_GOALS = 5
 
 
 def main():
@@ -45,10 +43,12 @@ def main():
     # Use the 'home' keyframe position as q_init.
     q_init_world = model.keyframe("home").qpos.copy()
 
-    # Generate valid goal configuration.
+    # Generate valid goal configurations.
     rng = np.random.default_rng(seed=seed)
     data = mujoco.MjData(model)
-    q_goal = utils.random_valid_config(rng, arm_jg, data, cr)
+    goal_configs = [
+        utils.random_valid_config(rng, arm_jg, data, cr) for _ in range(_NUM_GOALS)
+    ]
 
     # Set up the planner.
     planner_options = RRTOptions(
@@ -64,7 +64,7 @@ def main():
 
     print("Planning...")
     start = time.time()
-    path = planner.plan_to_config(q_init_world, q_goal)
+    path = planner.plan_to_configs(q_init_world, goal_configs)
     if not path:
         print("Planning failed")
         return
@@ -149,14 +149,15 @@ def main():
                 initial_pose.rotation().as_matrix(),
             )
 
-            # Visualize the target EE pose.
-            arm_jg.fk(q_goal, data)
-            goal_pose = utils.site_pose(data, _UR5_EE_SITE)
-            viz.add_frame(
-                viewer.user_scn,
-                goal_pose.translation(),
-                goal_pose.rotation().as_matrix(),
-            )
+            # Visualize the goal EE poses (derived from the goal configs).
+            for gq in goal_configs:
+                arm_jg.fk(gq, data)
+                goal_pose = utils.site_pose(data, _UR5_EE_SITE)
+                viz.add_frame(
+                    viewer.user_scn,
+                    goal_pose.translation(),
+                    goal_pose.rotation().as_matrix(),
+                )
 
             # Visualize the trajectory. The trajectory is of high resolution,
             # so plotting every other timestep should be sufficient.

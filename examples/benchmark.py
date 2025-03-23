@@ -3,8 +3,8 @@ Benchmark for testing planning time.
 
 The testing methodology is as follows:
 1. To be deterministic, seed the random number generator.
-2. Create a planner and a [q_init, q_goal] pairing.
-3. Plan from q_init to q_goal N number of times.
+2. Create a planner, initial state, and a list of EE goal poses.
+3. Plan from q_init to the EE goal poses N number of times.
 4. Report the following:
     a. How many plans succeeded vs how many plans timed out (success rate)
     b. Median planning time of successful planning attempts
@@ -23,6 +23,7 @@ from mj_maniPlan.rrt import RRT, RRTOptions
 
 _HERE = Path(__file__).parent
 _PANDA_XML = _HERE / "models" / "franka_emika_panda" / "scene.xml"
+_PANDA_EE_SITE = "ee_site"
 
 
 if __name__ == "__main__":
@@ -47,6 +48,7 @@ if __name__ == "__main__":
     seed = 42
     goal_biasing_probability = 0.1
     number_of_attempts = 15
+    num_goals = 5
 
     arm_jg = JointGroup(model, planning_joints)
     cr = CollisionRuleset(model, allowed_collisions)
@@ -54,11 +56,15 @@ if __name__ == "__main__":
     # Plan number_of_attempts times and record benchmarks.
     successful_planning_times = []
     for i in range(number_of_attempts):
-        # Generate a valid initial and goal configuration.
+        # Generate a valid initial state and multiple goal poses.
         data = mujoco.MjData(model)
         rng = np.random.default_rng(seed=seed)
-        q_init_world = model.keyframe("home").qpos
-        q_goal = utils.random_valid_config(rng, arm_jg, data, cr)
+        q_init_world = model.keyframe("home").qpos.copy()
+        goal_poses = []
+        for _ in range(num_goals):
+            q_goal = utils.random_valid_config(rng, arm_jg, data, cr)
+            arm_jg.fk(q_goal, data)
+            goal_poses.append(utils.site_pose(data, _PANDA_EE_SITE))
 
         planner_options = RRTOptions(
             jg=arm_jg,
@@ -72,7 +78,7 @@ if __name__ == "__main__":
 
         print(f"Attempt {i}...")
         start_time = time.time()
-        path = planner.plan_to_config(q_init_world, q_goal)
+        path = planner.plan_to_poses(q_init_world, goal_poses, _PANDA_EE_SITE)
         elapsed_time = time.time() - start_time
         if path:
             successful_planning_times.append(elapsed_time)

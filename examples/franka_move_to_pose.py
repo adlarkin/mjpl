@@ -17,10 +17,12 @@ _HERE = Path(__file__).parent
 _PANDA_XML = _HERE / "models" / "franka_emika_panda" / "scene_with_obstacles.xml"
 _PANDA_EE_SITE = "ee_site"
 
+_NUM_GOALS = 5
+
 
 def main():
     visualize, seed = parse_args(
-        description="Compute and follow a trajectory to a target pose."
+        description="Compute and follow a trajectory to a goal pose."
     )
 
     model = mujoco.MjModel.from_xml_path(_PANDA_XML.as_posix())
@@ -39,12 +41,14 @@ def main():
 
     q_init = model.keyframe("home").qpos.copy()
 
-    # Generate a valid target pose that's derived from a valid joint configuration.
+    # Generate valid goal poses that are derived from valid joint configurations.
     rng = np.random.default_rng(seed=seed)
     data = mujoco.MjData(model)
-    q_rand = utils.random_valid_config(rng, arm_jg, data, CollisionRuleset(model))
-    arm_jg.fk(q_rand, data)
-    target_pose = utils.site_pose(data, _PANDA_EE_SITE)
+    goal_poses = []
+    for _ in range(_NUM_GOALS):
+        q_rand = utils.random_valid_config(rng, arm_jg, data, CollisionRuleset(model))
+        arm_jg.fk(q_rand, data)
+        goal_poses.append(utils.site_pose(data, _PANDA_EE_SITE))
 
     allowed_collisions = np.array(
         [
@@ -67,10 +71,10 @@ def main():
 
     print("Planning...")
     start = time.time()
-    path = planner.plan_to_pose(
-        pose=target_pose,
-        site=_PANDA_EE_SITE,
+    path = planner.plan_to_poses(
         q_init_world=q_init,
+        poses=goal_poses,
+        site=_PANDA_EE_SITE,
     )
     if not path:
         print("Planning failed")
@@ -150,12 +154,13 @@ def main():
             site = data.site(_PANDA_EE_SITE)
             viz.add_frame(viewer.user_scn, site.xpos, site.xmat.reshape(3, 3))
 
-            # Visualize the target EE pose.
-            viz.add_frame(
-                viewer.user_scn,
-                target_pose.translation(),
-                target_pose.rotation().as_matrix(),
-            )
+            # Visualize the goal EE poses.
+            for gp in goal_poses:
+                viz.add_frame(
+                    viewer.user_scn,
+                    gp.translation(),
+                    gp.rotation().as_matrix(),
+                )
 
             # Visualize the trajectory. The trajectory is of high resolution,
             # so plotting every other timestep should be sufficient.
