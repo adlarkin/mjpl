@@ -56,10 +56,14 @@ if __name__ == "__main__":
     # Plan number_of_attempts times and record benchmarks.
     successful_planning_times = []
     for i in range(number_of_attempts):
-        # Generate a valid initial state and multiple goal poses.
+        # Let the "home" keyframe in the MJCF be the initial state.
+        home_keyframe = model.keyframe("home")
+        q_init = home_keyframe.qpos.copy()
+
+        # From the initial state, generate multiple goal poses.
         data = mujoco.MjData(model)
+        mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
         rng = np.random.default_rng(seed=seed)
-        q_init_world = model.keyframe("home").qpos.copy()
         goal_poses = []
         for _ in range(num_goals):
             q_goal = utils.random_valid_config(rng, arm_jg, data, cr)
@@ -78,7 +82,7 @@ if __name__ == "__main__":
 
         print(f"Attempt {i}...")
         start_time = time.time()
-        path = planner.plan_to_poses(q_init_world, goal_poses, _PANDA_EE_SITE)
+        path = planner.plan_to_poses(q_init, goal_poses, _PANDA_EE_SITE)
         elapsed_time = time.time() - start_time
         if path:
             successful_planning_times.append(elapsed_time)
