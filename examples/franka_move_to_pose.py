@@ -153,7 +153,7 @@ def main():
                 initial_pose.rotation().as_matrix(),
             )
 
-            # Visualize the goal EE pose,
+            # Visualize the goal EE pose.
             viz.add_frame(
                 viewer.user_scn,
                 goal_pose.translation(),
