@@ -21,7 +21,8 @@ class RRTOptions:
     cr: CollisionRuleset
     # Maximum planning time, in seconds.
     # If this value is <= 0, the planner will run until a solution is found.
-    # A value <= 0 may lead to infinite run time, since sampling-based planners are probabilistically complete!
+    # A value <= 0 may lead to infinite run time, since sampling-based planners
+    # are probabilistically complete!
     max_planning_time: float = 10.0
     # The RRT "growth factor".
     # This is the maximum distance between nodes in the tree.
@@ -30,7 +31,7 @@ class RRTOptions:
     # Seed used for the underlying sampler in the planner.
     # `None` means the algorithm is nondeterministic.
     seed: int | None = None
-    # How often to sample the goal state when building the tree.
+    # How often to sample a goal state when building the tree.
     # This should be a value within [0.0, 1.0].
     goal_biasing_probability: float = 0.05
     # The maximum distance for extending a tree using CONNECT.
@@ -62,8 +63,8 @@ class RRT:
 
         Args:
             q_init_world: Initial joint configuration of the world.
-            poses: Target poses.
-            site: The site (i.e., frame) for `poses`.
+            poses: Target poses, in the world frame.
+            site: The site (i.e., frame) that must satisfy each pose in `poses`.
             solver: Solver used to compute IK for each pose in `poses`.
 
         Returns:
@@ -151,6 +152,7 @@ class RRT:
         start_time = time.time()
         while time.time() - start_time < max_planning_time:
             if self.rng.random() <= self.options.goal_biasing_probability:
+                # randomly pick a goal
                 random_goal_idx = self.rng.integers(0, len(goal_nodes))
                 q_rand = goal_nodes[random_goal_idx].q
             else:
@@ -290,10 +292,8 @@ class RRT:
         # start at q_init. So we must reverse it.
         path_start = [n.q for n in start_tree.get_path(start_tree_node)]
         path_start.reverse()
-        # The path generated from goal_tree ends at the sink node, which must
-        # be removed.
+        # The path generated from goal_tree ends at q_goal, which is what we want.
         path_end = [n.q for n in goal_tree.get_path(goal_tree_node)]
-        path_end.pop()
         # The last value in path_start might be the same as the first value in
         # path_end. If this is the case, remove the duplicate value.
         if np.array_equal(path_start[-1], path_end[0]):

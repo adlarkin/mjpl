@@ -150,8 +150,8 @@ def main():
             )
 
             # Visualize the goal EE poses (derived from the goal configs).
-            for gq in goal_configs:
-                arm_jg.fk(gq, data)
+            for q_goal in goal_configs:
+                arm_jg.fk(q_goal, data)
                 goal_pose = utils.site_pose(data, _UR5_EE_SITE)
                 viz.add_frame(
                     viewer.user_scn,

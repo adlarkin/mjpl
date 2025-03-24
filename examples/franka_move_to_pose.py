@@ -155,11 +155,11 @@ def main():
             viz.add_frame(viewer.user_scn, site.xpos, site.xmat.reshape(3, 3))
 
             # Visualize the goal EE poses.
-            for gp in goal_poses:
+            for ee_pose in goal_poses:
                 viz.add_frame(
                     viewer.user_scn,
-                    gp.translation(),
-                    gp.rotation().as_matrix(),
+                    ee_pose.translation(),
+                    ee_pose.rotation().as_matrix(),
                 )
 
             # Visualize the trajectory. The trajectory is of high resolution,

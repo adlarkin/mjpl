@@ -130,11 +130,11 @@ class TestTree(unittest.TestCase):
         self.assertNotEqual(nn, tree.sink_node)
         self.assertEqual(nn, self.n_1)
 
-        # Sink node should be part of the path since the sink node is the tree's
-        # root node
+        # Sink node should be ignored in get_path
+        path = tree.get_path(tree.sink_node)
+        self.assertEqual(len(path), 0)
         path = tree.get_path(self.n_1)
-        self.assertEqual(len(path), 2)
-        self.assertListEqual(path, [self.n_1, tree.sink_node])
+        self.assertListEqual(path, [self.n_1])
 
 
 if __name__ == "__main__":
