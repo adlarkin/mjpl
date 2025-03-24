@@ -52,6 +52,49 @@ class RRT:
         self.options = options
         self.rng = np.random.default_rng(seed=options.seed)
 
+    def plan_to_pose(
+        self,
+        q_init_world: np.ndarray,
+        pose: SE3,
+        site: str,
+        solver: IKSolver | None = None,
+    ) -> list[np.ndarray]:
+        """Plan to a pose.
+
+        Args:
+            q_init_world: Initial joint configuration of the world.
+            pose: Target pose, in the world frame.
+            site: The site (i.e., frame) that must satisfy `pose`.
+            solver: Solver used to compute IK for `pose` and `site`.
+
+        Returns:
+            A path from `q_init_world` to `pose`. If a path cannot be found, an
+            empty list is returned.
+
+            A path is defined as a list of configurations that correspond to the
+            joints in the planner's JointGroup (see `RRTOptions.jg`).
+        """
+        return self.plan_to_poses(q_init_world, [pose], site, solver)
+
+    def plan_to_config(
+        self, q_init_world: np.ndarray, q_goal: np.ndarray
+    ) -> list[np.ndarray]:
+        """Plan to a configuration.
+
+        Args:
+            q_init_world: Initial joint configuration of the world.
+            q_goals: Goal joint configuration, which should specify values for
+                each joint in the planner's JointGroup (see `RRTOptions.jg`).
+
+        Returns:
+            A path from `q_init_world` to `q_goal`. If a path cannot be found, an
+            empty list is returned.
+
+            A path is defined as a list of configurations that correspond to the
+            joints in the planner's joint group (see `RRTOptions.jg`).
+        """
+        return self.plan_to_configs(q_init_world, [q_goal])
+
     def plan_to_poses(
         self,
         q_init_world: np.ndarray,
@@ -65,12 +108,12 @@ class RRT:
             q_init_world: Initial joint configuration of the world.
             poses: Target poses, in the world frame.
             site: The site (i.e., frame) that must satisfy each pose in `poses`.
-            solver: Solver used to compute IK for each pose in `poses`.
+            solver: Solver used to compute IK for `poses` and `site`.
 
         Returns:
-            A path to a pose in `poses`. The planner will return the first
-            path that is found. If a path cannot be found to any of the poses,
-            an empty list is returned.
+            A path from `q_init_world` to a pose in `poses`. The planner will
+            return the first path that is found. If a path cannot be found to
+            any of the poses, an empty list is returned.
 
             A path is defined as a list of configurations that correspond to the
             joints in the planner's JointGroup (see `RRTOptions.jg`).
@@ -102,12 +145,12 @@ class RRT:
         Args:
             q_init_world: Initial joint configuration of the world.
             q_goals: Goal joint configurations, which should specify values for
-            each joint in the planner's JointGroup (see `RRTOptions.jg`).
+                each joint in the planner's JointGroup (see `RRTOptions.jg`).
 
         Returns:
-            A path to a configuration in `q_goals`. The planner will return the
-            first path that is found. If a path cannot be found to any of the
-            configurations, an empty list is returned.
+            A path from `q_init_world` to a configuration in `q_goals`. The
+            planner will return the first path that is found. If a path cannot
+            be found to any of the configurations, an empty list is returned.
 
             A path is defined as a list of configurations that correspond to the
             joints in the planner's joint group (see `RRTOptions.jg`).

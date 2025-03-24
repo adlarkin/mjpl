@@ -3,8 +3,8 @@ Benchmark for testing planning time.
 
 The testing methodology is as follows:
 1. To be deterministic, seed the random number generator.
-2. Create a planner, initial state, and a list of EE goal poses.
-3. Plan from q_init to the EE goal poses N number of times.
+2. Create a planner and a [q_init, ee_goal_pose] pairing.
+3. Plan from q_init to ee_goal_pose N number of times.
 4. Report the following:
     a. How many plans succeeded vs how many plans timed out (success rate)
     b. Median planning time of successful planning attempts
@@ -48,7 +48,6 @@ if __name__ == "__main__":
     seed = 42
     goal_biasing_probability = 0.1
     number_of_attempts = 15
-    num_goals = 5
 
     arm_jg = JointGroup(model, planning_joints)
     cr = CollisionRuleset(model, allowed_collisions)
@@ -60,15 +59,13 @@ if __name__ == "__main__":
         home_keyframe = model.keyframe("home")
         q_init = home_keyframe.qpos.copy()
 
-        # From the initial state, generate multiple goal poses.
+        # From the initial state, generate a goal pose.
         data = mujoco.MjData(model)
         mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
         rng = np.random.default_rng(seed=seed)
-        goal_poses = []
-        for _ in range(num_goals):
-            q_goal = utils.random_valid_config(rng, arm_jg, data, cr)
-            arm_jg.fk(q_goal, data)
-            goal_poses.append(utils.site_pose(data, _PANDA_EE_SITE))
+        q_goal = utils.random_valid_config(rng, arm_jg, data, cr)
+        arm_jg.fk(q_goal, data)
+        goal_pose = utils.site_pose(data, _PANDA_EE_SITE)
 
         planner_options = RRTOptions(
             jg=arm_jg,
@@ -82,7 +79,7 @@ if __name__ == "__main__":
 
         print(f"Attempt {i}...")
         start_time = time.time()
-        path = planner.plan_to_poses(q_init, goal_poses, _PANDA_EE_SITE)
+        path = planner.plan_to_pose(q_init, goal_pose, _PANDA_EE_SITE)
         elapsed_time = time.time() - start_time
         if path:
             successful_planning_times.append(elapsed_time)

@@ -17,8 +17,6 @@ _HERE = Path(__file__).parent
 _PANDA_XML = _HERE / "models" / "franka_emika_panda" / "scene_with_obstacles.xml"
 _PANDA_EE_SITE = "ee_site"
 
-_NUM_GOALS = 5
-
 
 def main():
     visualize, seed = parse_args(
@@ -50,16 +48,14 @@ def main():
     )
     cr = CollisionRuleset(model, allowed_collisions)
 
-    # From the initial state, generate valid goal poses that are derived from
-    # valid joint configurations.
+    # From the initial state, generate a valid goal pose that's derived from a
+    # valid joint configuration.
     rng = np.random.default_rng(seed=seed)
     data = mujoco.MjData(model)
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
-    goal_poses = []
-    for _ in range(_NUM_GOALS):
-        q_rand = utils.random_valid_config(rng, arm_jg, data, cr)
-        arm_jg.fk(q_rand, data)
-        goal_poses.append(utils.site_pose(data, _PANDA_EE_SITE))
+    q_rand = utils.random_valid_config(rng, arm_jg, data, cr)
+    arm_jg.fk(q_rand, data)
+    goal_pose = utils.site_pose(data, _PANDA_EE_SITE)
 
     # Set up the planner.
     planner_options = RRTOptions(
@@ -75,7 +71,7 @@ def main():
 
     print("Planning...")
     start = time.time()
-    path = planner.plan_to_poses(q_init, goal_poses, _PANDA_EE_SITE)
+    path = planner.plan_to_pose(q_init, goal_pose, _PANDA_EE_SITE)
     if not path:
         print("Planning failed")
         return
@@ -157,13 +153,12 @@ def main():
                 initial_pose.rotation().as_matrix(),
             )
 
-            # Visualize the goal EE poses.
-            for ee_pose in goal_poses:
-                viz.add_frame(
-                    viewer.user_scn,
-                    ee_pose.translation(),
-                    ee_pose.rotation().as_matrix(),
-                )
+            # Visualize the goal EE pose,
+            viz.add_frame(
+                viewer.user_scn,
+                goal_pose.translation(),
+                goal_pose.rotation().as_matrix(),
+            )
 
             # Visualize the trajectory. The trajectory is of high resolution,
             # so plotting every other timestep should be sufficient.
