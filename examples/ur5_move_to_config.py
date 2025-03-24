@@ -42,9 +42,10 @@ def main():
     home_keyframe = model.keyframe("home")
     q_init = home_keyframe.qpos.copy()
 
-    # Generate a valid goal configuration.
+    # From the initial state, generate a valid goal configuration.
     rng = np.random.default_rng(seed=seed)
     data = mujoco.MjData(model)
+    mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
     q_goal = utils.random_valid_config(rng, arm_jg, data, cr)
 
     # Set up the planner.
