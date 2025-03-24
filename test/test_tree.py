@@ -21,6 +21,7 @@ class TestNode(unittest.TestCase):
 class TestTree(unittest.TestCase):
     def build_tree(self) -> Tree:
         tree = Tree(self.root)
+        self.assertIsNone(tree.sink_node)
         nodes = [self.n_1, self.n_2, self.n_3]
         for n in nodes:
             tree.add_node(n)
@@ -104,6 +105,36 @@ class TestTree(unittest.TestCase):
 
         path = tree.get_path(self.root)
         self.assertListEqual(path, [self.root])
+
+    def test_sink_node(self):
+        tree = Tree(self.root, is_sink=True)
+        self.assertIsNotNone(tree.sink_node)
+
+        # Sink node is not used in nearest neighbor
+        with self.assertRaisesRegex(
+            RuntimeError, "Tree contains no valid nodes for nearest neighbor"
+        ):
+            tree.nearest_neighbor(np.array([1]))
+
+        # Sink node is considered a part of the tree
+        sink_duplicate = Node(tree.sink_node.q, self.root)
+        self.assertIn(sink_duplicate, tree)
+        with self.assertRaisesRegex(ValueError, "already exists in the tree"):
+            tree.add_node(sink_duplicate)
+
+        # Sink node is not used in nearest neighbor, so make sure that calling
+        # nearest neighbor with a q that matches the sink node's q returns the
+        # nearest node that is NOT the sink node
+        tree.add_node(self.n_1)
+        nn = tree.nearest_neighbor(tree.sink_node.q)
+        self.assertNotEqual(nn, tree.sink_node)
+        self.assertEqual(nn, self.n_1)
+
+        # Sink node should be ignored in get_path
+        path = tree.get_path(tree.sink_node)
+        self.assertEqual(len(path), 0)
+        path = tree.get_path(self.n_1)
+        self.assertListEqual(path, [self.n_1])
 
 
 if __name__ == "__main__":

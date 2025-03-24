@@ -47,6 +47,7 @@ jobs:
             # which may cause flakes in CI.
             "python examples/ur5_move_to_config.py -s 3 -no-viz"
             "python examples/franka_move_to_pose.py -s 18 -no-viz"
+            "python examples/franka_plan_to_multiple_poses.py -s 5 -no-viz"
           )
           # Run all scripts. If any of the scripts fail, report a failure in CI
           failed=0

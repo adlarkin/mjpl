@@ -24,15 +24,22 @@ class Node:
 class Tree:
     """Tree of nodes."""
 
-    def __init__(self, root: Node):
+    def __init__(self, root: Node, is_sink: bool = False):
         """Constructor.
 
         Args:
             root: The tree's root node, which should have no parent.
+            is_sink: Whether or not the root node is a sink node. A sink node
+                is part of the tree, but ignored in `nearest_neighbor` and
+                `get_path`.
         """
         if root.parent:
             raise ValueError("The root node should have no parent.")
         self.nodes = {root}
+        self.sink_node = root if is_sink else None
+
+    def _is_sink(self, node: Node) -> bool:
+        return self.sink_node is not None and node == self.sink_node
 
     def add_node(self, node: Node):
         """Add a node to a tree.
@@ -60,10 +67,20 @@ class Tree:
 
         Returns: The node from the tree that's closest to `q`.
         """
-        return min(self.nodes, key=lambda node: np.linalg.norm(node.q - q))
+        closest_node = min(
+            self.nodes,
+            key=lambda node: (
+                np.inf if self._is_sink(node) else np.linalg.norm(node.q - q)
+            ),
+        )
+        if self._is_sink(closest_node):
+            raise RuntimeError(
+                "Tree contains no valid nodes for nearest neighbor search."
+            )
+        return closest_node
 
     def get_path(self, node: Node) -> list[Node]:
-        """Get the path from the given node to the root.
+        """Get the path from the given node to its non-sink root.
 
         Args:
             node: The node that defines the start of the path.
@@ -76,7 +93,7 @@ class Tree:
 
         path = []
         curr_node = node
-        while curr_node is not None:
+        while curr_node is not None and not self._is_sink(curr_node):
             path.append(curr_node)
             curr_node = curr_node.parent
         return path
