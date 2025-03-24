@@ -39,16 +39,9 @@ def main():
     arm_joint_ids = [model.joint(joint).id for joint in arm_joints]
     arm_jg = JointGroup(model, arm_joint_ids)
 
-    q_init = model.keyframe("home").qpos.copy()
-
-    # Generate valid goal poses that are derived from valid joint configurations.
-    rng = np.random.default_rng(seed=seed)
-    data = mujoco.MjData(model)
-    goal_poses = []
-    for _ in range(_NUM_GOALS):
-        q_rand = utils.random_valid_config(rng, arm_jg, data, CollisionRuleset(model))
-        arm_jg.fk(q_rand, data)
-        goal_poses.append(utils.site_pose(data, _PANDA_EE_SITE))
+    # Let the "home" keyframe in the MJCF be the initial state.
+    home_keyframe = model.keyframe("home")
+    q_init = home_keyframe.qpos.copy()
 
     allowed_collisions = np.array(
         [
@@ -56,6 +49,17 @@ def main():
         ]
     )
     cr = CollisionRuleset(model, allowed_collisions)
+
+    # From the initial state, generate valid goal poses that are derived from
+    # valid joint configurations.
+    rng = np.random.default_rng(seed=seed)
+    data = mujoco.MjData(model)
+    mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
+    goal_poses = []
+    for _ in range(_NUM_GOALS):
+        q_rand = utils.random_valid_config(rng, arm_jg, data, cr)
+        arm_jg.fk(q_rand, data)
+        goal_poses.append(utils.site_pose(data, _PANDA_EE_SITE))
 
     # Set up the planner.
     planner_options = RRTOptions(
@@ -71,11 +75,7 @@ def main():
 
     print("Planning...")
     start = time.time()
-    path = planner.plan_to_poses(
-        q_init_world=q_init,
-        poses=goal_poses,
-        site=_PANDA_EE_SITE,
-    )
+    path = planner.plan_to_poses(q_init, goal_poses, _PANDA_EE_SITE)
     if not path:
         print("Planning failed")
         return
@@ -124,9 +124,8 @@ def main():
     actuator_ids = [model.actuator(act).id for act in actuators]
 
     # Follow the trajectory via position control, starting from the initial state.
-    data.qpos = q_init.copy()
-    mujoco.mj_forward(model, data)
-    q_t = [arm_jg.qpos(data)]
+    mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
+    q_t = [q_init]
     for q_ref in traj.configurations:
         data.ctrl[actuator_ids] = q_ref
         mujoco.mj_step(model, data)
@@ -136,7 +135,7 @@ def main():
         if not cr.obeys_ruleset(data.contact.geom):
             print("Invalid collision occurred during trajectory execution.")
             return
-        q_t.append(arm_jg.qpos(data))
+        q_t.append(data.qpos.copy())
 
     if visualize:
         with mujoco.viewer.launch_passive(
@@ -149,10 +148,14 @@ def main():
             viewer.cam.elevation = -25
 
             # Visualize the initial EE pose.
-            arm_jg.fk(q_t[0], data)
+            data.qpos = q_init
             mujoco.mj_kinematics(model, data)
-            site = data.site(_PANDA_EE_SITE)
-            viz.add_frame(viewer.user_scn, site.xpos, site.xmat.reshape(3, 3))
+            initial_pose = utils.site_pose(data, _PANDA_EE_SITE)
+            viz.add_frame(
+                viewer.user_scn,
+                initial_pose.translation(),
+                initial_pose.rotation().as_matrix(),
+            )
 
             # Visualize the goal EE poses.
             for ee_pose in goal_poses:
@@ -174,7 +177,8 @@ def main():
                 start_time = time.time()
                 if not viewer.is_running():
                     return
-                arm_jg.fk(q_actual, data)
+                data.qpos = q_actual
+                mujoco.mj_kinematics(model, data)
                 viewer.sync()
                 time_until_next_step = model.opt.timestep - (time.time() - start_time)
                 if time_until_next_step > 0:

@@ -40,8 +40,9 @@ def main():
 
     cr = CollisionRuleset(model)
 
-    # Use the 'home' keyframe position as q_init.
-    q_init_world = model.keyframe("home").qpos.copy()
+    # Let the "home" keyframe in the MJCF be the initial state.
+    home_keyframe = model.keyframe("home")
+    q_init = home_keyframe.qpos.copy()
 
     # Generate valid goal configurations.
     rng = np.random.default_rng(seed=seed)
@@ -64,7 +65,7 @@ def main():
 
     print("Planning...")
     start = time.time()
-    path = planner.plan_to_configs(q_init_world, goal_configs)
+    path = planner.plan_to_configs(q_init, goal_configs)
     if not path:
         print("Planning failed")
         return
@@ -112,9 +113,8 @@ def main():
     actuator_ids = [model.actuator(act).id for act in actuators]
 
     # Follow the trajectory via position control, starting from the initial state.
-    data.qpos = q_init_world
-    mujoco.mj_forward(model, data)
-    q_t = [arm_jg.qpos(data)]
+    mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
+    q_t = [q_init]
     for q_ref in traj.configurations:
         data.ctrl[actuator_ids] = q_ref
         mujoco.mj_step(model, data)
@@ -124,7 +124,7 @@ def main():
         if not cr.obeys_ruleset(data.contact.geom):
             print("Invalid collision occurred during trajectory execution.")
             return
-        q_t.append(arm_jg.qpos(data))
+        q_t.append(data.qpos.copy())
 
     if visualize:
         with mujoco.viewer.launch_passive(
@@ -140,7 +140,7 @@ def main():
             viewer.cam.elevation = -25
 
             # Visualize the initial EE pose.
-            data.qpos = q_init_world
+            data.qpos = q_init
             mujoco.mj_kinematics(model, data)
             initial_pose = utils.site_pose(data, _UR5_EE_SITE)
             viz.add_frame(
@@ -171,7 +171,8 @@ def main():
                 start_time = time.time()
                 if not viewer.is_running():
                     return
-                arm_jg.fk(q_actual, data)
+                data.qpos = q_actual
+                mujoco.mj_kinematics(model, data)
                 viewer.sync()
                 time_until_next_step = model.opt.timestep - (time.time() - start_time)
                 if time_until_next_step > 0:
