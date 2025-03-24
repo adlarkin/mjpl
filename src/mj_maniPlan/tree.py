@@ -67,16 +67,17 @@ class Tree:
 
         Returns: The node from the tree that's closest to `q`.
         """
-        if self.sink_node and self.nodes == {self.sink_node}:
-            raise RuntimeError(
-                "Tree contains no valid nodes for nearest neighbor search."
-            )
-        return min(
+        closest_node = min(
             self.nodes,
             key=lambda node: (
                 np.inf if self._is_sink(node) else np.linalg.norm(node.q - q)
             ),
         )
+        if self._is_sink(closest_node):
+            raise RuntimeError(
+                "Tree contains no valid nodes for nearest neighbor search."
+            )
+        return closest_node
 
     def get_path(self, node: Node) -> list[Node]:
         """Get the path from the given node to its non-sink root.
