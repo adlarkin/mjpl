@@ -17,7 +17,7 @@ class IKSolver(ABC):
         """Solve IK.
 
         Args:
-            pose: The target pose.
+            pose: The target pose, in the world frame.
             site: Name of the site for the target pose (i.e., the target frame).
             q_init_guess: Initial guess for the joint configuration.
 

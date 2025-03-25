@@ -170,7 +170,9 @@ def main():
             for q_ref in traj.configurations[::2]:
                 arm_jg.fk(q_ref, data)
                 pos = data.site(_PANDA_EE_SITE).xpos
-                viz.add_sphere(viewer.user_scn, pos, 0.004, [0.2, 0.6, 0.2, 0.2])
+                viz.add_sphere(
+                    viewer.user_scn, pos, radius=0.004, rgba=[0.2, 0.6, 0.2, 0.2]
+                )
 
             # Replay the robot following the trajectory.
             for q_actual in q_t:
