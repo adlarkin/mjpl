@@ -20,6 +20,16 @@ _UR5_XML = _HERE / "models" / "universal_robots_ur5e" / "scene.xml"
 _UR5_EE_SITE = "attachment_site"
 
 
+def circle_waypoints(
+    radius: float, h: float, k: float, num_points: int = 10
+) -> np.ndarray:
+    """Create waypoints that form a circle centered about (h,k)"""
+    t = np.linspace(0, 1, num_points)
+    x = radius * np.cos(2 * np.pi * t) + h
+    y = radius * np.sin(2 * np.pi * t) + k
+    return np.stack((x, y), axis=1)
+
+
 def main():
     visualize, seed = parse_args(
         description="Compute and follow a trajectory along a cartesian path."
@@ -49,17 +59,14 @@ def main():
     # in the xy plane, centered about the initial EE pose
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
     mujoco.mj_kinematics(model, data)
-    radius = 0.1
     initial_ee_pose = utils.site_pose(data, _UR5_EE_SITE)
-    poses = []
-    for t in np.linspace(0, 2, 20):
-        x = radius * np.cos(2 * np.pi * t) + initial_ee_pose.translation()[0]
-        y = radius * np.sin(2 * np.pi * t) + initial_ee_pose.translation()[1]
-        next_pose = SE3.from_rotation_and_translation(
-            initial_ee_pose.rotation(),
-            np.array([x, y, initial_ee_pose.translation()[2]]),
+    x, y, z = initial_ee_pose.translation()
+    poses = [
+        SE3.from_rotation_and_translation(
+            initial_ee_pose.rotation(), np.array([c_x, c_y, z])
         )
-        poses.append(next_pose)
+        for c_x, c_y in circle_waypoints(radius=0.1, h=x, k=y)
+    ]
 
     solver = MinkIKSolver(
         model=model,
