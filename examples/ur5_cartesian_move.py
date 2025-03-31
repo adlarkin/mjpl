@@ -21,12 +21,12 @@ _UR5_EE_SITE = "attachment_site"
 
 
 def circle_waypoints(
-    radius: float, h: float, k: float, num_points: int = 10
+    radius: float, c_x: float, c_y: float, num_points: int = 25
 ) -> np.ndarray:
-    """Create waypoints that form a circle centered about (h,k)"""
+    """Create waypoints that form a circle centered about (c_x,c_y)"""
     t = np.linspace(0, 1, num_points)
-    x = radius * np.cos(2 * np.pi * t) + h
-    y = radius * np.sin(2 * np.pi * t) + k
+    x = radius * np.cos(2 * np.pi * t) + c_x
+    y = radius * np.sin(2 * np.pi * t) + c_y
     return np.stack((x, y), axis=1)
 
 
@@ -60,12 +60,12 @@ def main():
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
     mujoco.mj_kinematics(model, data)
     initial_ee_pose = utils.site_pose(data, _UR5_EE_SITE)
-    x, y, z = initial_ee_pose.translation()
+    ee_x, ee_y, ee_z = initial_ee_pose.translation()
     poses = [
         SE3.from_rotation_and_translation(
-            initial_ee_pose.rotation(), np.array([c_x, c_y, z])
+            initial_ee_pose.rotation(), np.array([x, y, ee_z])
         )
-        for c_x, c_y in circle_waypoints(radius=0.1, h=x, k=y)
+        for x, y in circle_waypoints(radius=0.1, c_x=ee_x, c_y=ee_y)
     ]
 
     solver = MinkIKSolver(

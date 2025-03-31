@@ -12,21 +12,23 @@ from mj_maniPlan.inverse_kinematics.mink_ik_solver import MinkIKSolver
 from mj_maniPlan.joint_group import JointGroup
 
 
-def pose_equal(p1: SE3, p2: SE3, floating_point_error: bool = False) -> None:
-    """Helper function for comparing equality of two poses."""
-    if floating_point_error:
-        np.testing.assert_allclose(
-            p1.translation(), p2.translation(), rtol=0.0, atol=1e-9
-        )
-        np.testing.assert_allclose(
-            p1.rotation().parameters(),
-            p2.rotation().parameters(),
-            rtol=0.0,
-            atol=1e-9,
-        )
-    else:
-        np.testing.assert_equal(p1.translation(), p2.translation())
-        np.testing.assert_equal(p1.rotation().parameters(), p2.rotation().parameters())
+def poses_exactly_equal(p1: SE3, p2: SE3) -> None:
+    np.testing.assert_equal(p1.translation(), p2.translation())
+    np.testing.assert_equal(p1.rotation().parameters(), p2.rotation().parameters())
+
+
+def poses_approximately_equal(
+    p1: SE3, p2: SE3, pos_tolerance: float = 1e-9, ori_tolerance: float = 1e-9
+) -> None:
+    np.testing.assert_allclose(
+        p1.translation(), p2.translation(), rtol=0.0, atol=pos_tolerance
+    )
+    np.testing.assert_allclose(
+        p1.rotation().parameters(),
+        p2.rotation().parameters(),
+        rtol=0.0,
+        atol=ori_tolerance,
+    )
 
 
 class TestCartesianPlanner(unittest.TestCase):
@@ -44,28 +46,28 @@ class TestCartesianPlanner(unittest.TestCase):
             start_pose, end_pose, lin_threshold=np.inf, ori_threshold=np.inf
         )
         self.assertEqual(len(poses), 2)
-        pose_equal(poses[0], start_pose)
-        pose_equal(poses[1], end_pose)
+        poses_exactly_equal(poses[0], start_pose)
+        poses_exactly_equal(poses[1], end_pose)
 
         # Interpolate based on position
         poses = _interpolate_poses(
             start_pose, end_pose, lin_threshold=0.65, ori_threshold=np.inf
         )
         self.assertEqual(len(poses), 3)
-        pose_equal(poses[0], start_pose)
-        pose_equal(poses[2], end_pose)
+        poses_exactly_equal(poses[0], start_pose)
+        poses_exactly_equal(poses[2], end_pose)
         halfway_pose = SE3.from_rotation_and_translation(
             SO3.from_x_radians(np.pi / 2), np.array([0.5, 0.0, 0.0])
         )
-        pose_equal(poses[1], halfway_pose, floating_point_error=True)
+        poses_approximately_equal(poses[1], halfway_pose)
 
         # Interpolate based on orientation
         poses = _interpolate_poses(
             start_pose, end_pose, lin_threshold=np.inf, ori_threshold=np.pi * 0.3
         )
         self.assertEqual(len(poses), 5)
-        pose_equal(poses[0], start_pose)
-        pose_equal(poses[4], end_pose)
+        poses_exactly_equal(poses[0], start_pose)
+        poses_exactly_equal(poses[4], end_pose)
         # There should be three evenly spaced intermediate poses
         intermediate_poses = [
             SE3.from_rotation_and_translation(
@@ -78,9 +80,9 @@ class TestCartesianPlanner(unittest.TestCase):
                 SO3.from_x_radians(np.pi * 0.75), np.array([0.75, 0.0, 0.0])
             ),
         ]
-        pose_equal(poses[1], intermediate_poses[0], floating_point_error=True)
-        pose_equal(poses[2], intermediate_poses[1], floating_point_error=True)
-        pose_equal(poses[3], intermediate_poses[2], floating_point_error=True)
+        poses_approximately_equal(poses[1], intermediate_poses[0])
+        poses_approximately_equal(poses[2], intermediate_poses[1])
+        poses_approximately_equal(poses[3], intermediate_poses[2])
 
         # If thresholds for position and orientation are given, the one that
         # requires more interpolation steps should take preference.
@@ -91,11 +93,11 @@ class TestCartesianPlanner(unittest.TestCase):
             start_pose, end_pose, lin_threshold=0.65, ori_threshold=np.pi * 0.3
         )
         self.assertEqual(len(poses), 5)
-        pose_equal(poses[0], start_pose)
-        pose_equal(poses[4], end_pose)
-        pose_equal(poses[1], intermediate_poses[0], floating_point_error=True)
-        pose_equal(poses[2], intermediate_poses[1], floating_point_error=True)
-        pose_equal(poses[3], intermediate_poses[2], floating_point_error=True)
+        poses_exactly_equal(poses[0], start_pose)
+        poses_exactly_equal(poses[4], end_pose)
+        poses_approximately_equal(poses[1], intermediate_poses[0])
+        poses_approximately_equal(poses[2], intermediate_poses[1])
+        poses_approximately_equal(poses[3], intermediate_poses[2])
 
         with self.assertRaisesRegex(ValueError, "`lin_threshold` must be > 0"):
             _interpolate_poses(
