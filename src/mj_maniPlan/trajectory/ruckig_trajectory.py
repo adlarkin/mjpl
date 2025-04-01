@@ -12,7 +12,7 @@ class RuckigTrajectoryGenerator(TrajectoryGenerator):
         dt: float,
         max_velocity: np.ndarray,
         max_acceleration: np.ndarray,
-        jerk: np.ndarray,
+        max_jerk: np.ndarray,
         min_velocity: np.ndarray | None = None,
         min_acceleration: np.ndarray | None = None,
     ):
@@ -22,7 +22,7 @@ class RuckigTrajectoryGenerator(TrajectoryGenerator):
             dt: Trajectory timestep.
             max_velocity: Maximum allowed velocity of each joint.
             max_acceleration: Maximum allowed acceleration of each joint.
-            jerk: Allowed jerk on each joint.
+            max_jerk: Maximum allowed jerk of each joint.
             min_velocity: Minimum allowed velocity of each joint. If this is
                 not set, the negative of max_velocity will be used.
             min_acceleration: Minimum allowed acceleration of each joint. If
@@ -33,7 +33,7 @@ class RuckigTrajectoryGenerator(TrajectoryGenerator):
         self.min_velocity = min_velocity or -max_velocity
         self.max_acceleration = max_acceleration
         self.min_acceleration = min_acceleration or -max_acceleration
-        self.jerk = jerk
+        self.max_jerk = max_jerk
 
     def generate_trajectory(self, path: list[np.ndarray]) -> Trajectory:
         dof = path[0].size
@@ -60,7 +60,7 @@ class RuckigTrajectoryGenerator(TrajectoryGenerator):
         inp.min_velocity = self.min_velocity
         inp.max_acceleration = self.max_acceleration
         inp.min_acceleration = self.min_acceleration
-        inp.max_jerk = self.jerk
+        inp.max_jerk = self.max_jerk
 
         positions = []
         velocities = []

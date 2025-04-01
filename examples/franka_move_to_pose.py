@@ -97,7 +97,7 @@ def main():
         dt=model.opt.timestep,
         max_velocity=np.ones(dof) * np.pi,
         max_acceleration=np.ones(dof) * 0.5 * np.pi,
-        jerk=np.ones(dof),
+        max_jerk=np.ones(dof),
     )
 
     print("Generating trajectory...")

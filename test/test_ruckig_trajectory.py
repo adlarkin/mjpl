@@ -36,7 +36,7 @@ class TestRuckigTrajectoryGenerator(unittest.TestCase):
             dt=model.opt.timestep,
             max_velocity=np.ones(dof),
             max_acceleration=np.ones(dof),
-            jerk=np.ones(dof),
+            max_jerk=np.ones(dof),
         )
         np.testing.assert_equal(
             traj_generator.min_velocity, -traj_generator.max_velocity
