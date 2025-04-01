@@ -4,6 +4,7 @@ import mujoco
 import numpy as np
 from robot_descriptions.loaders.mujoco import load_robot_description
 
+import mj_maniPlan.utils as utils
 from mj_maniPlan.collision_ruleset import CollisionRuleset
 from mj_maniPlan.inverse_kinematics.mink_ik_solver import MinkIKSolver
 from mj_maniPlan.joint_group import JointGroup
@@ -73,17 +74,10 @@ class TestInverseKinematics(unittest.TestCase):
         for solution in ik_solutions:
             data.qpos = solution.copy()
             mujoco.mj_kinematics(self.model, data)
-            site = data.site(self.site_name)
-            # position error
-            pos_error = np.linalg.norm(site.xpos - target_pose.translation())
-            self.assertLessEqual(pos_error, pos_tolerance)
-            # orientation error
-            quat = np.zeros(4)
-            mujoco.mju_mat2Quat(quat, site.xmat)
-            ori_error = np.zeros(3)
-            mujoco.mju_subQuat(ori_error, quat, target_pose.rotation().wxyz)
-            ori_error = np.linalg.norm(ori_error)
-            self.assertLessEqual(ori_error, ori_tolerance)
+            actual_site_pose = utils.site_pose(data, self.site_name)
+            err = target_pose.minus(actual_site_pose)
+            self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
+            self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
 
     def test_invalid_args(self):
         with self.assertRaisesRegex(ValueError, "`max_attempts` must be > 0"):
