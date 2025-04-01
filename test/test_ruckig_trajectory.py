@@ -4,13 +4,13 @@ import mujoco
 import numpy as np
 from robot_descriptions.loaders.mujoco import load_robot_description
 
-import mj_maniPlan.trajectory as traj
 from mj_maniPlan.collision_ruleset import CollisionRuleset
 from mj_maniPlan.joint_group import JointGroup
+from mj_maniPlan.trajectory.ruckig_trajectory import RuckigTrajectoryGenerator
 from mj_maniPlan.utils import random_valid_config
 
 
-class TestTrajectory(unittest.TestCase):
+class TestRuckigTrajectoryGenerator(unittest.TestCase):
     def test_generate_trajectory(self):
         model = load_robot_description("ur5e_mj_description")
         data = mujoco.MjData(model)
@@ -32,29 +32,40 @@ class TestTrajectory(unittest.TestCase):
         rng = np.random.default_rng(seed=5)
         q_goal = random_valid_config(rng, arm_jg, data, CollisionRuleset(model))
 
-        path = [q_init_arm, q_goal]
-        limits = traj.TrajectoryLimits(
-            jg=arm_jg,
-            min_velocity=-np.ones(dof),
+        traj_generator = RuckigTrajectoryGenerator(
+            dt=model.opt.timestep,
             max_velocity=np.ones(dof),
-            min_acceleration=-np.ones(dof),
             max_acceleration=np.ones(dof),
-            jerk=np.ones(dof),
+            max_jerk=np.ones(dof),
         )
-        t = traj.generate_trajectory(path, limits, model.opt.timestep)
+        np.testing.assert_equal(
+            traj_generator.min_velocity, -traj_generator.max_velocity
+        )
+        np.testing.assert_equal(
+            traj_generator.min_acceleration, -traj_generator.max_acceleration
+        )
+
+        path = [q_init_arm, q_goal]
+        t = traj_generator.generate_trajectory(path)
 
         # Ensure limits are enforced.
         for v in t.velocities:
             self.assertTrue(
-                np.all((v >= limits.min_velocity) & (v <= limits.max_velocity))
+                np.all(
+                    (v >= traj_generator.min_velocity)
+                    & (v <= traj_generator.max_velocity)
+                )
             )
         for a in t.accelerations:
             self.assertTrue(
-                np.all((a >= limits.min_acceleration) & (a <= limits.max_acceleration))
+                np.all(
+                    (a >= traj_generator.min_acceleration)
+                    & (a <= traj_generator.max_acceleration)
+                )
             )
 
         # Ensure trajectory achieves the goal state.
-        np.testing.assert_allclose(q_goal, t.configurations[-1], rtol=1e-5, atol=1e-8)
+        np.testing.assert_allclose(q_goal, t.positions[-1], rtol=1e-5, atol=1e-8)
         # The final velocities and accelerations should be the zero vector,
         # so enforce absolute tolerance only since tolerance is not scale-dependent.
         np.testing.assert_allclose(np.zeros(dof), t.velocities[-1], rtol=0, atol=1e-8)

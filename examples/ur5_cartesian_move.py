@@ -13,7 +13,7 @@ from mj_maniPlan.cartesian_planner import cartesian_plan
 from mj_maniPlan.collision_ruleset import CollisionRuleset
 from mj_maniPlan.inverse_kinematics.mink_ik_solver import MinkIKSolver
 from mj_maniPlan.joint_group import JointGroup
-from mj_maniPlan.trajectory import TrajectoryLimits, generate_trajectory
+from mj_maniPlan.trajectory.ruckig_trajectory import RuckigTrajectoryGenerator
 
 _HERE = Path(__file__).parent
 _UR5_XML = _HERE / "models" / "universal_robots_ur5e" / "scene.xml"
@@ -88,21 +88,19 @@ def main():
     # We only need the joints in the JointGroup for trajectory generation.
     path_jg = [q[arm_jg.qpos_addrs] for q in path]
 
-    # These values are for demonstration purposes only.
+    # The trajectory limits used here are for demonstration purposes only.
     # In practice, consult your hardware spec sheet for this information.
     dof = len(arm_joints)
-    tr_limits = TrajectoryLimits(
-        jg=arm_jg,
-        min_velocity=-np.ones(dof) * np.pi,
+    traj_generator = RuckigTrajectoryGenerator(
+        dt=model.opt.timestep,
         max_velocity=np.ones(dof) * np.pi,
-        min_acceleration=-np.ones(dof) * 0.5 * np.pi,
         max_acceleration=np.ones(dof) * 0.5 * np.pi,
-        jerk=np.ones(dof),
+        max_jerk=np.ones(dof),
     )
 
     print("Generating trajectory...")
     start = time.time()
-    traj = generate_trajectory(path_jg, tr_limits, model.opt.timestep)
+    trajectory = traj_generator.generate_trajectory(path_jg)
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
     # Actuator indices in data.ctrl that correspond to the joints in the trajectory.
@@ -119,7 +117,7 @@ def main():
     # Follow the trajectory via position control, starting from the initial state.
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
     q_t = [q_init]
-    for q_ref in traj.configurations:
+    for q_ref in trajectory.positions:
         data.ctrl[actuator_ids] = q_ref
         mujoco.mj_step(model, data)
         # While the planner gives a sequence of waypoints are collision free, the
@@ -153,7 +151,7 @@ def main():
 
             # Visualize the trajectory. The trajectory is of high resolution,
             # so plotting every other timestep should be sufficient.
-            for q_ref in traj.configurations[::2]:
+            for q_ref in trajectory.positions[::2]:
                 arm_jg.fk(q_ref, data)
                 pos = data.site(_UR5_EE_SITE).xpos
                 viz.add_sphere(
