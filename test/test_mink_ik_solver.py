@@ -11,7 +11,7 @@ from mj_maniPlan.joint_group import JointGroup
 from mj_maniPlan.utils import site_pose
 
 
-class TestInverseKinematics(unittest.TestCase):
+class TestMinkIKSolver(unittest.TestCase):
     def setUp(self):
         self.model = load_robot_description("ur5e_mj_description")
         self.site_name = "attachment_site"
