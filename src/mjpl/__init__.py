@@ -1,4 +1,4 @@
-"""MuJoCo motion planning library."""
+"""mjpl: MuJoCo motion planning library."""
 
 from .cartesian_planner import cartesian_plan
 from .collision_ruleset import CollisionRuleset

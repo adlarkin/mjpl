@@ -4,7 +4,7 @@ import mujoco
 import numpy as np
 from robot_descriptions.loaders.mujoco import load_robot_description
 
-import mj_maniPlan as mjpl
+import mjpl
 
 
 class TestMinkIKSolver(unittest.TestCase):

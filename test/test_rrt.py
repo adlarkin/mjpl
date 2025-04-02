@@ -4,8 +4,8 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
-import mj_maniPlan as mjpl
-from mj_maniPlan.tree import Node, Tree
+import mjpl
+from mjpl.tree import Node, Tree
 
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"

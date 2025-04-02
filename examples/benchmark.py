@@ -16,7 +16,7 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
-import mj_maniPlan as mjpl
+import mjpl
 
 _HERE = Path(__file__).parent
 _PANDA_XML = _HERE / "models" / "franka_emika_panda" / "scene.xml"

@@ -6,8 +6,8 @@ import mujoco
 import mujoco.viewer
 import numpy as np
 
-import mj_maniPlan as mjpl
-import mj_maniPlan.visualization as viz
+import mjpl
+import mjpl.visualization as viz
 
 _HERE = Path(__file__).parent
 _PANDA_XML = _HERE / "models" / "franka_emika_panda" / "scene.xml"
@@ -125,7 +125,7 @@ def main():
         mujoco.mj_step(model, data)
         # While the planner gives a sequence of waypoints are collision free, the
         # generated trajectory may not. For more info, see:
-        # https://github.com/adlarkin/mj_maniPlan/issues/54
+        # https://github.com/adlarkin/mjpl/issues/54
         if not cr.obeys_ruleset(data.contact.geom):
             print("Invalid collision occurred during trajectory execution.")
             return
