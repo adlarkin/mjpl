@@ -35,7 +35,7 @@ class TestUtils(unittest.TestCase):
         mujoco.mj_kinematics(model, data)
 
         site_name = "attachment_site"
-        pose = mjpl.utils.site_pose(data, site_name)
+        pose = mjpl.site_pose(data, site_name)
 
         site = data.site(site_name)
         np.testing.assert_allclose(site.xpos, pose.translation(), rtol=0, atol=1e-12)
@@ -188,7 +188,7 @@ class TestUtils(unittest.TestCase):
 
         # all waypoints in the path are valid and directly connectable, so this
         # should result in a direct connection between path[0] and path[-1]
-        shortened_path = mjpl.utils.shortcut(path, jg, model, cr, seed=5)
+        shortened_path = mjpl.shortcut(path, jg, model, cr, seed=5)
         self.assertTrue(len(shortened_path), 2)
         np.testing.assert_equal(shortened_path[0], path[0])
         np.testing.assert_equal(shortened_path[1], path[-1])
@@ -197,7 +197,7 @@ class TestUtils(unittest.TestCase):
         # This means that after enough tries, the first and penultimate
         # (i.e., last valid) waypoints can be directly connected
         invalid_path = path + [np.array([3.0, -5.0])]
-        shortened_path = mjpl.utils.shortcut(
+        shortened_path = mjpl.shortcut(
             invalid_path, jg, model, cr, max_attempts=20, seed=42
         )
         self.assertTrue(len(shortened_path), 3)
@@ -227,13 +227,13 @@ class TestUtils(unittest.TestCase):
         path = [model.keyframe("home").qpos.copy()]
         rng = np.random.default_rng(seed=seed)
         random_waypoints = [
-            mjpl.utils.random_valid_config(rng, jg, data, cr) for _ in range(5)
+            mjpl.random_valid_config(rng, jg, data, cr) for _ in range(5)
         ]
         path.extend(random_waypoints)
 
         # Perform shortcutting. The path should now be shorter, but still start
         # and end at the same waypoints.
-        shortcut_path = mjpl.utils.shortcut(path, jg, model, cr, seed=seed)
+        shortcut_path = mjpl.shortcut(path, jg, model, cr, seed=seed)
         self.assertLess(len(shortcut_path), len(path))
         self.assertGreaterEqual(len(shortcut_path), 2)
         np.testing.assert_equal(shortcut_path[0], path[0])
