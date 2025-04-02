@@ -16,10 +16,7 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
-import mj_maniPlan.utils as utils
-from mj_maniPlan.collision_ruleset import CollisionRuleset
-from mj_maniPlan.joint_group import JointGroup
-from mj_maniPlan.rrt import RRT, RRTOptions
+import mj_maniPlan as mjpl
 
 _HERE = Path(__file__).parent
 _PANDA_XML = _HERE / "models" / "franka_emika_panda" / "scene.xml"
@@ -49,8 +46,8 @@ if __name__ == "__main__":
     goal_biasing_probability = 0.1
     number_of_attempts = 15
 
-    arm_jg = JointGroup(model, planning_joints)
-    cr = CollisionRuleset(model, allowed_collisions)
+    arm_jg = mjpl.JointGroup(model, planning_joints)
+    cr = mjpl.CollisionRuleset(model, allowed_collisions)
 
     # Plan number_of_attempts times and record benchmarks.
     successful_planning_times = []
@@ -63,11 +60,11 @@ if __name__ == "__main__":
         data = mujoco.MjData(model)
         mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
         rng = np.random.default_rng(seed=seed)
-        q_goal = utils.random_valid_config(rng, arm_jg, data, cr)
+        q_goal = mjpl.random_valid_config(rng, arm_jg, data, cr)
         arm_jg.fk(q_goal, data)
-        goal_pose = utils.site_pose(data, _PANDA_EE_SITE)
+        goal_pose = mjpl.site_pose(data, _PANDA_EE_SITE)
 
-        planner_options = RRTOptions(
+        planner_options = mjpl.RRTOptions(
             jg=arm_jg,
             cr=cr,
             max_planning_time=max_planning_time,
@@ -75,7 +72,7 @@ if __name__ == "__main__":
             seed=seed,
             goal_biasing_probability=goal_biasing_probability,
         )
-        planner = RRT(planner_options)
+        planner = mjpl.RRT(planner_options)
 
         print(f"Attempt {i}...")
         start_time = time.time()

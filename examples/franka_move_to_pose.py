@@ -1,17 +1,13 @@
 import time
 from pathlib import Path
 
+import example_utils as ex_utils
 import mujoco
 import mujoco.viewer
 import numpy as np
-from example_utils import parse_args
 
-import mj_maniPlan.utils as utils
+import mj_maniPlan as mjpl
 import mj_maniPlan.visualization as viz
-from mj_maniPlan.collision_ruleset import CollisionRuleset
-from mj_maniPlan.joint_group import JointGroup
-from mj_maniPlan.rrt import RRT, RRTOptions
-from mj_maniPlan.trajectory.ruckig_trajectory import RuckigTrajectoryGenerator
 
 _HERE = Path(__file__).parent
 _PANDA_XML = _HERE / "models" / "franka_emika_panda" / "scene_with_obstacles.xml"
@@ -19,7 +15,7 @@ _PANDA_EE_SITE = "ee_site"
 
 
 def main():
-    visualize, seed = parse_args(
+    visualize, seed = ex_utils.parse_args(
         description="Compute and follow a trajectory to a goal pose."
     )
 
@@ -35,7 +31,7 @@ def main():
         "joint7",
     ]
     arm_joint_ids = [model.joint(joint).id for joint in arm_joints]
-    arm_jg = JointGroup(model, arm_joint_ids)
+    arm_jg = mjpl.JointGroup(model, arm_joint_ids)
 
     # Let the "home" keyframe in the MJCF be the initial state.
     home_keyframe = model.keyframe("home")
@@ -46,19 +42,19 @@ def main():
             [model.body("left_finger").id, model.body("right_finger").id],
         ]
     )
-    cr = CollisionRuleset(model, allowed_collisions)
+    cr = mjpl.CollisionRuleset(model, allowed_collisions)
 
     # From the initial state, generate a valid goal pose that's derived from a
     # valid joint configuration.
     rng = np.random.default_rng(seed=seed)
     data = mujoco.MjData(model)
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
-    q_rand = utils.random_valid_config(rng, arm_jg, data, cr)
+    q_rand = mjpl.random_valid_config(rng, arm_jg, data, cr)
     arm_jg.fk(q_rand, data)
-    goal_pose = utils.site_pose(data, _PANDA_EE_SITE)
+    goal_pose = mjpl.site_pose(data, _PANDA_EE_SITE)
 
     # Set up the planner.
-    planner_options = RRTOptions(
+    planner_options = mjpl.RRTOptions(
         jg=arm_jg,
         cr=cr,
         max_planning_time=10,
@@ -67,7 +63,7 @@ def main():
         goal_biasing_probability=0.1,
         max_connection_distance=np.inf,
     )
-    planner = RRT(planner_options)
+    planner = mjpl.RRT(planner_options)
 
     print("Planning...")
     start = time.time()
@@ -79,7 +75,7 @@ def main():
 
     print("Shortcutting...")
     start = time.time()
-    shortcut_path = utils.shortcut(
+    shortcut_path = mjpl.shortcut(
         path,
         arm_jg,
         model,
@@ -93,7 +89,7 @@ def main():
     # The trajectory limits used here are for demonstration purposes only.
     # In practice, consult your hardware spec sheet for this information.
     dof = len(arm_joints)
-    traj_generator = RuckigTrajectoryGenerator(
+    traj_generator = mjpl.RuckigTrajectoryGenerator(
         dt=model.opt.timestep,
         max_velocity=np.ones(dof) * np.pi,
         max_acceleration=np.ones(dof) * 0.5 * np.pi,
@@ -144,7 +140,7 @@ def main():
             # Visualize the initial EE pose.
             data.qpos = q_init
             mujoco.mj_kinematics(model, data)
-            initial_pose = utils.site_pose(data, _PANDA_EE_SITE)
+            initial_pose = mjpl.site_pose(data, _PANDA_EE_SITE)
             viz.add_frame(
                 viewer.user_scn,
                 initial_pose.translation(),

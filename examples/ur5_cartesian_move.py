@@ -1,19 +1,14 @@
 import time
 from pathlib import Path
 
+import example_utils as ex_utils
 import mujoco
 import mujoco.viewer
 import numpy as np
-from example_utils import parse_args
 from mink.lie import SE3
 
-import mj_maniPlan.utils as utils
+import mj_maniPlan as mjpl
 import mj_maniPlan.visualization as viz
-from mj_maniPlan.cartesian_planner import cartesian_plan
-from mj_maniPlan.collision_ruleset import CollisionRuleset
-from mj_maniPlan.inverse_kinematics.mink_ik_solver import MinkIKSolver
-from mj_maniPlan.joint_group import JointGroup
-from mj_maniPlan.trajectory.ruckig_trajectory import RuckigTrajectoryGenerator
 
 _HERE = Path(__file__).parent
 _UR5_XML = _HERE / "models" / "universal_robots_ur5e" / "scene.xml"
@@ -31,7 +26,7 @@ def circle_waypoints(
 
 
 def main():
-    visualize, seed = parse_args(
+    visualize, seed = ex_utils.parse_args(
         description="Compute and follow a trajectory along a cartesian path."
     )
 
@@ -47,9 +42,9 @@ def main():
         "wrist_3_joint",
     ]
     arm_joint_ids = [model.joint(joint).id for joint in arm_joints]
-    arm_jg = JointGroup(model, arm_joint_ids)
+    arm_jg = mjpl.JointGroup(model, arm_joint_ids)
 
-    cr = CollisionRuleset(model)
+    cr = mjpl.CollisionRuleset(model)
 
     # Let the "home" keyframe in the MJCF be the initial state.
     home_keyframe = model.keyframe("home")
@@ -59,7 +54,7 @@ def main():
     # in the xy plane, centered about the initial EE pose
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
     mujoco.mj_kinematics(model, data)
-    initial_ee_pose = utils.site_pose(data, _UR5_EE_SITE)
+    initial_ee_pose = mjpl.site_pose(data, _UR5_EE_SITE)
     ee_x, ee_y, ee_z = initial_ee_pose.translation()
     poses = [
         SE3.from_rotation_and_translation(
@@ -68,7 +63,7 @@ def main():
         for x, y in circle_waypoints(radius=0.1, c_x=ee_x, c_y=ee_y)
     ]
 
-    solver = MinkIKSolver(
+    solver = mjpl.MinkIKSolver(
         model=model,
         jg=arm_jg,
         cr=cr,
@@ -78,7 +73,7 @@ def main():
 
     print("Planning...")
     start = time.time()
-    path = cartesian_plan(q_init, poses, _UR5_EE_SITE, solver)
+    path = mjpl.cartesian_plan(q_init, poses, _UR5_EE_SITE, solver)
     if not path:
         print("Planning failed")
         return
@@ -91,7 +86,7 @@ def main():
     # The trajectory limits used here are for demonstration purposes only.
     # In practice, consult your hardware spec sheet for this information.
     dof = len(arm_joints)
-    traj_generator = RuckigTrajectoryGenerator(
+    traj_generator = mjpl.RuckigTrajectoryGenerator(
         dt=model.opt.timestep,
         max_velocity=np.ones(dof) * np.pi,
         max_acceleration=np.ones(dof) * 0.5 * np.pi,

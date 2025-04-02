@@ -5,11 +5,7 @@ import numpy as np
 from mink.lie import SE3, SO3
 from robot_descriptions.loaders.mujoco import load_robot_description
 
-import mj_maniPlan.utils as utils
-from mj_maniPlan.cartesian_planner import _interpolate_poses, cartesian_plan
-from mj_maniPlan.collision_ruleset import CollisionRuleset
-from mj_maniPlan.inverse_kinematics.mink_ik_solver import MinkIKSolver
-from mj_maniPlan.joint_group import JointGroup
+import mj_maniPlan as mjpl
 
 
 def poses_exactly_equal(p1: SE3, p2: SE3) -> None:
@@ -42,7 +38,7 @@ class TestCartesianPlanner(unittest.TestCase):
 
         # Thresholds of inf mean no interpolation occurs, so we should just get
         # the start and end pose
-        poses = _interpolate_poses(
+        poses = mjpl.cartesian_planner._interpolate_poses(
             start_pose, end_pose, lin_threshold=np.inf, ori_threshold=np.inf
         )
         self.assertEqual(len(poses), 2)
@@ -50,7 +46,7 @@ class TestCartesianPlanner(unittest.TestCase):
         poses_exactly_equal(poses[1], end_pose)
 
         # Interpolate based on position
-        poses = _interpolate_poses(
+        poses = mjpl.cartesian_planner._interpolate_poses(
             start_pose, end_pose, lin_threshold=0.65, ori_threshold=np.inf
         )
         self.assertEqual(len(poses), 3)
@@ -62,7 +58,7 @@ class TestCartesianPlanner(unittest.TestCase):
         poses_approximately_equal(poses[1], halfway_pose)
 
         # Interpolate based on orientation
-        poses = _interpolate_poses(
+        poses = mjpl.cartesian_planner._interpolate_poses(
             start_pose, end_pose, lin_threshold=np.inf, ori_threshold=np.pi * 0.3
         )
         self.assertEqual(len(poses), 5)
@@ -89,7 +85,7 @@ class TestCartesianPlanner(unittest.TestCase):
         # In this scenario, we should get the same behavior as the scenario
         # above (where only orientation was applied) since orientation requires
         # more interpolation steps than linear.
-        poses = _interpolate_poses(
+        poses = mjpl.cartesian_planner._interpolate_poses(
             start_pose, end_pose, lin_threshold=0.65, ori_threshold=np.pi * 0.3
         )
         self.assertEqual(len(poses), 5)
@@ -100,17 +96,17 @@ class TestCartesianPlanner(unittest.TestCase):
         poses_approximately_equal(poses[3], intermediate_poses[2])
 
         with self.assertRaisesRegex(ValueError, "`lin_threshold` must be > 0"):
-            _interpolate_poses(
+            mjpl.cartesian_planner._interpolate_poses(
                 start_pose, end_pose, lin_threshold=0.0, ori_threshold=np.inf
             )
-            _interpolate_poses(
+            mjpl.cartesian_planner._interpolate_poses(
                 start_pose, end_pose, lin_threshold=-1.0, ori_threshold=np.inf
             )
         with self.assertRaisesRegex(ValueError, "`ori_threshold` must be > 0"):
-            _interpolate_poses(
+            mjpl.cartesian_planner._interpolate_poses(
                 start_pose, end_pose, lin_threshold=np.inf, ori_threshold=0.0
             )
-            _interpolate_poses(
+            mjpl.cartesian_planner._interpolate_poses(
                 start_pose, end_pose, lin_threshold=np.inf, ori_threshold=-1.0
             )
 
@@ -128,8 +124,8 @@ class TestCartesianPlanner(unittest.TestCase):
             "wrist_3_joint",
         ]
         arm_joint_ids = [model.joint(joint).id for joint in arm_joints]
-        jg = JointGroup(model, arm_joint_ids)
-        cr = CollisionRuleset(model)
+        jg = mjpl.JointGroup(model, arm_joint_ids)
+        cr = mjpl.CollisionRuleset(model)
 
         # Use the "home" keyframe as the initial configuration.
         home_keyframe = model.keyframe("home")
@@ -139,7 +135,7 @@ class TestCartesianPlanner(unittest.TestCase):
         # desired Cartesian path.
         mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
         mujoco.mj_kinematics(model, data)
-        current_ee_pose = utils.site_pose(data, site)
+        current_ee_pose = mjpl.site_pose(data, site)
         next_ee_pose = current_ee_pose.multiply(
             SE3.from_translation(np.array([0.02, 0.0, 0.0]))
         )
@@ -155,7 +151,7 @@ class TestCartesianPlanner(unittest.TestCase):
         # Define an IK solver.
         pos_tolerance = 1e-3
         ori_tolerance = 1e-3
-        solver = MinkIKSolver(
+        solver = mjpl.MinkIKSolver(
             model=model,
             jg=jg,
             cr=cr,
@@ -166,7 +162,7 @@ class TestCartesianPlanner(unittest.TestCase):
         )
 
         # Plan a Cartesian path.
-        path = cartesian_plan(
+        path = mjpl.cartesian_plan(
             q_init_world, poses, site, solver, lin_threshold=0.01, ori_threshold=0.1
         )
         self.assertEqual(len(path), 4)
@@ -176,20 +172,20 @@ class TestCartesianPlanner(unittest.TestCase):
         # within the IK solver's tolerance.
         data.qpos = path[1]
         mujoco.mj_kinematics(model, data)
-        actual_site_pose = utils.site_pose(data, site)
+        actual_site_pose = mjpl.site_pose(data, site)
         err = poses[0].minus(actual_site_pose)
         self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
         self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
         # An interpolated pose should have been added to the Cartesian path (`poses`)
         data.qpos = path[2]
         mujoco.mj_kinematics(model, data)
-        actual_site_pose = utils.site_pose(data, site)
+        actual_site_pose = mjpl.site_pose(data, site)
         err = interpolated_pose.minus(actual_site_pose)
         self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
         self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
         data.qpos = path[3]
         mujoco.mj_kinematics(model, data)
-        actual_site_pose = utils.site_pose(data, site)
+        actual_site_pose = mjpl.site_pose(data, site)
         err = poses[1].minus(actual_site_pose)
         self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
         self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)

@@ -4,11 +4,7 @@ import mujoco
 import numpy as np
 from robot_descriptions.loaders.mujoco import load_robot_description
 
-import mj_maniPlan.utils as utils
-from mj_maniPlan.collision_ruleset import CollisionRuleset
-from mj_maniPlan.inverse_kinematics.mink_ik_solver import MinkIKSolver
-from mj_maniPlan.joint_group import JointGroup
-from mj_maniPlan.utils import site_pose
+import mj_maniPlan as mjpl
 
 
 class TestMinkIKSolver(unittest.TestCase):
@@ -25,8 +21,8 @@ class TestMinkIKSolver(unittest.TestCase):
             "wrist_3_joint",
         ]
         arm_joint_ids = [self.model.joint(joint).id for joint in arm_joints]
-        self.jg = JointGroup(self.model, arm_joint_ids)
-        self.cr = CollisionRuleset(self.model)
+        self.jg = mjpl.JointGroup(self.model, arm_joint_ids)
+        self.cr = mjpl.CollisionRuleset(self.model)
 
     def test_ik(self):
         q_init_world = self.model.keyframe("home").qpos.copy()
@@ -37,12 +33,12 @@ class TestMinkIKSolver(unittest.TestCase):
         rng = np.random.default_rng(seed=12345)
         data.qpos = rng.uniform(*self.model.jnt_range.T)
         mujoco.mj_kinematics(self.model, data)
-        target_pose = site_pose(data, self.site_name)
+        target_pose = mjpl.site_pose(data, self.site_name)
 
         # Construct IK solver.
         pos_tolerance = 1e-3
         ori_tolerance = 1e-3
-        solver = MinkIKSolver(
+        solver = mjpl.MinkIKSolver(
             model=self.model,
             jg=self.jg,
             cr=self.cr,
@@ -74,20 +70,20 @@ class TestMinkIKSolver(unittest.TestCase):
         for solution in ik_solutions:
             data.qpos = solution.copy()
             mujoco.mj_kinematics(self.model, data)
-            actual_site_pose = utils.site_pose(data, self.site_name)
+            actual_site_pose = mjpl.site_pose(data, self.site_name)
             err = target_pose.minus(actual_site_pose)
             self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
             self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
 
     def test_invalid_args(self):
         with self.assertRaisesRegex(ValueError, "`max_attempts` must be > 0"):
-            MinkIKSolver(
+            mjpl.MinkIKSolver(
                 model=self.model,
                 jg=self.jg,
                 cr=self.cr,
                 max_attempts=-2,
             )
-            MinkIKSolver(
+            mjpl.MinkIKSolver(
                 model=self.model,
                 jg=self.jg,
                 cr=self.cr,
@@ -95,13 +91,13 @@ class TestMinkIKSolver(unittest.TestCase):
             )
 
         with self.assertRaisesRegex(ValueError, "`iterations` must be > 0"):
-            MinkIKSolver(
+            mjpl.MinkIKSolver(
                 model=self.model,
                 jg=self.jg,
                 cr=self.cr,
                 iterations=-2,
             )
-            MinkIKSolver(
+            mjpl.MinkIKSolver(
                 model=self.model,
                 jg=self.jg,
                 cr=self.cr,
