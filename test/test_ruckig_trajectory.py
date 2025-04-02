@@ -4,10 +4,7 @@ import mujoco
 import numpy as np
 from robot_descriptions.loaders.mujoco import load_robot_description
 
-from mj_maniPlan.collision_ruleset import CollisionRuleset
-from mj_maniPlan.joint_group import JointGroup
-from mj_maniPlan.trajectory.ruckig_trajectory import RuckigTrajectoryGenerator
-from mj_maniPlan.utils import random_valid_config
+import mj_maniPlan as mjpl
 
 
 class TestRuckigTrajectoryGenerator(unittest.TestCase):
@@ -24,15 +21,17 @@ class TestRuckigTrajectoryGenerator(unittest.TestCase):
             model.joint("wrist_3_joint").id,
         ]
         dof = len(arm_joints)
-        arm_jg = JointGroup(model, arm_joints)
+        arm_jg = mjpl.JointGroup(model, arm_joints)
 
         data.qpos = model.keyframe("home").qpos
         q_init_arm = arm_jg.qpos(data)
 
         rng = np.random.default_rng(seed=5)
-        q_goal = random_valid_config(rng, arm_jg, data, CollisionRuleset(model))
+        q_goal = mjpl.random_valid_config(
+            rng, arm_jg, data, mjpl.CollisionRuleset(model)
+        )
 
-        traj_generator = RuckigTrajectoryGenerator(
+        traj_generator = mjpl.RuckigTrajectoryGenerator(
             dt=model.opt.timestep,
             max_velocity=np.ones(dof),
             max_acceleration=np.ones(dof),

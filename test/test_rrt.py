@@ -4,10 +4,7 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
-import mj_maniPlan.rrt as rrt
-import mj_maniPlan.utils as utils
-from mj_maniPlan.collision_ruleset import CollisionRuleset
-from mj_maniPlan.joint_group import JointGroup
+import mj_maniPlan as mjpl
 from mj_maniPlan.tree import Node, Tree
 
 _HERE = Path(__file__).parent
@@ -22,11 +19,11 @@ class TestRRT(unittest.TestCase):
         self.obstacle = model.geom("wall_obstacle")
 
         planning_joints = [model.joint("ball_slide_x").id]
-        jg = JointGroup(model, planning_joints)
+        jg = mjpl.JointGroup(model, planning_joints)
 
-        cr = CollisionRuleset(model)
+        cr = mjpl.CollisionRuleset(model)
 
-        options = rrt.RRTOptions(
+        options = mjpl.RRTOptions(
             jg=jg,
             cr=cr,
             max_planning_time=5.0,
@@ -39,7 +36,7 @@ class TestRRT(unittest.TestCase):
         # So there's only one value in data.qpos (the ball's x position)
         self.q_init = np.array([-0.1])
 
-        self.planner = rrt.RRT(options)
+        self.planner = mjpl.RRT(options)
 
     def test_extend(self):
         self.load_ball_with_obstacle_model()
@@ -223,7 +220,7 @@ class TestRRT(unittest.TestCase):
 
         for i in range(1, len(path)):
             self.assertLessEqual(
-                utils.configuration_distance(path[i - 1], path[i]),
+                mjpl.utils.configuration_distance(path[i - 1], path[i]),
                 self.planner.options.epsilon,
             )
 
