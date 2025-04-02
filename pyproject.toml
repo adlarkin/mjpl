@@ -21,6 +21,7 @@ maintainers = [
 ]
 description = "MuJoCo motion planning library."
 readme = "README.md"
+license = {file = "LICENSE"}
 keywords = ["robotics", "motion", "planning", "manipulation", "mujoco"]
 classifiers = [
   "Framework :: Robot Framework :: Library",
@@ -28,8 +29,6 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
 ]
-license = "MIT"
-license-files = ["LICEN[CS]E*"]
 
 [project.optional-dependencies]
 test = [
