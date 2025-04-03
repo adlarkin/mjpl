@@ -5,7 +5,7 @@ import numpy as np
 from mink.lie import SE3, SO3
 from robot_descriptions.loaders.mujoco import load_robot_description
 
-import mj_maniPlan as mjpl
+import mjpl
 
 
 def poses_exactly_equal(p1: SE3, p2: SE3) -> None:

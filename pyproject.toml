@@ -1,9 +1,9 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling >= 1.27"]
 build-backend = "hatchling.build"
 
 [project]
-name = "mj_maniPlan"
+name = "mjpl"
 version = "0.0.1"
 dependencies = [
   "mink",
@@ -19,15 +19,19 @@ authors = [
 maintainers = [
   { name="Ashton Larkin", email="" },
 ]
-description = "Manipulator motion planning in MuJoCo"
+description = "MuJoCo motion planning library."
 readme = "README.md"
 license = {file = "LICENSE"}
 keywords = ["robotics", "motion", "planning", "manipulation", "mujoco"]
 classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
   "Framework :: Robot Framework :: Library",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering",
 ]
 
 [project.optional-dependencies]
@@ -36,13 +40,13 @@ test = [
 ]
 dev = [
   "black",
-  "mj_maniplan[test]",
+  "mjpl[test]",
   "pre-commit",
   "ruff",
 ]
 
 [project.urls]
-Homepage = "https://github.com/adlarkin/mj_maniPlan"
+Homepage = "https://github.com/adlarkin/mjpl"
 
 [tool.ruff]
 target-version = "py310"

@@ -5,9 +5,7 @@ import mujoco
 import numpy as np
 from robot_descriptions.loaders.mujoco import load_robot_description
 
-import mj_maniPlan.utils as utils
-from mj_maniPlan.collision_ruleset import CollisionRuleset
-from mj_maniPlan.joint_group import JointGroup
+import mjpl
 
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
@@ -19,15 +17,15 @@ class TestUtils(unittest.TestCase):
         start = np.array([0.0, 0.0])
         target = np.array([0.5, 0.0])
 
-        q_next = utils.step(start, target, max_step_dist=5.0)
+        q_next = mjpl.utils.step(start, target, max_step_dist=5.0)
         np.testing.assert_equal(q_next, target)
 
-        q_next = utils.step(start, target, max_step_dist=0.1)
+        q_next = mjpl.utils.step(start, target, max_step_dist=0.1)
         np.testing.assert_allclose(q_next, np.array([0.1, 0.0]), rtol=0, atol=1e-8)
 
         with self.assertRaisesRegex(ValueError, "`max_step_dist` must be > 0.0"):
-            utils.step(start, target, max_step_dist=0.0)
-            utils.step(start, target, max_step_dist=-1.0)
+            mjpl.utils.step(start, target, max_step_dist=0.0)
+            mjpl.utils.step(start, target, max_step_dist=-1.0)
 
     def test_site_pose(self):
         model = load_robot_description("ur5e_mj_description")
@@ -37,7 +35,7 @@ class TestUtils(unittest.TestCase):
         mujoco.mj_kinematics(model, data)
 
         site_name = "attachment_site"
-        pose = utils.site_pose(data, site_name)
+        pose = mjpl.site_pose(data, site_name)
 
         site = data.site(site_name)
         np.testing.assert_allclose(site.xpos, pose.translation(), rtol=0, atol=1e-12)
@@ -51,8 +49,8 @@ class TestUtils(unittest.TestCase):
             model.joint("ball_slide_x").id,
             model.joint("ball_slide_y").id,
         ]
-        jg = JointGroup(model, planning_joints)
-        cr = CollisionRuleset(model)
+        jg = mjpl.JointGroup(model, planning_joints)
+        cr = mjpl.CollisionRuleset(model)
 
         path = [
             np.array([0.0, 0.0]),
@@ -63,7 +61,7 @@ class TestUtils(unittest.TestCase):
         ]
 
         # connect with validation checking and no filling
-        connected_path = utils._connect_waypoints(
+        connected_path = mjpl.utils._connect_waypoints(
             path,
             start_idx=0,
             end_idx=2,
@@ -79,7 +77,7 @@ class TestUtils(unittest.TestCase):
         np.testing.assert_equal(connected_path[2], path[3])
 
         # connect with validation checking and filling
-        connected_path = utils._connect_waypoints(
+        connected_path = mjpl.utils._connect_waypoints(
             path,
             start_idx=0,
             end_idx=2,
@@ -104,7 +102,7 @@ class TestUtils(unittest.TestCase):
         # corresponds to a waypoint that violates the joint limits, this
         # should fail (i.e., the returned path is an unmodified copy of
         # the original)
-        connected_path = utils._connect_waypoints(
+        connected_path = mjpl.utils._connect_waypoints(
             path,
             start_idx=1,
             end_idx=3,
@@ -122,7 +120,7 @@ class TestUtils(unittest.TestCase):
 
         # connect without validation checking on the waypoint that violates
         # joint limits
-        connected_path = utils._connect_waypoints(
+        connected_path = mjpl.utils._connect_waypoints(
             path,
             start_idx=1,
             end_idx=3,
@@ -139,7 +137,7 @@ class TestUtils(unittest.TestCase):
         with self.assertRaisesRegex(
             ValueError, "`jg` and `data` must either be None or not None"
         ):
-            utils._connect_waypoints(
+            mjpl.utils._connect_waypoints(
                 path,
                 start_idx=0,
                 end_idx=2,
@@ -147,15 +145,15 @@ class TestUtils(unittest.TestCase):
                 jg=None,
                 data=mujoco.MjData(model),
             )
-            utils._connect_waypoints(
+            mjpl.utils._connect_waypoints(
                 path, start_idx=0, end_idx=2, fill=False, jg=jg, data=None
             )
 
         with self.assertRaisesRegex(ValueError, "`min_fill_dist` must be > 0"):
-            utils._connect_waypoints(
+            mjpl.utils._connect_waypoints(
                 path, start_idx=0, end_idx=2, fill=False, min_fill_dist=0.0
             )
-            utils._connect_waypoints(
+            mjpl.utils._connect_waypoints(
                 path, start_idx=0, end_idx=2, fill=False, min_fill_dist=-1.0
             )
 
@@ -165,8 +163,8 @@ class TestUtils(unittest.TestCase):
             model.joint("ball_slide_x").id,
             model.joint("ball_slide_y").id,
         ]
-        jg = JointGroup(model, planning_joints)
-        cr = CollisionRuleset(model)
+        jg = mjpl.JointGroup(model, planning_joints)
+        cr = mjpl.CollisionRuleset(model)
 
         """
         Path that can benefit from shortcutting.
@@ -190,7 +188,7 @@ class TestUtils(unittest.TestCase):
 
         # all waypoints in the path are valid and directly connectable, so this
         # should result in a direct connection between path[0] and path[-1]
-        shortened_path = utils.shortcut(path, jg, model, cr, seed=5)
+        shortened_path = mjpl.shortcut(path, jg, model, cr, seed=5)
         self.assertTrue(len(shortened_path), 2)
         np.testing.assert_equal(shortened_path[0], path[0])
         np.testing.assert_equal(shortened_path[1], path[-1])
@@ -199,7 +197,7 @@ class TestUtils(unittest.TestCase):
         # This means that after enough tries, the first and penultimate
         # (i.e., last valid) waypoints can be directly connected
         invalid_path = path + [np.array([3.0, -5.0])]
-        shortened_path = utils.shortcut(
+        shortened_path = mjpl.shortcut(
             invalid_path, jg, model, cr, max_attempts=20, seed=42
         )
         self.assertTrue(len(shortened_path), 3)
@@ -220,8 +218,8 @@ class TestUtils(unittest.TestCase):
             "wrist_3_joint",
         ]
         arm_joint_ids = [model.joint(joint).id for joint in arm_joints]
-        jg = JointGroup(model, arm_joint_ids)
-        cr = CollisionRuleset(model)
+        jg = mjpl.JointGroup(model, arm_joint_ids)
+        cr = mjpl.CollisionRuleset(model)
 
         seed = 42
 
@@ -229,13 +227,13 @@ class TestUtils(unittest.TestCase):
         path = [model.keyframe("home").qpos.copy()]
         rng = np.random.default_rng(seed=seed)
         random_waypoints = [
-            utils.random_valid_config(rng, jg, data, cr) for _ in range(5)
+            mjpl.random_valid_config(rng, jg, data, cr) for _ in range(5)
         ]
         path.extend(random_waypoints)
 
         # Perform shortcutting. The path should now be shorter, but still start
         # and end at the same waypoints.
-        shortcut_path = utils.shortcut(path, jg, model, cr, seed=seed)
+        shortcut_path = mjpl.shortcut(path, jg, model, cr, seed=seed)
         self.assertLess(len(shortcut_path), len(path))
         self.assertGreaterEqual(len(shortcut_path), 2)
         np.testing.assert_equal(shortcut_path[0], path[0])
@@ -254,7 +252,7 @@ class TestUtils(unittest.TestCase):
         ]
 
         # perform a fill that adds one intermediate waypoint
-        filled_path = utils.fill_path(path, max_dist_between_points=0.3)
+        filled_path = mjpl.utils.fill_path(path, max_dist_between_points=0.3)
         self.assertEqual(len(filled_path), 4)
         np.testing.assert_equal(filled_path[0], path[0])
         np.testing.assert_allclose(
@@ -265,14 +263,14 @@ class TestUtils(unittest.TestCase):
 
         # perform a fill that adds no intermediate waypoints
         # (dist > adjacent waypoint distance)
-        filled_path = utils.fill_path(path, max_dist_between_points=0.75)
+        filled_path = mjpl.utils.fill_path(path, max_dist_between_points=0.75)
         self.assertEqual(len(filled_path), len(path))
         np.testing.assert_equal(filled_path[0], path[0])
         np.testing.assert_equal(filled_path[1], path[1])
         np.testing.assert_equal(filled_path[2], path[2])
 
         # perform a fill that adds multiple intermediate waypoints
-        filled_path = utils.fill_path(path, max_dist_between_points=0.1)
+        filled_path = mjpl.utils.fill_path(path, max_dist_between_points=0.1)
         self.assertEqual(len(filled_path), 8)
         np.testing.assert_equal(filled_path[0], path[0])
         np.testing.assert_allclose(
