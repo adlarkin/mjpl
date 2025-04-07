@@ -39,7 +39,6 @@ test = [
   "robot_descriptions",
 ]
 dev = [
-  "black",
   "mjpl[test]",
   "pre-commit",
   "ruff",

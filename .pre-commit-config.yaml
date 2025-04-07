@@ -1,15 +1,10 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.6  # Use the latest stable version of Ruff
+    rev: v0.9.6
     hooks:
       - id: ruff
+      - id: ruff-format
 
-  - repo: https://github.com/psf/black
-    rev: 25.1.0  # Use the latest stable version of Black
-    hooks:
-      - id: black
-
-  # Custom local hook to run unit tests before commit
   - repo: local
     hooks:
       - id: run-tests
