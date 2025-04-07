@@ -21,20 +21,20 @@ For local development, install the developer dependencies:
 pip3 install -e ".[dev]"
 ```
 
-This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and [Black](https://black.readthedocs.io/en/stable/) for formatting.
+This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting.
 Unit tests are written via the [unittest](https://docs.python.org/3/library/unittest.html) framework.
 
 To run the linter, formatter, and tests locally:
-```
+```bash
 # Check for linter errors
 ruff check .
 # Apply lint fixes
 ruff check --fix .
 
-# Check for formatting errors
-black --check .
+# Check for format errors
+ruff format --diff .
 # Apply format fixes
-black .
+ruff format .
 
 # Run unit tests
 python3 -m unittest -v
