@@ -5,7 +5,7 @@ from .trajectory import Trajectory, TrajectoryGenerator
 
 
 class ToppraTrajectoryGenerator(TrajectoryGenerator):
-    """toppra implementation of TrajectoryGenerator."""
+    """TOPP-RA implementation of TrajectoryGenerator."""
 
     def __init__(
         self,
