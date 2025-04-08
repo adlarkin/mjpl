@@ -5,7 +5,7 @@ from .collision_ruleset import CollisionRuleset
 from .inverse_kinematics import MinkIKSolver
 from .joint_group import JointGroup
 from .rrt import RRT, RRTOptions
-from .trajectory import RuckigTrajectoryGenerator
+from .trajectory import RuckigTrajectoryGenerator, ToppraTrajectoryGenerator
 from .utils import random_valid_config, shortcut, site_pose
 
 __all__ = (
@@ -15,6 +15,7 @@ __all__ = (
     "RRT",
     "RRTOptions",
     "RuckigTrajectoryGenerator",
+    "ToppraTrajectoryGenerator",
     "cartesian_plan",
     "random_valid_config",
     "site_pose",

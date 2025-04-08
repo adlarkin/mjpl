@@ -86,11 +86,10 @@ def main():
     # The trajectory limits used here are for demonstration purposes only.
     # In practice, consult your hardware spec sheet for this information.
     dof = len(arm_joints)
-    traj_generator = mjpl.RuckigTrajectoryGenerator(
+    traj_generator = mjpl.ToppraTrajectoryGenerator(
         dt=model.opt.timestep,
-        max_velocity=np.ones(dof) * np.pi,
-        max_acceleration=np.ones(dof) * 0.5 * np.pi,
-        max_jerk=np.ones(dof),
+        max_velocity=np.ones(dof) * 0.5 * np.pi,
+        max_acceleration=np.ones(dof) * 0.25 * np.pi,
     )
 
     print("Generating trajectory...")

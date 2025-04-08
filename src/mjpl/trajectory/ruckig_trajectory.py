@@ -74,8 +74,6 @@ class RuckigTrajectoryGenerator(TrajectoryGenerator):
             accelerations.append(np.array(out.new_acceleration))
             out.pass_to_input(inp)
         if res != Result.Finished:
-            raise ValueError(
-                "Did not successfully complete trajectory generation (this should not happen!)"
-            )
+            raise ValueError("Trajectory generation failed.")
 
         return Trajectory(self.dt, positions, velocities, accelerations)

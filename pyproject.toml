@@ -11,6 +11,9 @@ dependencies = [
   "numpy",
   "ruckig",
   "scipy",
+  # toppra 0.6.3 adds support for numpy > 2.0:
+  # https://github.com/hungpham2511/toppra/pull/259
+  "toppra >= 0.6.3",
 ]
 requires-python = ">=3.10"
 authors = [
