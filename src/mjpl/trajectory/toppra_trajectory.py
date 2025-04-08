@@ -48,9 +48,7 @@ class ToppraTrajectoryGenerator(TrajectoryGenerator):
         )
         trajectory = instance.compute_trajectory()
         if trajectory is None:
-            raise ValueError(
-                f"Unable to generate trajectory for the following path: {path}"
-            )
+            raise ValueError("Trajectory generation failed.")
         t = np.arange(self.dt, trajectory.duration, self.dt)
         if not np.isclose(t[-1], trajectory.duration, rtol=0.0, atol=1e-8):
             t = np.append(t, trajectory.duration)
