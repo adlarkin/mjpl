@@ -9,18 +9,19 @@ class TestRuckigTrajectoryGenerator(unittest.TestCase):
     def test_generate_trajectory(self):
         dof = 7
 
-        traj_generator = mjpl.RuckigTrajectoryGenerator(
+        traj_generator = mjpl.ToppraTrajectoryGenerator(
             dt=0.002,
             max_velocity=np.ones(dof),
             max_acceleration=np.ones(dof),
-            max_jerk=np.ones(dof),
         )
-        np.testing.assert_equal(
-            traj_generator.min_velocity, -traj_generator.max_velocity
-        )
-        np.testing.assert_equal(
-            traj_generator.min_acceleration, -traj_generator.max_acceleration
-        )
+
+        vel_limit_min = traj_generator.velocity_constraint.vlim[:, 0]
+        vel_limit_max = traj_generator.velocity_constraint.vlim[:, 1]
+        np.testing.assert_equal(vel_limit_min, -vel_limit_max)
+
+        acc_limit_min = traj_generator.acceleration_constraint.alim[:, 0]
+        acc_limit_max = traj_generator.acceleration_constraint.alim[:, 1]
+        np.testing.assert_equal(acc_limit_min, -acc_limit_max)
 
         rng = np.random.default_rng(seed=5)
         path = [
@@ -32,16 +33,11 @@ class TestRuckigTrajectoryGenerator(unittest.TestCase):
         # Ensure limits are enforced, with some tolerance for floating point error.
         tolerance = 1e-8
         for v in t.velocities:
-            self.assertTrue(np.all(v >= traj_generator.min_velocity - tolerance))
-            self.assertTrue(np.all(v <= traj_generator.max_velocity + tolerance))
+            self.assertTrue(np.all(v >= vel_limit_min - tolerance))
+            self.assertTrue(np.all(v <= vel_limit_max + tolerance))
         for a in t.accelerations:
-            self.assertTrue(np.all(a >= traj_generator.min_acceleration - tolerance))
-            self.assertTrue(np.all(a <= traj_generator.max_acceleration + tolerance))
-        for i in range(len(t.accelerations)):
-            prev_acc = np.zeros(dof) if i == 0 else t.accelerations[i - 1]
-            curr_acc = t.accelerations[i]
-            jerk = np.abs((curr_acc - prev_acc) / t.dt)
-            self.assertTrue(np.all(jerk <= traj_generator.max_jerk + tolerance))
+            self.assertTrue(np.all(a >= acc_limit_min - tolerance))
+            self.assertTrue(np.all(a <= acc_limit_max + tolerance))
 
         # Ensure trajectory achieves the goal state.
         np.testing.assert_allclose(path[-1], t.positions[-1], rtol=1e-5, atol=1e-8)
