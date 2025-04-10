@@ -98,7 +98,9 @@ def main():
 
     print("Generating trajectory...")
     start = time.time()
-    trajectory = traj_generator.generate_trajectory(shortcut_path)
+    trajectory = mjpl.valid_trajectory(
+        shortcut_path, traj_generator, q_init, arm_jg, cr
+    )
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
     # Actuator indices in data.ctrl that correspond to the joints in the trajectory.
@@ -119,12 +121,6 @@ def main():
     for q_ref in trajectory.positions:
         data.ctrl[actuator_ids] = q_ref
         mujoco.mj_step(model, data)
-        # While the planner gives a sequence of waypoints are collision free, the
-        # generated trajectory may not. For more info, see:
-        # https://github.com/adlarkin/mjpl/issues/54
-        if not cr.obeys_ruleset(data.contact.geom):
-            print("Invalid collision occurred during trajectory execution.")
-            return
         q_t.append(data.qpos.copy())
 
     if visualize:
