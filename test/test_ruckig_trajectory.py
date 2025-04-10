@@ -6,7 +6,7 @@ import mjpl
 
 
 class TestRuckigTrajectoryGenerator(unittest.TestCase):
-    def test_generate_trajectory(self):
+    def test_build_trajectory(self):
         dof = 7
 
         traj_generator = mjpl.RuckigTrajectoryGenerator(
@@ -27,7 +27,7 @@ class TestRuckigTrajectoryGenerator(unittest.TestCase):
             rng.random(dof),
             rng.random(dof),
         ]
-        t = traj_generator.generate_trajectory(path)
+        t = traj_generator._build(path)
 
         # Ensure limits are enforced, with some tolerance for floating point error.
         tolerance = 1e-8

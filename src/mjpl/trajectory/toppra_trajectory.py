@@ -1,7 +1,7 @@
 import numpy as np
 import toppra as ta
 
-from .trajectory import Trajectory, TrajectoryGenerator
+from .trajectory_interface import Trajectory, TrajectoryGenerator
 
 
 class ToppraTrajectoryGenerator(TrajectoryGenerator):
@@ -40,7 +40,7 @@ class ToppraTrajectoryGenerator(TrajectoryGenerator):
             acceleration_limits
         )
 
-    def generate_trajectory(self, path: list[np.ndarray]) -> Trajectory:
+    def _build(self, path: list[np.ndarray]) -> Trajectory:
         instance = ta.algorithm.TOPPRA(
             constraint_list=[self.velocity_constraint, self.acceleration_constraint],
             path=ta.SplineInterpolator(np.linspace(0, 1, len(path)), path),

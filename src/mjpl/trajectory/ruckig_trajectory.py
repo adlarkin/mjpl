@@ -1,7 +1,7 @@
 import numpy as np
 from ruckig import InputParameter, OutputParameter, Result, Ruckig
 
-from .trajectory import Trajectory, TrajectoryGenerator
+from .trajectory_interface import Trajectory, TrajectoryGenerator
 
 
 class RuckigTrajectoryGenerator(TrajectoryGenerator):
@@ -35,7 +35,7 @@ class RuckigTrajectoryGenerator(TrajectoryGenerator):
         self.min_acceleration = min_acceleration or -max_acceleration
         self.max_jerk = max_jerk
 
-    def generate_trajectory(self, path: list[np.ndarray]) -> Trajectory:
+    def _build(self, path: list[np.ndarray]) -> Trajectory:
         dof = path[0].size
         otg = Ruckig(dof, self.dt, len(path))
         inp = InputParameter(dof)
