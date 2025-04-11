@@ -98,7 +98,9 @@ def main():
 
     print("Generating trajectory...")
     start = time.time()
-    trajectory = traj_generator.generate_trajectory(shortcut_path, q_init, arm_jg, cr)
+    trajectory = mjpl.generate_trajectory(
+        shortcut_path, traj_generator, q_init, arm_jg, cr
+    )
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
     # Actuator indices in data.ctrl that correspond to the joints in the trajectory.
