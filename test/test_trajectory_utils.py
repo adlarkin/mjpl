@@ -101,6 +101,9 @@ class TestTrajectoryUtils(unittest.TestCase):
         np.testing.assert_equal(path_copy[3], self.path[2])
         np.testing.assert_equal(path_copy[4], self.path[3])
 
+        with self.assertRaisesRegex(ValueError, "must be the same length"):
+            _add_intermediate_waypoint([], [0.0], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
