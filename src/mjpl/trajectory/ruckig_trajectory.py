@@ -1,7 +1,7 @@
 import numpy as np
 from ruckig import InputParameter, OutputParameter, Result, Ruckig
 
-from .trajectory import Trajectory, TrajectoryGenerator
+from .trajectory_interface import Trajectory, TrajectoryGenerator
 
 
 class RuckigTrajectoryGenerator(TrajectoryGenerator):

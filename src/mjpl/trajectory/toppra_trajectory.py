@@ -1,7 +1,7 @@
 import numpy as np
 import toppra as ta
 
-from .trajectory import Trajectory, TrajectoryGenerator
+from .trajectory_interface import Trajectory, TrajectoryGenerator
 
 
 class ToppraTrajectoryGenerator(TrajectoryGenerator):
