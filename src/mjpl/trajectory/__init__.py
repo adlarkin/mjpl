@@ -1,9 +1,9 @@
 from .ruckig_trajectory import RuckigTrajectoryGenerator
 from .toppra_trajectory import ToppraTrajectoryGenerator
-from .utils import generate_trajectory
+from .utils import generate_collision_free_trajectory
 
 __all__ = (
     "RuckigTrajectoryGenerator",
     "ToppraTrajectoryGenerator",
-    "generate_trajectory",
+    "generate_collision_free_trajectory",
 )

@@ -8,7 +8,7 @@ from .rrt import RRT, RRTOptions
 from .trajectory import (
     RuckigTrajectoryGenerator,
     ToppraTrajectoryGenerator,
-    generate_trajectory,
+    generate_collision_free_trajectory,
 )
 from .utils import random_valid_config, shortcut, site_pose
 
@@ -21,7 +21,7 @@ __all__ = (
     "RuckigTrajectoryGenerator",
     "ToppraTrajectoryGenerator",
     "cartesian_plan",
-    "generate_trajectory",
+    "generate_collision_free_trajectory",
     "random_valid_config",
     "site_pose",
     "shortcut",

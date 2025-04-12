@@ -98,7 +98,7 @@ def main():
 
     print("Generating trajectory...")
     start = time.time()
-    trajectory = mjpl.generate_trajectory(
+    trajectory = mjpl.generate_collision_free_trajectory(
         shortcut_path, traj_generator, q_init, arm_jg, cr
     )
     print(f"Trajectory generation took {(time.time() - start):.4f}s")

@@ -6,7 +6,7 @@ from ..joint_group import JointGroup
 from .trajectory_interface import Trajectory, TrajectoryGenerator
 
 
-def generate_trajectory(
+def generate_collision_free_trajectory(
     path: list[np.ndarray],
     generator: TrajectoryGenerator,
     q_init: np.ndarray,
