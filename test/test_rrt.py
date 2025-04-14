@@ -4,15 +4,12 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
-import mj_maniPlan.rrt as rrt
-from mj_maniPlan.collision_ruleset import CollisionRuleset
-from mj_maniPlan.joint_group import JointGroup
-from mj_maniPlan.utils import configuration_distance
+import mjpl
+from mjpl.tree import Node, Tree
 
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
 _BALL_XML = _MODEL_DIR / "ball.xml"
-_BALL_XY_PLANE_XML = _MODEL_DIR / "ball_xy_plane.xml"
 
 
 class TestRRT(unittest.TestCase):
@@ -22,16 +19,15 @@ class TestRRT(unittest.TestCase):
         self.obstacle = model.geom("wall_obstacle")
 
         planning_joints = [model.joint("ball_slide_x").id]
-        jg = JointGroup(model, planning_joints)
+        jg = mjpl.JointGroup(model, planning_joints)
 
-        cr = CollisionRuleset(model)
+        cr = mjpl.CollisionRuleset(model)
 
-        options = rrt.RRTOptions(
+        options = mjpl.RRTOptions(
             jg=jg,
             cr=cr,
             max_planning_time=5.0,
             epsilon=0.1,
-            shortcut_filler_epsilon=0.1,
             seed=42,
         )
 
@@ -40,42 +36,16 @@ class TestRRT(unittest.TestCase):
         # So there's only one value in data.qpos (the ball's x position)
         self.q_init = np.array([-0.1])
 
-        self.planner = rrt.RRT(options)
-
-    def load_ball_sliding_along_xy_model(self, epsilon, shortcut_filler_epsilon):
-        model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
-
-        planning_joints = [
-            model.joint("ball_slide_x").id,
-            model.joint("ball_slide_y").id,
-        ]
-        jg = JointGroup(model, planning_joints)
-
-        cr = CollisionRuleset(model)
-
-        options = rrt.RRTOptions(
-            jg=jg,
-            cr=cr,
-            max_planning_time=5.0,
-            epsilon=epsilon,
-            shortcut_filler_epsilon=shortcut_filler_epsilon,
-            seed=42,
-        )
-
-        # Initial joint configuration.
-        self.q_init = np.array([-0.1, 0.0])
-
-        self.planner = rrt.RRT(options)
+        self.planner = mjpl.RRT(options)
 
     def test_extend(self):
         self.load_ball_with_obstacle_model()
 
-        tree = rrt.Tree()
-        tree.add_node(rrt.Node(self.q_init, None))
+        tree = Tree(Node(self.q_init))
 
         q_goal = np.array([0.5])
         expected_q_extended = np.array([0.0])
-        extended_node = self.planner.extend(q_goal, tree)
+        extended_node = self.planner._extend(q_goal, tree)
         self.assertIsNotNone(extended_node)
         self.assertEqual(len(tree.nodes), 2)
         self.assertAlmostEqual(extended_node.q, expected_q_extended, places=9)
@@ -86,14 +56,14 @@ class TestRRT(unittest.TestCase):
             expected_q_extended,
             self.q_init,
         ]
-        path = tree.get_path(extended_node)
+        path = [n.q for n in tree.get_path(extended_node)]
         self.assertEqual(len(path), len(expected_path))
         for i in range(len(path)):
             self.assertAlmostEqual(path[i][0], expected_path[i][0], places=9)
 
         # extending towards a q that is already in the tree should do nothing
         existing_nodes = tree.nodes.copy()
-        same_extended_node = self.planner.extend(extended_node.q, tree)
+        same_extended_node = self.planner._extend(extended_node.q, tree)
         self.assertIsNotNone(same_extended_node)
         self.assertSetEqual(tree.nodes, existing_nodes)
         # The assertSetEqual above runs the equality operator on all elements of the set.
@@ -102,11 +72,10 @@ class TestRRT(unittest.TestCase):
         self.assertIs(same_extended_node, extended_node)
 
         # Test extend where the "nearest node" is already given
-        tree = rrt.Tree()
-        root_node = rrt.Node(np.array([0.0]), None)
-        tree.add_node(root_node)
-        tree.add_node(rrt.Node(np.array([2.0]), root_node))
-        extended_node = self.planner.extend(np.array([3.0]), tree, root_node)
+        root_node = Node(np.array([0.0]))
+        tree = Tree(root_node)
+        tree.add_node(Node(np.array([2.0]), root_node))
+        extended_node = self.planner._extend(np.array([3.0]), tree, root_node)
         self.assertIsNotNone(extended_node)
         self.assertIs(extended_node.parent, root_node)
         self.assertAlmostEqual(extended_node.q[0], 0.1, places=9)
@@ -114,11 +83,10 @@ class TestRRT(unittest.TestCase):
     def test_connect(self):
         self.load_ball_with_obstacle_model()
 
-        tree = rrt.Tree()
-        tree.add_node(rrt.Node(self.q_init, None))
+        tree = Tree(Node(self.q_init))
 
         q_goal = np.array([0.15])
-        goal_node = self.planner.connect(q_goal, tree)
+        goal_node = self.planner._connect(q_goal, tree)
 
         expected_qs_in_tree = [
             self.q_init,
@@ -133,55 +101,96 @@ class TestRRT(unittest.TestCase):
         # Check the path from the last connected node.
         # This implicitly checks each connected node's parent.
         expected_path = expected_qs_in_tree[::-1]
-        path = tree.get_path(goal_node)
+        path = [n.q for n in tree.get_path(goal_node)]
         self.assertEqual(len(path), len(expected_path))
         for i in range(len(path)):
             self.assertAlmostEqual(path[i][0], expected_path[i][0], places=9)
 
         # connecting towards a q that is already in the tree should do nothing
         existing_nodes = tree.nodes.copy()
-        same_connected_node = self.planner.connect(goal_node.q, tree)
+        same_connected_node = self.planner._connect(goal_node.q, tree)
         self.assertSetEqual(tree.nodes, existing_nodes)
         # The assertSetEqual above runs the equality operator on all elements of the set.
         # Since node equality is defined as having the same q, we should take the check a
         # step further to ensure that same_extended_node and extended_node are the same object.
         self.assertIs(same_connected_node, goal_node)
 
+    def test_connect_max_distance(self):
+        self.load_ball_with_obstacle_model()
+
+        tree = Tree(Node(self.q_init))
+        q_goal = np.array([0.15])
+
+        # Run one connect operation to a max distance.
+        goal_node = self.planner._connect(
+            q_goal, tree, eps=0.05, max_connection_distance=0.075
+        )
+
+        expected_qs_in_tree = [
+            self.q_init,
+            np.array([-0.05]),  # Moves one "eps"
+            np.array([-0.025]),  # Moves to max connection distance
+        ]
+        for q_tree in expected_qs_in_tree:
+            n = tree.nearest_neighbor(q_tree)
+            self.assertAlmostEqual(n.q[0], q_tree[0], places=9)
+
+        # Run a second and third connect which should still not get to the goal.
+        for _ in range(2):
+            goal_node = self.planner._connect(
+                q_goal, tree, eps=0.05, max_connection_distance=0.075
+            )
+
+        expected_qs_in_tree.extend(
+            [
+                np.array([0.025]),  # Moves one "eps"
+                np.array([0.05]),  # Moves to max connection distance
+                np.array([0.1]),  # Moves one more "eps"
+                np.array([0.125]),  # Moves to max connection distance
+            ]
+        )
+        for q_tree in expected_qs_in_tree:
+            n = tree.nearest_neighbor(q_tree)
+            self.assertAlmostEqual(n.q[0], q_tree[0], places=9)
+
+        # The final connect should finally reach the goal!
+        goal_node = self.planner._connect(
+            q_goal, tree, eps=0.05, max_connection_distance=0.075
+        )
+        self.assertAlmostEqual(goal_node.q[0], q_goal[0], places=9)
+
     def test_extend_and_connect_into_obstacle(self):
         self.load_ball_with_obstacle_model()
 
-        tree = rrt.Tree()
-        tree.add_node(rrt.Node(self.q_init, None))
+        tree = Tree(Node(self.q_init))
 
         # Try to connect to the maximum joint value for the ball.
         # There is an obstacle in the way, so the final connection should be just before
         # where the obstacle lies.
         q_goal = np.array([1.0])
-        connected_node = self.planner.connect(q_goal, tree)
+        connected_node = self.planner._connect(q_goal, tree)
         obstacle_min_x = self.obstacle.pos[0] - self.obstacle.size[0]
         self.assertLess(connected_node.q[0], obstacle_min_x)
 
         # Try to extend towards the goal.
         # This should not work since the extension is in collision.
         existing_nodes = tree.nodes.copy()
-        extended_node = self.planner.extend(q_goal, tree)
+        extended_node = self.planner._extend(q_goal, tree)
         self.assertIsNone(extended_node)
         self.assertSetEqual(tree.nodes, existing_nodes)
 
-    def test_get_path(self):
+    def test_combine_paths(self):
         self.load_ball_with_obstacle_model()
 
         q_new = np.array([0.15])
 
-        start_tree = rrt.Tree()
-        start_tree.add_node(rrt.Node(self.q_init, None))
-        connected_node_a = self.planner.connect(q_new, start_tree)
+        start_tree = Tree(Node(self.q_init))
+        connected_node_a = self.planner._connect(q_new, start_tree)
 
-        goal_tree = rrt.Tree()
-        goal_tree.add_node(rrt.Node(np.array([0.5]), None))
-        connected_node_b = self.planner.connect(q_new, goal_tree)
+        goal_tree = Tree(Node(np.array([0.5])))
+        connected_node_b = self.planner._connect(q_new, goal_tree)
 
-        path = self.planner.get_path(
+        path = self.planner._combine_paths(
             start_tree, connected_node_a, goal_tree, connected_node_b
         )
         expected_path = [
@@ -206,12 +215,12 @@ class TestRRT(unittest.TestCase):
         self.assertGreater(len(path), 2)
 
         # The path should start at q_init and end at q_goal
-        self.assertTrue(np.array_equal(path[0], self.q_init))
-        self.assertTrue(np.array_equal(path[-1], q_goal))
+        np.testing.assert_equal(path[0], self.q_init)
+        np.testing.assert_equal(path[-1], q_goal)
 
         for i in range(1, len(path)):
             self.assertLessEqual(
-                configuration_distance(path[i - 1], path[i]),
+                mjpl.utils.configuration_distance(path[i - 1], path[i]),
                 self.planner.options.epsilon,
             )
 
@@ -222,103 +231,8 @@ class TestRRT(unittest.TestCase):
         q_goal = np.array([-0.05])
         path = self.planner.plan_to_config(self.q_init, q_goal)
         self.assertEqual(len(path), 2)
-        self.assertTrue(np.array_equal(path[0], self.q_init))
-        self.assertTrue(np.array_equal(path[1], q_goal))
-
-    def test_shortcut(self):
-        self.load_ball_sliding_along_xy_model(0.1, 0.3)
-
-        """
-        Suboptimal path that can benefit from shortcutting
-        (waypoints in this path have a distance of the corresponding RRTOptions.epsilon)
-
-                          n_3 -> n_4 -> n_5
-                           ^             |
-                           |             v
-            n_0 -> n_1 -> n_2           n_6 -> n_7
-        """
-        tree = rrt.Tree()
-        n_0 = rrt.Node(self.q_init, None)
-        n_1 = rrt.Node(np.array([0.0, 0.0]), n_0)
-        n_2 = rrt.Node(np.array([0.1, 0.0]), n_1)
-        n_3 = rrt.Node(np.array([0.1, 0.1]), n_2)
-        n_4 = rrt.Node(np.array([0.2, 0.1]), n_3)
-        n_5 = rrt.Node(np.array([0.3, 0.1]), n_4)
-        n_6 = rrt.Node(np.array([0.3, 0.0]), n_5)
-        n_7 = rrt.Node(np.array([0.4, 0.0]), n_6)
-        nodes = [n_0, n_1, n_2, n_3, n_4, n_5, n_6, n_7]
-        for n in nodes:
-            tree.add_node(n)
-
-        path = tree.get_path(n_7)
-        path.reverse()
-        self.assertEqual(len(path), len(nodes))
-        for i in range(len(path)):
-            self.assertTrue(np.array_equal(path[i], nodes[i].q))
-
-        original_path = path.copy()
-
-        # Test case where waypoints are removed but filler waypoints are not added.
-        expected_shortcut_path = [
-            n_0.q,
-            n_1.q,
-            n_2.q,
-            n_6.q,
-            n_7.q,
-        ]
-        shortcut_path = self.planner.shortcut(path, start_idx=2, end_idx=6)
-        self.assertEqual(len(shortcut_path), len(expected_shortcut_path))
-        for i in range(len(shortcut_path)):
-            self.assertTrue(np.array_equal(shortcut_path[i], expected_shortcut_path[i]))
-
-        # Test case where waypoints are removed and filler waypoints are added.
-        expected_shortcut_path = [
-            n_0.q,
-            np.array([0.2, 0.0]),
-            n_7.q,
-        ]
-        shortcut_path = self.planner.shortcut(path, start_idx=0, end_idx=7)
-        self.assertEqual(len(shortcut_path), len(expected_shortcut_path))
-        # First and last waypoints of the shortcut path should match the first and last
-        # waypoints of the original path.
-        self.assertTrue(np.array_equal(shortcut_path[0], expected_shortcut_path[0]))
-        self.assertTrue(np.array_equal(shortcut_path[-1], expected_shortcut_path[-1]))
-        # Filler waypoint was added since the configuration distance between the first and
-        # last waypoint in the shortcut path is greater than RRTOptions.epsilon.
-        self.assertTrue(
-            (abs(shortcut_path[1] - expected_shortcut_path[1]) <= 1e-9).all()
-        )
-
-        # Shortcutting two adjacent waypoints should keep all of the original path waypoints
-        # since the filler epsilon is greater than the epsilon used for the original path.
-        unmodified_path = self.planner.shortcut(path, start_idx=6, end_idx=7)
-        self.assertEqual(len(unmodified_path), len(path))
-        for i in range(len(unmodified_path)):
-            self.assertTrue(np.array_equal(unmodified_path[i], path[i]))
-
-        # Test shortcutting with a filler epsilon of infinity.
-        # This has the effect of performing no waypoint filling on the initial shortcut path.
-        self.load_ball_sliding_along_xy_model(0.1, float("inf"))
-        shortcut_path = self.planner.shortcut(path, start_idx=0, end_idx=7)
-        # Since no filling is performed, the shortcut path is just the initial and final waypoint
-        # from the original path.
-        self.assertEqual(len(shortcut_path), 2)
-        self.assertTrue(np.array_equal(shortcut_path[0], path[0]))
-        self.assertTrue(np.array_equal(shortcut_path[-1], path[-1]))
-
-        # make sure invalid kwargs are caught
-        with self.assertRaisesRegex(ValueError, "Invalid kwargs"):
-            self.planner.shortcut(path)
-            self.planner.shortcut(path, num_attempts=1, start_idx=5, end_idx=6)
-            self.planner.shortcut(path, num_attempts=1, start_idx=5)
-            self.planner.shortcut(path, num_attempts=1, end_idx=5)
-            self.planner.shortcut(path, start_idx=5)
-            self.planner.shortcut(path, end_idx=5)
-
-        # shortcutting should create a new path and not modify the original
-        self.assertEqual(len(original_path), len(path))
-        for i in range(len(original_path)):
-            self.assertTrue(np.array_equal(original_path[i], path[i]))
+        np.testing.assert_equal(path[0], self.q_init)
+        np.testing.assert_equal(path[1], q_goal)
 
 
 if __name__ == "__main__":

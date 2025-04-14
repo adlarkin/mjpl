@@ -4,7 +4,7 @@ import mujoco
 import numpy as np
 from robot_descriptions.loaders.mujoco import load_robot_description
 
-from mj_maniPlan.collision_ruleset import CollisionRuleset
+import mjpl
 
 
 class TestCollisionRuleset(unittest.TestCase):
@@ -44,7 +44,7 @@ class TestCollisionRuleset(unittest.TestCase):
                 [self.link1, self.link2],
             ]
         )
-        cr = CollisionRuleset(self.model, valid_collision_bodies)
+        cr = mjpl.CollisionRuleset(self.model, valid_collision_bodies)
 
         geom_collision_matrix = np.empty((0, 2))
         self.assertTrue(cr.obeys_ruleset(geom_collision_matrix))
@@ -101,7 +101,7 @@ class TestCollisionRuleset(unittest.TestCase):
                 [self.left_finger, self.right_finger],
             ]
         )
-        cr = CollisionRuleset(self.model, valid_collision_bodies)
+        cr = mjpl.CollisionRuleset(self.model, valid_collision_bodies)
 
         geom_collision_matrix = np.empty((0, 2))
         self.assertTrue(cr.obeys_ruleset(geom_collision_matrix))
@@ -161,7 +161,7 @@ class TestCollisionRuleset(unittest.TestCase):
         self.assertFalse(cr.obeys_ruleset(geom_collision_matrix))
 
     def test_no_valid_collisions(self):
-        cr = CollisionRuleset(self.model)
+        cr = mjpl.CollisionRuleset(self.model)
 
         no_collisions = np.empty((0, 2))
         self.assertTrue(cr.obeys_ruleset(no_collisions))
@@ -180,7 +180,7 @@ class TestCollisionRuleset(unittest.TestCase):
                 [self.link5, self.link6],
             ]
         )
-        cr = CollisionRuleset(self.model, valid_collision_bodies)
+        cr = mjpl.CollisionRuleset(self.model, valid_collision_bodies)
 
         allowed_bodies = cr.allowed_collision_bodies
         self.assertTrue(np.array_equal(allowed_bodies, valid_collision_bodies))

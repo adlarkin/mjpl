@@ -1,17 +1,13 @@
 import time
 from pathlib import Path
 
+import example_utils as ex_utils
 import mujoco
 import mujoco.viewer
 import numpy as np
-from example_utils import parse_args
 
-import mj_maniPlan.visualization as viz
-from mj_maniPlan.collision_ruleset import CollisionRuleset
-from mj_maniPlan.joint_group import JointGroup
-from mj_maniPlan.rrt import RRT, RRTOptions
-from mj_maniPlan.trajectory import TrajectoryLimits, generate_trajectory
-from mj_maniPlan.utils import random_valid_config
+import mjpl
+import mjpl.visualization as viz
 
 _HERE = Path(__file__).parent
 _PANDA_XML = _HERE / "models" / "franka_emika_panda" / "scene_with_obstacles.xml"
@@ -19,8 +15,8 @@ _PANDA_EE_SITE = "ee_site"
 
 
 def main():
-    visualize, seed = parse_args(
-        description="Compute and follow a trajectory to a target pose."
+    visualize, seed = ex_utils.parse_args(
+        description="Compute and follow a trajectory to a goal pose."
     )
 
     model = mujoco.MjModel.from_xml_path(_PANDA_XML.as_posix())
@@ -35,43 +31,43 @@ def main():
         "joint7",
     ]
     arm_joint_ids = [model.joint(joint).id for joint in arm_joints]
-    arm_jg = JointGroup(model, arm_joint_ids)
+    arm_jg = mjpl.JointGroup(model, arm_joint_ids)
 
-    q_init = model.keyframe("home").qpos.copy()
-
-    # Generate a valid target pose that's derived from a valid joint configuration.
-    rng = np.random.default_rng(seed=seed)
-    data = mujoco.MjData(model)
-    q_rand = random_valid_config(rng, arm_jg, data, CollisionRuleset(model))
-    arm_jg.fk(q_rand, data)
-    target_pos = data.site(_PANDA_EE_SITE).xpos.copy()
-    target_rotmat = data.site(_PANDA_EE_SITE).xmat.copy()
+    # Let the "home" keyframe in the MJCF be the initial state.
+    home_keyframe = model.keyframe("home")
+    q_init = home_keyframe.qpos.copy()
 
     allowed_collisions = np.array(
         [
             [model.body("left_finger").id, model.body("right_finger").id],
         ]
     )
-    cr = CollisionRuleset(model, allowed_collisions)
+    cr = mjpl.CollisionRuleset(model, allowed_collisions)
+
+    # From the initial state, generate a valid goal pose that's derived from a
+    # valid joint configuration.
+    rng = np.random.default_rng(seed=seed)
+    data = mujoco.MjData(model)
+    mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
+    q_rand = mjpl.random_valid_config(rng, arm_jg, data, cr)
+    arm_jg.fk(q_rand, data)
+    goal_pose = mjpl.site_pose(data, _PANDA_EE_SITE)
 
     # Set up the planner.
-    epsilon = 0.05
-    planner_options = RRTOptions(
+    planner_options = mjpl.RRTOptions(
         jg=arm_jg,
         cr=cr,
         max_planning_time=10,
-        epsilon=epsilon,
-        shortcut_filler_epsilon=np.inf,
+        epsilon=0.05,
         seed=seed,
         goal_biasing_probability=0.1,
+        max_connection_distance=np.inf,
     )
-    planner = RRT(planner_options)
+    planner = mjpl.RRT(planner_options)
 
     print("Planning...")
     start = time.time()
-    path = planner.plan_to_pose(
-        q_init, _PANDA_EE_SITE, target_pos, target_rotmat.reshape(3, 3)
-    )
+    path = planner.plan_to_pose(q_init, goal_pose, _PANDA_EE_SITE)
     if not path:
         print("Planning failed")
         return
@@ -79,24 +75,32 @@ def main():
 
     print("Shortcutting...")
     start = time.time()
-    shortcut_path = planner.shortcut(path, num_attempts=len(path))
+    shortcut_path = mjpl.shortcut(
+        path,
+        arm_jg,
+        model,
+        cr,
+        validation_dist=planner_options.epsilon,
+        max_attempts=len(path),
+        seed=seed,
+    )
     print(f"Shortcutting took {(time.time() - start):.4f}s")
 
-    # These values are for demonstration purposes only.
+    # The trajectory limits used here are for demonstration purposes only.
     # In practice, consult your hardware spec sheet for this information.
     dof = len(arm_joints)
-    tr_limits = TrajectoryLimits(
-        jg=arm_jg,
-        min_velocity=-np.ones(dof) * np.pi,
+    traj_generator = mjpl.RuckigTrajectoryGenerator(
+        dt=model.opt.timestep,
         max_velocity=np.ones(dof) * np.pi,
-        min_acceleration=-np.ones(dof) * 0.5 * np.pi,
         max_acceleration=np.ones(dof) * 0.5 * np.pi,
-        jerk=np.ones(dof),
+        max_jerk=np.ones(dof),
     )
 
     print("Generating trajectory...")
     start = time.time()
-    traj = generate_trajectory(shortcut_path, tr_limits, model.opt.timestep)
+    trajectory = mjpl.generate_collision_free_trajectory(
+        shortcut_path, traj_generator, q_init, arm_jg, cr
+    )
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
     # Actuator indices in data.ctrl that correspond to the joints in the trajectory.
@@ -112,13 +116,12 @@ def main():
     actuator_ids = [model.actuator(act).id for act in actuators]
 
     # Follow the trajectory via position control, starting from the initial state.
-    data.qpos = q_init.copy()
-    mujoco.mj_forward(model, data)
-    q_t = [arm_jg.qpos(data)]
-    for q_ref in traj.configurations:
+    mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
+    q_t = [q_init]
+    for q_ref in trajectory.positions:
         data.ctrl[actuator_ids] = q_ref
         mujoco.mj_step(model, data)
-        q_t.append(arm_jg.qpos(data))
+        q_t.append(data.qpos.copy())
 
     if visualize:
         with mujoco.viewer.launch_passive(
@@ -131,27 +134,38 @@ def main():
             viewer.cam.elevation = -25
 
             # Visualize the initial EE pose.
-            arm_jg.fk(q_t[0], data)
+            data.qpos = q_init
             mujoco.mj_kinematics(model, data)
-            site = data.site(_PANDA_EE_SITE)
-            viz.add_frame(viewer.user_scn, site.xpos, site.xmat.reshape(3, 3))
+            initial_pose = mjpl.site_pose(data, _PANDA_EE_SITE)
+            viz.add_frame(
+                viewer.user_scn,
+                initial_pose.translation(),
+                initial_pose.rotation().as_matrix(),
+            )
 
-            # Visualize the target EE pose.
-            viz.add_frame(viewer.user_scn, target_pos, target_rotmat.reshape(3, 3))
+            # Visualize the goal EE pose.
+            viz.add_frame(
+                viewer.user_scn,
+                goal_pose.translation(),
+                goal_pose.rotation().as_matrix(),
+            )
 
             # Visualize the trajectory. The trajectory is of high resolution,
             # so plotting every other timestep should be sufficient.
-            for q_ref in traj.configurations[::2]:
+            for q_ref in trajectory.positions[::2]:
                 arm_jg.fk(q_ref, data)
                 pos = data.site(_PANDA_EE_SITE).xpos
-                viz.add_sphere(viewer.user_scn, pos, 0.004, [0.2, 0.6, 0.2, 0.2])
+                viz.add_sphere(
+                    viewer.user_scn, pos, radius=0.004, rgba=[0.2, 0.6, 0.2, 0.2]
+                )
 
             # Replay the robot following the trajectory.
             for q_actual in q_t:
                 start_time = time.time()
                 if not viewer.is_running():
                     return
-                arm_jg.fk(q_actual, data)
+                data.qpos = q_actual
+                mujoco.mj_kinematics(model, data)
                 viewer.sync()
                 time_until_next_step = model.opt.timestep - (time.time() - start_time)
                 if time_until_next_step > 0:

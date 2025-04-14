@@ -10,45 +10,58 @@ import mjpl
 import mjpl.visualization as viz
 
 _HERE = Path(__file__).parent
-_UR5_XML = _HERE / "models" / "universal_robots_ur5e" / "scene.xml"
-_UR5_EE_SITE = "attachment_site"
+_PANDA_XML = _HERE / "models" / "franka_emika_panda" / "scene.xml"
+_PANDA_EE_SITE = "ee_site"
+
+_NUM_GOALS = 5
 
 
 def main():
     visualize, seed = ex_utils.parse_args(
-        description="Compute and follow a trajectory to a target configuration."
+        description="Compute and follow a trajectory to a pose from a list of candidate goal poses."
     )
 
-    model = mujoco.MjModel.from_xml_path(_UR5_XML.as_posix())
+    model = mujoco.MjModel.from_xml_path(_PANDA_XML.as_posix())
 
     arm_joints = [
-        "shoulder_pan_joint",
-        "shoulder_lift_joint",
-        "elbow_joint",
-        "wrist_1_joint",
-        "wrist_2_joint",
-        "wrist_3_joint",
+        "joint1",
+        "joint2",
+        "joint3",
+        "joint4",
+        "joint5",
+        "joint6",
+        "joint7",
     ]
     arm_joint_ids = [model.joint(joint).id for joint in arm_joints]
     arm_jg = mjpl.JointGroup(model, arm_joint_ids)
-
-    cr = mjpl.CollisionRuleset(model)
 
     # Let the "home" keyframe in the MJCF be the initial state.
     home_keyframe = model.keyframe("home")
     q_init = home_keyframe.qpos.copy()
 
-    # From the initial state, generate a valid goal configuration.
+    allowed_collisions = np.array(
+        [
+            [model.body("left_finger").id, model.body("right_finger").id],
+        ]
+    )
+    cr = mjpl.CollisionRuleset(model, allowed_collisions)
+
+    # From the initial state, generate valid goal poses that are derived from
+    # valid joint configurations.
     rng = np.random.default_rng(seed=seed)
     data = mujoco.MjData(model)
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
-    q_goal = mjpl.random_valid_config(rng, arm_jg, data, cr)
+    goal_poses = []
+    for _ in range(_NUM_GOALS):
+        q_rand = mjpl.random_valid_config(rng, arm_jg, data, cr)
+        arm_jg.fk(q_rand, data)
+        goal_poses.append(mjpl.site_pose(data, _PANDA_EE_SITE))
 
     # Set up the planner.
     planner_options = mjpl.RRTOptions(
         jg=arm_jg,
         cr=cr,
-        max_planning_time=10.0,
+        max_planning_time=10,
         epsilon=0.05,
         seed=seed,
         goal_biasing_probability=0.1,
@@ -58,7 +71,7 @@ def main():
 
     print("Planning...")
     start = time.time()
-    path = planner.plan_to_config(q_init, q_goal)
+    path = planner.plan_to_poses(q_init, goal_poses, _PANDA_EE_SITE)
     if not path:
         print("Planning failed")
         return
@@ -96,12 +109,13 @@ def main():
 
     # Actuator indices in data.ctrl that correspond to the joints in the trajectory.
     actuators = [
-        "shoulder_pan",
-        "shoulder_lift",
-        "elbow",
-        "wrist_1",
-        "wrist_2",
-        "wrist_3",
+        "actuator1",
+        "actuator2",
+        "actuator3",
+        "actuator4",
+        "actuator5",
+        "actuator6",
+        "actuator7",
     ]
     actuator_ids = [model.actuator(act).id for act in actuators]
 
@@ -115,10 +129,7 @@ def main():
 
     if visualize:
         with mujoco.viewer.launch_passive(
-            model=model,
-            data=data,
-            show_left_ui=False,
-            show_right_ui=False,
+            model=model, data=data, show_left_ui=False, show_right_ui=False
         ) as viewer:
             # Update the viewer's orientation to capture the scene.
             viewer.cam.lookat = [0, 0, 0.35]
@@ -129,27 +140,26 @@ def main():
             # Visualize the initial EE pose.
             data.qpos = q_init
             mujoco.mj_kinematics(model, data)
-            initial_pose = mjpl.site_pose(data, _UR5_EE_SITE)
+            initial_pose = mjpl.site_pose(data, _PANDA_EE_SITE)
             viz.add_frame(
                 viewer.user_scn,
                 initial_pose.translation(),
                 initial_pose.rotation().as_matrix(),
             )
 
-            # Visualize the goal EE pose (derived from the goal config).
-            arm_jg.fk(q_goal, data)
-            goal_pose = mjpl.site_pose(data, _UR5_EE_SITE)
-            viz.add_frame(
-                viewer.user_scn,
-                goal_pose.translation(),
-                goal_pose.rotation().as_matrix(),
-            )
+            # Visualize the goal EE poses.
+            for ee_pose in goal_poses:
+                viz.add_frame(
+                    viewer.user_scn,
+                    ee_pose.translation(),
+                    ee_pose.rotation().as_matrix(),
+                )
 
             # Visualize the trajectory. The trajectory is of high resolution,
             # so plotting every other timestep should be sufficient.
             for q_ref in trajectory.positions[::2]:
                 arm_jg.fk(q_ref, data)
-                pos = data.site(_UR5_EE_SITE).xpos
+                pos = data.site(_PANDA_EE_SITE).xpos
                 viz.add_sphere(
                     viewer.user_scn, pos, radius=0.004, rgba=[0.2, 0.6, 0.2, 0.2]
                 )
