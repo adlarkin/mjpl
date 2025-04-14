@@ -10,7 +10,7 @@ from mjpl.planning.utils import _combine_paths, _connect, _extend
 
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
-_BALL_XML = _MODEL_DIR / "ball.xml"
+_BALL_XML = _MODEL_DIR / "ball_with_obstacle.xml"
 
 
 class TestPlanningUtils(unittest.TestCase):

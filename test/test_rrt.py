@@ -8,7 +8,7 @@ import mjpl
 
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
-_BALL_XML = _MODEL_DIR / "ball.xml"
+_BALL_XML = _MODEL_DIR / "ball_with_obstacle.xml"
 
 
 class TestRRT(unittest.TestCase):
