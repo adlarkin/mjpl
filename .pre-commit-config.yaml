@@ -14,14 +14,17 @@ repos:
         pass_filenames: false  # We don't pass filenames to unittest
 
 
-# Configures automatic testing with pre-commit.ci
+# Configures pre-commit in CI: https://pre-commit.ci/
 ci:
   autofix_commit_msg: |
-    [pre-commit.ci] auto fixes from pre-commit.com hooks
-    for more information, see https://pre-commit.ci
+   [pre-commit.ci] auto fixes from pre-commit.com hooks
+   
+   for more information, see https://pre-commit.ci
   autofix_prs: true
   autoupdate_branch: ''
   autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
   autoupdate_schedule: weekly
+  # pre-commit.ci doesn't install project dependencies, so in order to run tests
+  # (which requires test dependencies), we have to define test execution in GitHub actions
   skip: ['run-tests']
   submodules: false
