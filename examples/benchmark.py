@@ -64,15 +64,14 @@ if __name__ == "__main__":
         arm_jg.fk(q_goal, data)
         goal_pose = mjpl.site_pose(data, _PANDA_EE_SITE)
 
-        planner_options = mjpl.RRTOptions(
-            jg=arm_jg,
-            cr=cr,
+        planner = mjpl.RRT(
+            arm_jg,
+            cr,
             max_planning_time=max_planning_time,
             epsilon=epsilon,
             seed=seed,
             goal_biasing_probability=goal_biasing_probability,
         )
-        planner = mjpl.RRT(planner_options)
 
         print(f"Attempt {i}...")
         start_time = time.time()

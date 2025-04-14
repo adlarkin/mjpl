@@ -5,7 +5,8 @@ import mujoco
 import numpy as np
 
 import mjpl
-from mjpl.tree import Node, Tree
+from mjpl.planning.tree import Node, Tree
+from mjpl.planning.utils import _combine_paths, _connect, _extend
 
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
@@ -27,7 +28,7 @@ class TestRRT(unittest.TestCase):
         # Test a valid EXTEND.
         q_goal = np.array([0.5])
         expected_q_extended = np.array([0.0])
-        extended_node = mjpl.rrt._extend(q_goal, tree, root_node, epsilon, jg, cr, data)
+        extended_node = _extend(q_goal, tree, root_node, epsilon, jg, cr, data)
         self.assertIsNotNone(extended_node)
         self.assertSetEqual(tree.nodes, {root_node, extended_node})
         np.testing.assert_allclose(
@@ -37,7 +38,7 @@ class TestRRT(unittest.TestCase):
 
         # Running EXTEND when q_target == start_node.q should do nothing.
         existing_nodes = tree.nodes.copy()
-        same_extended_node = mjpl.rrt._extend(
+        same_extended_node = _extend(
             extended_node.q, tree, extended_node, epsilon, jg, cr, data
         )
         self.assertIsNotNone(same_extended_node)
@@ -49,9 +50,7 @@ class TestRRT(unittest.TestCase):
         q_init = np.array([0.75])
         root_node = Node(q_init)
         tree = Tree(root_node)
-        extended_node = mjpl.rrt._extend(
-            np.array([0.9]), tree, root_node, epsilon, jg, cr, data
-        )
+        extended_node = _extend(np.array([0.9]), tree, root_node, epsilon, jg, cr, data)
         self.assertIsNone(extended_node)
         self.assertSetEqual(tree.nodes, {root_node})
 
@@ -68,7 +67,7 @@ class TestRRT(unittest.TestCase):
 
         # Test a valid CONNECT.
         q_goal = np.array([0.15])
-        connected_node = mjpl.rrt._connect(q_goal, tree, epsilon, np.inf, jg, cr, data)
+        connected_node = _connect(q_goal, tree, epsilon, np.inf, jg, cr, data)
         np.testing.assert_allclose(connected_node.q, q_goal, rtol=0, atol=1e-9)
         # Check the path from the last connected node.
         # This implicitly checks each connected node's parent.
@@ -86,7 +85,7 @@ class TestRRT(unittest.TestCase):
         # Running CONNECT when q_target corresponds to a node that's already
         # in the tree should do nothing.
         existing_nodes = tree.nodes.copy()
-        same_connected_node = mjpl.rrt._connect(
+        same_connected_node = _connect(
             connected_node.q, tree, epsilon, np.inf, jg, cr, data
         )
         self.assertIn(same_connected_node, existing_nodes)
@@ -99,7 +98,7 @@ class TestRRT(unittest.TestCase):
         q_goal = np.array([0.5])
         max_connection_dist = 0.45
         max_connected_q = q_init + max_connection_dist
-        connected_node = mjpl.rrt._connect(
+        connected_node = _connect(
             q_goal, tree, epsilon, max_connection_dist, jg, cr, data
         )
         np.testing.assert_allclose(connected_node.q, max_connected_q, rtol=0, atol=1e-9)
@@ -126,7 +125,7 @@ class TestRRT(unittest.TestCase):
         obstacle = model.geom("wall_obstacle")
         obstacle_min_x = obstacle.pos[0] - obstacle.size[0]
         q_goal = np.array([1.0])
-        connected_node = mjpl.rrt._connect(q_goal, tree, epsilon, np.inf, jg, cr, data)
+        connected_node = _connect(q_goal, tree, epsilon, np.inf, jg, cr, data)
         self.assertNotEqual(connected_node, root_node)
         self.assertGreater(len(tree.nodes), 1)
         np.testing.assert_array_less(connected_node.q, obstacle_min_x)
@@ -148,7 +147,7 @@ class TestRRT(unittest.TestCase):
             child_goal.q,
             root_goal.q,
         ]
-        path = mjpl.rrt._combine_paths(start_tree, child_start, goal_tree, child_goal)
+        path = _combine_paths(start_tree, child_start, goal_tree, child_goal)
         self.assertTrue(len(path), len(expected_path))
         for i in range(len(path)):
             np.testing.assert_array_equal(path[i], expected_path[i])
@@ -168,9 +167,7 @@ class TestRRT(unittest.TestCase):
             child_goal.q,
             root_goal.q,
         ]
-        path = mjpl.rrt._combine_paths(
-            start_tree, grandchild_start, goal_tree, grandchild_goal
-        )
+        path = _combine_paths(start_tree, grandchild_start, goal_tree, grandchild_goal)
         self.assertTrue(len(path), len(expected_path))
         for i in range(len(path)):
             np.testing.assert_array_equal(path[i], expected_path[i])

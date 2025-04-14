@@ -6,6 +6,7 @@ from mink.lie import SE3, SO3
 from robot_descriptions.loaders.mujoco import load_robot_description
 
 import mjpl
+from mjpl.planning.cartesian_planner import _interpolate_poses
 
 
 def poses_exactly_equal(p1: SE3, p2: SE3) -> None:
@@ -38,7 +39,7 @@ class TestCartesianPlanner(unittest.TestCase):
 
         # Thresholds of inf mean no interpolation occurs, so we should just get
         # the start and end pose
-        poses = mjpl.cartesian_planner._interpolate_poses(
+        poses = _interpolate_poses(
             start_pose, end_pose, lin_threshold=np.inf, ori_threshold=np.inf
         )
         self.assertEqual(len(poses), 2)
@@ -46,7 +47,7 @@ class TestCartesianPlanner(unittest.TestCase):
         poses_exactly_equal(poses[1], end_pose)
 
         # Interpolate based on position
-        poses = mjpl.cartesian_planner._interpolate_poses(
+        poses = _interpolate_poses(
             start_pose, end_pose, lin_threshold=0.65, ori_threshold=np.inf
         )
         self.assertEqual(len(poses), 3)
@@ -58,7 +59,7 @@ class TestCartesianPlanner(unittest.TestCase):
         poses_approximately_equal(poses[1], halfway_pose)
 
         # Interpolate based on orientation
-        poses = mjpl.cartesian_planner._interpolate_poses(
+        poses = _interpolate_poses(
             start_pose, end_pose, lin_threshold=np.inf, ori_threshold=np.pi * 0.3
         )
         self.assertEqual(len(poses), 5)
@@ -85,7 +86,7 @@ class TestCartesianPlanner(unittest.TestCase):
         # In this scenario, we should get the same behavior as the scenario
         # above (where only orientation was applied) since orientation requires
         # more interpolation steps than linear.
-        poses = mjpl.cartesian_planner._interpolate_poses(
+        poses = _interpolate_poses(
             start_pose, end_pose, lin_threshold=0.65, ori_threshold=np.pi * 0.3
         )
         self.assertEqual(len(poses), 5)
@@ -96,17 +97,17 @@ class TestCartesianPlanner(unittest.TestCase):
         poses_approximately_equal(poses[3], intermediate_poses[2])
 
         with self.assertRaisesRegex(ValueError, "`lin_threshold` must be > 0"):
-            mjpl.cartesian_planner._interpolate_poses(
+            _interpolate_poses(
                 start_pose, end_pose, lin_threshold=0.0, ori_threshold=np.inf
             )
-            mjpl.cartesian_planner._interpolate_poses(
+            _interpolate_poses(
                 start_pose, end_pose, lin_threshold=-1.0, ori_threshold=np.inf
             )
         with self.assertRaisesRegex(ValueError, "`ori_threshold` must be > 0"):
-            mjpl.cartesian_planner._interpolate_poses(
+            _interpolate_poses(
                 start_pose, end_pose, lin_threshold=np.inf, ori_threshold=0.0
             )
-            mjpl.cartesian_planner._interpolate_poses(
+            _interpolate_poses(
                 start_pose, end_pose, lin_threshold=np.inf, ori_threshold=-1.0
             )
 

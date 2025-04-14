@@ -58,16 +58,7 @@ def main():
         goal_poses.append(mjpl.site_pose(data, _PANDA_EE_SITE))
 
     # Set up the planner.
-    planner_options = mjpl.RRTOptions(
-        jg=arm_jg,
-        cr=cr,
-        max_planning_time=10,
-        epsilon=0.05,
-        seed=seed,
-        goal_biasing_probability=0.1,
-        max_connection_distance=np.inf,
-    )
-    planner = mjpl.RRT(planner_options)
+    planner = mjpl.RRT(arm_jg, cr, seed=seed, goal_biasing_probability=0.1)
 
     print("Planning...")
     start = time.time()
@@ -84,7 +75,7 @@ def main():
         arm_jg,
         model,
         cr,
-        validation_dist=planner_options.epsilon,
+        validation_dist=planner.epsilon,
         max_attempts=len(path),
         seed=seed,
     )

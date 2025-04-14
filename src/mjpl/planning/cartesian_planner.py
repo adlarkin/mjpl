@@ -2,7 +2,7 @@ import numpy as np
 from mink.lie import SE3, SO3
 from scipy.spatial.transform import Rotation, Slerp
 
-from .inverse_kinematics.ik_solver import IKSolver
+from ..inverse_kinematics.ik_solver import IKSolver
 
 
 def _interpolate_poses(
