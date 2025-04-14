@@ -278,9 +278,8 @@ def _extend(
         eps: The maximum distance `start_node` will extend towards `q_target`.
 
     Returns:
-        The node that was the result of extending `start_node` towards
-        `q_target`, or None if extension wasn't possible. This node also
-        belongs to `tree`.
+        The node that was the result of extending `start_node` towards `q_target`,
+        or None if extension wasn't possible. This node also belongs to `tree`.
     """
     if np.array_equal(start_node.q, q_target):
         return start_node
