@@ -73,8 +73,8 @@ def main():
     shortcut_path = mjpl.shortcut(
         path,
         arm_jg,
-        model,
         cr,
+        q_init=q_init,
         validation_dist=planner.epsilon,
         max_attempts=len(path),
         seed=seed,
