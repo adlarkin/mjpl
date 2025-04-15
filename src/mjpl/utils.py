@@ -6,10 +6,6 @@ from .collision_ruleset import CollisionRuleset
 from .joint_group import JointGroup
 
 
-def configuration_distance(q_from: np.ndarray, q_to: np.ndarray):
-    return np.linalg.norm(q_to - q_from)
-
-
 def step(start: np.ndarray, target: np.ndarray, max_step_dist: float) -> np.ndarray:
     """Step a vector towards a target.
 
@@ -93,9 +89,6 @@ def _connect_waypoints(
 ) -> list[np.ndarray]:
     """If possible, directly connect two specific waypoints from a path.
 
-    This is meant to be a helper function for things like `shortcut` and
-    `fill_path`.
-
     Args:
         path: The path with waypoints to connect.
         start_idx: The index of the first waypoint.
@@ -173,9 +166,6 @@ def shortcut(
 
     Returns:
         A path with direct connections between each adjacent waypoint.
-
-    Notes:
-        Shortuctting does not perform waypoint filling. See `fill_path`.
     """
     data = mujoco.MjData(model)
     rng = np.random.default_rng(seed=seed)
@@ -213,31 +203,3 @@ def shortcut(
         )
 
     return shortened_path
-
-
-# TODO: consider removing this method if it's not needed
-def fill_path(
-    path: list[np.ndarray], max_dist_between_points: float
-) -> list[np.ndarray]:
-    """Perform waypoint filling on a path.
-
-    Args:
-        path: The path to fill.
-        max_dist_between_points: The distance between filler waypoints.
-
-    Returns:
-        A path with intermediate waypoints between adjacent waypoints in
-        `path` that are further than `max_dist_between_points` apart.
-    """
-    filled_path = [path[0]]
-    for i in range(len(path) - 1):
-        filled_segment = _connect_waypoints(
-            path=[path[i], path[i + 1]],
-            start_idx=0,
-            end_idx=1,
-            fill=True,
-            min_fill_dist=max_dist_between_points,
-        )
-        filled_path.extend(filled_segment[1:])
-
-    return filled_path

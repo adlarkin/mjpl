@@ -244,53 +244,6 @@ class TestUtils(unittest.TestCase):
             intermediate_q = shortcut_path[i]
             self.assertIn(tuple(intermediate_q), original_intermediate_qs)
 
-    def test_fill_path(self):
-        path = [
-            np.array([-0.1, 0.0]),
-            np.array([0.4, 0.0]),
-            np.array([0.6, 0.0]),
-        ]
-
-        # perform a fill that adds one intermediate waypoint
-        filled_path = mjpl.utils.fill_path(path, max_dist_between_points=0.3)
-        self.assertEqual(len(filled_path), 4)
-        np.testing.assert_equal(filled_path[0], path[0])
-        np.testing.assert_allclose(
-            filled_path[1], np.array([0.2, 0.0]), rtol=0, atol=1e-8
-        )
-        np.testing.assert_equal(filled_path[2], path[1])
-        np.testing.assert_equal(filled_path[3], path[2])
-
-        # perform a fill that adds no intermediate waypoints
-        # (dist > adjacent waypoint distance)
-        filled_path = mjpl.utils.fill_path(path, max_dist_between_points=0.75)
-        self.assertEqual(len(filled_path), len(path))
-        np.testing.assert_equal(filled_path[0], path[0])
-        np.testing.assert_equal(filled_path[1], path[1])
-        np.testing.assert_equal(filled_path[2], path[2])
-
-        # perform a fill that adds multiple intermediate waypoints
-        filled_path = mjpl.utils.fill_path(path, max_dist_between_points=0.1)
-        self.assertEqual(len(filled_path), 8)
-        np.testing.assert_equal(filled_path[0], path[0])
-        np.testing.assert_allclose(
-            filled_path[1], np.array([0.0, 0.0]), rtol=0, atol=1e-8
-        )
-        np.testing.assert_allclose(
-            filled_path[2], np.array([0.1, 0.0]), rtol=0, atol=1e-8
-        )
-        np.testing.assert_allclose(
-            filled_path[3], np.array([0.2, 0.0]), rtol=0, atol=1e-8
-        )
-        np.testing.assert_allclose(
-            filled_path[4], np.array([0.3, 0.0]), rtol=0, atol=1e-8
-        )
-        np.testing.assert_equal(filled_path[5], path[1])
-        np.testing.assert_allclose(
-            filled_path[6], np.array([0.5, 0.0]), rtol=0, atol=1e-8
-        )
-        np.testing.assert_equal(filled_path[7], path[2])
-
 
 if __name__ == "__main__":
     unittest.main()
