@@ -9,7 +9,51 @@ import mjpl
 
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
-_BALL_XY_PLANE_XML = _MODEL_DIR / "ball_xy_plane.xml"
+_BALL_XY_PLANE_XML = _MODEL_DIR / "two_dof_ball.xml"
+
+
+def directly_connectable_path() -> list[np.ndarray]:
+    """
+    Path that can be directly connected between the start and end.
+    "X" represents an obstacle.
+
+                  p2 -> p3 --> p4
+                  ^            |
+                  |     X      |
+            p0 -> p1    X      |
+                        X      |
+                               v
+                        p6 <-- p5
+    """
+    p0 = np.array([0.0, 0.0])
+    p1 = np.array([0.25, 0.0])
+    p2 = np.array([0.25, 0.75])
+    p3 = np.array([0.5, 0.75])
+    p4 = np.array([1.0, 0.75])
+    p5 = np.array([1.0, -0.75])
+    p6 = np.array([0.5, -0.75])
+    return [p0, p1, p2, p3, p4, p5, p6]
+
+
+def shortcuttable_path() -> list[np.ndarray]:
+    """
+    Path that can benefit from shortcutting.
+    "X" represents an obstacle.
+
+                  p2 -> p3 --> p4
+                  ^            |
+                  |     X      v
+            p0 -> p1    X      p5 -> p6
+                        X
+    """
+    p0 = np.array([0.0, 0.0])
+    p1 = np.array([0.25, 0.0])
+    p2 = np.array([0.25, 0.75])
+    p3 = np.array([0.5, 0.75])
+    p4 = np.array([1.0, 0.75])
+    p5 = np.array([1.0, 0.0])
+    p6 = np.array([1.0, 0.25])
+    return [p0, p1, p2, p3, p4, p5, p6]
 
 
 class TestUtils(unittest.TestCase):
@@ -52,12 +96,26 @@ class TestUtils(unittest.TestCase):
         jg = mjpl.JointGroup(model, planning_joints)
         cr = mjpl.CollisionRuleset(model)
 
+        # Waypoint connection should fail if an obstacle is present.
+        path = shortcuttable_path()
+        connected_path = mjpl.utils._connect_waypoints(
+            path,
+            start_idx=1,
+            end_idx=5,
+            fill=False,
+            min_fill_dist=0.1,
+            jg=jg,
+            data=mujoco.MjData(model),
+            cr=cr,
+        )
+        self.assertListEqual(path, connected_path)
+
         path = [
-            np.array([0.0, 0.0]),
-            np.array([1.0, 0.0]),
-            np.array([2.0, 0.0]),
+            np.array([0.0, 1.0]),
+            np.array([1.0, 1.0]),
+            np.array([2.0, 1.0]),
             # This is outside of the model's joint limits
-            np.array([3.0, 0.0]),
+            np.array([3.0, 1.0]),
         ]
 
         # connect with validation checking and no filling
@@ -71,10 +129,7 @@ class TestUtils(unittest.TestCase):
             data=mujoco.MjData(model),
             cr=cr,
         )
-        self.assertEqual(len(connected_path), 3)
-        np.testing.assert_equal(connected_path[0], path[0])
-        np.testing.assert_equal(connected_path[1], path[2])
-        np.testing.assert_equal(connected_path[2], path[3])
+        self.assertListEqual(connected_path, [path[0], path[2], path[3]])
 
         # connect with validation checking and filling
         connected_path = mjpl.utils._connect_waypoints(
@@ -90,10 +145,10 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(len(connected_path), 5)
         np.testing.assert_equal(connected_path[0], path[0])
         np.testing.assert_allclose(
-            connected_path[1], np.array([0.7, 0.0]), rtol=0, atol=1e-8
+            connected_path[1], np.array([0.7, 1.0]), rtol=0, atol=1e-8
         )
         np.testing.assert_allclose(
-            connected_path[2], np.array([1.4, 0.0]), rtol=0, atol=1e-8
+            connected_path[2], np.array([1.4, 1.0]), rtol=0, atol=1e-8
         )
         np.testing.assert_equal(connected_path[3], path[2])
         np.testing.assert_equal(connected_path[4], path[3])
@@ -112,11 +167,7 @@ class TestUtils(unittest.TestCase):
             data=mujoco.MjData(model),
             cr=cr,
         )
-        self.assertEqual(len(connected_path), len(path))
-        np.testing.assert_equal(connected_path[0], path[0])
-        np.testing.assert_equal(connected_path[1], path[1])
-        np.testing.assert_equal(connected_path[2], path[2])
-        np.testing.assert_equal(connected_path[3], path[3])
+        self.assertListEqual(connected_path, path)
 
         # connect without validation checking on the waypoint that violates
         # joint limits
@@ -129,10 +180,7 @@ class TestUtils(unittest.TestCase):
             jg=None,
             data=None,
         )
-        self.assertEqual(len(connected_path), 3)
-        np.testing.assert_equal(connected_path[0], path[0])
-        np.testing.assert_equal(connected_path[1], path[1])
-        np.testing.assert_equal(connected_path[2], path[3])
+        self.assertListEqual(connected_path, [path[0], path[1], path[3]])
 
         with self.assertRaisesRegex(
             ValueError, "`jg` and `data` must either be None or not None"
@@ -166,32 +214,11 @@ class TestUtils(unittest.TestCase):
         jg = mjpl.JointGroup(model, planning_joints)
         cr = mjpl.CollisionRuleset(model)
 
-        """
-        Path that can benefit from shortcutting.
+        path = directly_connectable_path()
 
-                p2 -> p3 -> p4 -> p5
-                ^                 |
-                |                 |
-                p1 <- p0          |
-                                  |
-                                  v
-                                  p6
-        """
-        p0 = np.array([0.0, 0.0])
-        p1 = np.array([-0.1, 0.0])
-        p2 = np.array([-0.1, 0.1])
-        p3 = np.array([0.0, 0.1])
-        p4 = np.array([0.1, 0.1])
-        p5 = np.array([0.2, 0.1])
-        p6 = np.array([0.2, -0.1])
-        path = [p0, p1, p2, p3, p4, p5, p6]
-
-        # all waypoints in the path are valid and directly connectable, so this
-        # should result in a direct connection between path[0] and path[-1]
+        # The first and last waypoints in the path can be connected directly.
         shortened_path = mjpl.shortcut(path, jg, model, cr, seed=5)
-        self.assertTrue(len(shortened_path), 2)
-        np.testing.assert_equal(shortened_path[0], path[0])
-        np.testing.assert_equal(shortened_path[1], path[-1])
+        self.assertListEqual(shortened_path, [path[0], path[-1]])
 
         # Add a final point to the path that violates joint limits.
         # This means that after enough tries, the first and penultimate
@@ -200,10 +227,15 @@ class TestUtils(unittest.TestCase):
         shortened_path = mjpl.shortcut(
             invalid_path, jg, model, cr, max_attempts=20, seed=42
         )
-        self.assertTrue(len(shortened_path), 3)
-        np.testing.assert_equal(shortened_path[0], invalid_path[0])
-        np.testing.assert_equal(shortened_path[1], invalid_path[-2])
-        np.testing.assert_equal(shortened_path[2], invalid_path[-1])
+        self.assertListEqual(
+            shortened_path, [invalid_path[0], invalid_path[-2], invalid_path[-1]]
+        )
+
+        # Test shortcutting on a path that can be shortened, but is not
+        # directly connectable from the start to end.
+        path = shortcuttable_path()
+        shortened_path = mjpl.shortcut(path, jg, model, cr, seed=5)
+        self.assertListEqual(shortened_path, [path[0], path[2], path[4], path[6]])
 
     def test_shortcut_6dof(self):
         model = load_robot_description("ur5e_mj_description")
@@ -240,8 +272,7 @@ class TestUtils(unittest.TestCase):
         np.testing.assert_equal(shortcut_path[-1], path[-1])
         # (must convert numpy arrays to tuples to make them hashable)
         original_intermediate_qs = {tuple(q) for q in path[1:-1]}
-        for i in range(1, len(shortcut_path) - 1):
-            intermediate_q = shortcut_path[i]
+        for intermediate_q in shortcut_path[1:-1]:
             self.assertIn(tuple(intermediate_q), original_intermediate_qs)
 
 
