@@ -23,6 +23,9 @@ def _extend(
         tree: The tree with a node to extend towards `q_target`.
         start_node: The node in `tree` to extend towards `q_target`.
         eps: The maximum distance `start_node` will extend towards `q_target`.
+        jg: The JointGroup corresponding to the configurations of interest.
+        cr: The CollisionRuleset configurations must obey.
+        data: MuJoCo data. Used for validation checking.
 
     Returns:
         The node that was the result of extending `start_node` towards `q_target`,
@@ -55,13 +58,12 @@ def _connect(
             to `q_target`.
         eps: The maximum distance between nodes added to `tree`. If the
             distance between the start node in `tree` and `q_target` is greater
-            than `eps`, multiple nodes will be added to `tree`. If this isn't
-            defined, the planner's epsilon parameter will be used
-            (see `RRTOptions.epsilon`).
-        max_connection_distance: The maximum distance to cover before
-            terminating the connect operation. If this isn't defined, the
-            planner's max_connection_distance parameter will be used (see
-            `RRTOptions.max_connection_distance`).
+            than `eps`, multiple nodes will be added to `tree`.
+        max_connection_distance: The maximum distance to cover before terminating
+            the connect operation.
+        jg: The JointGroup corresponding to the configurations of interest.
+        cr: The CollisionRuleset configurations must obey.
+        data: MuJoCo data. Used for validation checking.
 
     Returns:
         The node that is the result of connecting a node from `tree` towards

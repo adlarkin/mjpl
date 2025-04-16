@@ -85,7 +85,7 @@ class RRT:
             empty list is returned.
 
             A path is defined as a list of configurations that correspond to the
-            joints in the planner's JointGroup (see `RRTOptions.jg`).
+            joints in the planner's JointGroup.
         """
         return self.plan_to_poses(q_init_world, [pose], site, solver)
 
@@ -97,14 +97,14 @@ class RRT:
         Args:
             q_init_world: Initial joint configuration of the world.
             q_goals: Goal joint configuration, which should specify values for
-                each joint in the planner's JointGroup (see `RRTOptions.jg`).
+                each joint in the planner's JointGroup.
 
         Returns:
             A path from `q_init_world` to `q_goal`. If a path cannot be found, an
             empty list is returned.
 
             A path is defined as a list of configurations that correspond to the
-            joints in the planner's joint group (see `RRTOptions.jg`).
+            joints in the planner's joint group.
         """
         return self.plan_to_configs(q_init_world, [q_goal])
 
@@ -129,7 +129,7 @@ class RRT:
             any of the poses, an empty list is returned.
 
             A path is defined as a list of configurations that correspond to the
-            joints in the planner's JointGroup (see `RRTOptions.jg`).
+            joints in the planner's JointGroup.
         """
         if solver is None:
             solver = MinkIKSolver(
@@ -158,7 +158,7 @@ class RRT:
         Args:
             q_init_world: Initial joint configuration of the world.
             q_goals: Goal joint configurations, which should specify values for
-                each joint in the planner's JointGroup (see `RRTOptions.jg`).
+                each joint in the planner's JointGroup.
 
         Returns:
             A path from `q_init_world` to a configuration in `q_goals`. The
@@ -166,7 +166,7 @@ class RRT:
             be found to any of the configurations, an empty list is returned.
 
             A path is defined as a list of configurations that correspond to the
-            joints in the planner's joint group (see `RRTOptions.jg`).
+            joints in the planner's JointGroup.
         """
         assert q_init_world.size == self.jg.model.nq
         for q in q_goals:

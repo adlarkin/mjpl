@@ -9,9 +9,9 @@ from .trajectory_interface import Trajectory, TrajectoryGenerator
 def generate_collision_free_trajectory(
     path: list[np.ndarray],
     generator: TrajectoryGenerator,
-    q_init: np.ndarray,
     jg: JointGroup,
     cr: CollisionRuleset,
+    q_init: np.ndarray | None = None,
 ) -> Trajectory:
     """Generate a trajectory that follows a path and obeys a collision ruleset.
 
@@ -30,9 +30,10 @@ def generate_collision_free_trajectory(
     Args:
         path: The path the trajectory must follow.
         generator: Trajectory generator.
-        q_init: The initial joint configuration of the world.
         jg: The joints used for the path and trajectory.
         cr: The collision ruleset the trajectory must adhere to.
+        q_init: Full initial configuration. Used to set values of joints that are
+            not in `jg`.
 
     Returns:
         A trajectory that follows `path` without violating `cr`.
