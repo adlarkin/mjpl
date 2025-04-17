@@ -44,17 +44,15 @@ class RRT:
                 This must be a value between [0.0, 1.0].
             max_connection_distance: The maximum distance for extending a tree using CONNECT.
         """
-        if (
-            max_planning_time < 0.0
-            or epsilon <= 0.0
-            or max_connection_distance < 0.0
-            or goal_biasing_probability < 0.0
-            or goal_biasing_probability > 1.0
-        ):
-            raise ValueError(
-                "`max_planning_time` and `max_connection_distance` must be >= 0.0. "
-                "`epsilon` must be > 0.0. `goal_biasing_probability` must be within [0.0, 1.0]."
-            )
+        if max_planning_time <= 0.0:
+            raise ValueError("`max_planning_time` must be > 0.0")
+        if epsilon <= 0.0:
+            raise ValueError("`epsilon` must be > 0.0")
+        if max_connection_distance <= 0.0:
+            raise ValueError("`max_connection_distance` must be > 0.0")
+        if goal_biasing_probability < 0.0 or goal_biasing_probability > 1.0:
+            raise ValueError("`goal_biasing_probability` must be within [0.0, 1.0].")
+
         self.jg = jg
         self.cr = cr
         self.max_planning_time = max_planning_time

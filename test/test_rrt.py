@@ -51,6 +51,24 @@ class TestRRT(unittest.TestCase):
         np.testing.assert_equal(path[0], q_init)
         np.testing.assert_equal(path[1], q_goal)
 
+    def test_invalid_args(self):
+        model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
+        jg = mjpl.JointGroup(model, [])
+        cr = mjpl.CollisionRuleset(model)
+
+        with self.assertRaisesRegex(ValueError, "max_planning_time"):
+            mjpl.RRT(jg, cr, max_planning_time=0.0)
+            mjpl.RRT(jg, cr, max_planning_time=-1.0)
+        with self.assertRaisesRegex(ValueError, "epsilon"):
+            mjpl.RRT(jg, cr, epsilon=0.0)
+            mjpl.RRT(jg, cr, epsilon=-1.0)
+        with self.assertRaisesRegex(ValueError, "max_connection_distance"):
+            mjpl.RRT(jg, cr, max_connection_distance=0.0)
+            mjpl.RRT(jg, cr, max_connection_distance=-1.0)
+        with self.assertRaisesRegex(ValueError, "goal_biasing_probability"):
+            mjpl.RRT(jg, cr, goal_biasing_probability=-1.0)
+            mjpl.RRT(jg, cr, goal_biasing_probability=2.0)
+
 
 if __name__ == "__main__":
     unittest.main()
