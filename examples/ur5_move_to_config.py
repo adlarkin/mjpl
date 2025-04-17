@@ -45,16 +45,7 @@ def main():
     q_goal = mjpl.random_valid_config(rng, arm_jg, data, cr)
 
     # Set up the planner.
-    planner_options = mjpl.RRTOptions(
-        jg=arm_jg,
-        cr=cr,
-        max_planning_time=10.0,
-        epsilon=0.05,
-        seed=seed,
-        goal_biasing_probability=0.1,
-        max_connection_distance=np.inf,
-    )
-    planner = mjpl.RRT(planner_options)
+    planner = mjpl.RRT(arm_jg, cr, seed=seed, goal_biasing_probability=0.1)
 
     print("Planning...")
     start = time.time()
@@ -69,9 +60,9 @@ def main():
     shortcut_path = mjpl.shortcut(
         path,
         arm_jg,
-        model,
         cr,
-        validation_dist=planner_options.epsilon,
+        q_init=q_init,
+        validation_dist=planner.epsilon,
         max_attempts=len(path),
         seed=seed,
     )
@@ -90,7 +81,7 @@ def main():
     print("Generating trajectory...")
     start = time.time()
     trajectory = mjpl.generate_collision_free_trajectory(
-        shortcut_path, traj_generator, q_init, arm_jg, cr
+        shortcut_path, traj_generator, arm_jg, cr, q_init
     )
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 

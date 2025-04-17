@@ -1,10 +1,10 @@
 """mjpl: MuJoCo motion planning library."""
 
-from .cartesian_planner import cartesian_plan
 from .collision_ruleset import CollisionRuleset
 from .inverse_kinematics import MinkIKSolver
 from .joint_group import JointGroup
-from .rrt import RRT, RRTOptions
+from .planning.cartesian_planner import cartesian_plan
+from .planning.rrt import RRT
 from .trajectory import (
     RuckigTrajectoryGenerator,
     ToppraTrajectoryGenerator,
@@ -17,7 +17,6 @@ __all__ = (
     "MinkIKSolver",
     "JointGroup",
     "RRT",
-    "RRTOptions",
     "RuckigTrajectoryGenerator",
     "ToppraTrajectoryGenerator",
     "cartesian_plan",
