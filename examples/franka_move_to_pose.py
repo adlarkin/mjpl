@@ -59,7 +59,7 @@ def main():
     print("Planning...")
     start = time.time()
     path = planner.plan_to_pose(q_init, goal_pose, _PANDA_EE_SITE)
-    if not path:
+    if path is None:
         print("Planning failed")
         return
     print(f"Planning took {(time.time() - start):.4f}s")
@@ -70,9 +70,8 @@ def main():
         path,
         arm_jg,
         cr,
-        q_init=q_init,
         validation_dist=planner.epsilon,
-        max_attempts=len(path),
+        max_attempts=len(path.waypoints),
         seed=seed,
     )
     print(f"Shortcutting took {(time.time() - start):.4f}s")
@@ -90,7 +89,7 @@ def main():
     print("Generating trajectory...")
     start = time.time()
     trajectory = mjpl.generate_collision_free_trajectory(
-        shortcut_path, traj_generator, arm_jg, cr, q_init
+        shortcut_path, traj_generator, arm_jg, cr
     )
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 

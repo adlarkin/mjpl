@@ -9,6 +9,7 @@ from ..collision_ruleset import CollisionRuleset
 from ..inverse_kinematics.ik_solver import IKSolver
 from ..inverse_kinematics.mink_ik_solver import MinkIKSolver
 from ..joint_group import JointGroup
+from ..types import Path
 from .tree import Node, Tree
 from .utils import _combine_paths, _connect
 
@@ -69,7 +70,7 @@ class RRT:
         pose: SE3,
         site: str,
         solver: IKSolver | None = None,
-    ) -> list[np.ndarray]:
+    ) -> Path | None:
         """Plan to a pose.
 
         Args:
@@ -89,7 +90,7 @@ class RRT:
 
     def plan_to_config(
         self, q_init_world: np.ndarray, q_goal: np.ndarray
-    ) -> list[np.ndarray]:
+    ) -> Path | None:
         """Plan to a configuration.
 
         Args:
@@ -112,7 +113,7 @@ class RRT:
         poses: list[SE3],
         site: str,
         solver: IKSolver | None = None,
-    ) -> list[np.ndarray]:
+    ) -> Path | None:
         """Plan to a list of poses.
 
         Args:
@@ -143,14 +144,14 @@ class RRT:
         valid_solutions = [q for q in potential_solutions if q is not None]
         if not valid_solutions:
             print("Unable to find at least one configuration from the target poses.")
-            return []
+            return None
 
         goal_configs = [q[self.jg.qpos_addrs] for q in valid_solutions]
         return self.plan_to_configs(q_init_world, goal_configs)
 
     def plan_to_configs(
         self, q_init_world: np.ndarray, q_goals: list[np.ndarray]
-    ) -> list[np.ndarray]:
+    ) -> Path | None:
         """Plan to a list of configurations.
 
         Args:
@@ -175,16 +176,16 @@ class RRT:
         q_init = self.jg.qpos(data)
         if not utils.is_valid_config(q_init, self.jg, data, self.cr):
             print("q_init is not a valid configuration")
-            return []
+            return None
         for q in q_goals:
             if not utils.is_valid_config(q, self.jg, data, self.cr):
                 print(f"The following goal config is not a valid configuration: {q}")
-                return []
+                return None
 
         # Is there a direct connection to any of the goals from q_init?
         for q in q_goals:
             if np.linalg.norm(q - q_init) <= self.epsilon:
-                return [q_init, q]
+                return Path(q_init=q_init_world, waypoints=[q_init, q], joints=[])
 
         start_tree = Tree(Node(q_init))
         # To support multiple goals, the root of the goal tree is a sink node
@@ -227,9 +228,10 @@ class RRT:
                 np.linalg.norm(new_goal_tree_node.q - new_start_tree_node.q)
                 <= self.epsilon
             ):
-                return _combine_paths(
+                waypoints = _combine_paths(
                     start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
                 )
+                return Path(q_init=q_init_world, waypoints=waypoints, joints=[])
 
             if not np.array_equal(new_start_tree_node.q, q_rand):
                 new_goal_tree_node = _connect(
@@ -254,8 +256,9 @@ class RRT:
                     np.linalg.norm(new_goal_tree_node.q - new_start_tree_node.q)
                     <= self.epsilon
                 ):
-                    return _combine_paths(
+                    waypoints = _combine_paths(
                         start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
                     )
+                    return Path(q_init=q_init_world, waypoints=waypoints, joints=[])
 
-        return []
+        return None

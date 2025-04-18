@@ -4,6 +4,7 @@ from mink.lie import SE3, SO3
 
 from .collision_ruleset import CollisionRuleset
 from .joint_group import JointGroup
+from .types import Path
 
 
 def step(start: np.ndarray, target: np.ndarray, max_step_dist: float) -> np.ndarray:
@@ -78,7 +79,7 @@ def random_valid_config(
 
 
 def _connect_waypoints(
-    path: list[np.ndarray],
+    waypoints: list[np.ndarray],
     start_idx: int,
     end_idx: int,
     validation_dist: float = 0.05,
@@ -86,10 +87,10 @@ def _connect_waypoints(
     data: mujoco.MjData | None = None,
     cr: CollisionRuleset | None = None,
 ) -> list[np.ndarray]:
-    """If possible, directly connect two specific waypoints from a path.
+    """If possible, directly connect two specific waypoints from a list of waypoints.
 
     Args:
-        path: The path with waypoints to connect.
+        waypoints: The list of waypoints.
         start_idx: The index of the first waypoint.
         end_idx: The index of the second waypoint.
         validation_dist: The distance increment that is used for performing intermediate
@@ -101,7 +102,7 @@ def _connect_waypoints(
         cr: The CollisionRuleset to enforce (if any) for validation checks.
 
     Returns:
-        A path with a direct connection between the waypoints at indices
+        A waypoint list with a direct connection between the waypoints at indices
         (`start_idx`, `end_idx`) if the waypoints at these indices can be connected.
     """
     if validation_dist <= 0.0:
@@ -111,34 +112,31 @@ def _connect_waypoints(
         raise ValueError("Both `jg` and `data` must either be None or not None.")
     validate = jg is not None and data is not None
 
-    q_start = path[start_idx]
-    q_target = path[end_idx]
+    q_start = waypoints[start_idx]
+    q_target = waypoints[end_idx]
 
     q_curr = step(q_start, q_target, validation_dist)
     while not np.array_equal(q_curr, q_target):
         if validate and not is_valid_config(q_curr, jg, data, cr):
-            return path
+            return waypoints
         q_curr = step(q_curr, q_target, validation_dist)
-    return path[: start_idx + 1] + path[end_idx:]
+    return waypoints[: start_idx + 1] + waypoints[end_idx:]
 
 
 def shortcut(
-    path: list[np.ndarray],
+    path: Path,
     jg: JointGroup,
     cr: CollisionRuleset | None,
-    q_init: np.ndarray | None = None,
     validation_dist: float = 0.05,
     max_attempts: int = 100,
     seed: int | None = None,
-) -> list[np.ndarray]:
+) -> Path:
     """Perform shortcutting on a path.
 
     Args:
         path: The path to shortcut.
         jg: The JointGroup to apply validation checks on when shortcutting.
         cr: The CollisionRuleset to enforce (if any) for validation checks.
-        q_init: Full initial configuration. Used to set values of joints that are
-            not in `jg`.
         validation_dist: The distance between each validation check, which occurs
             between a pair of waypoints that are trying to be directly connected
             if these waypoints are further than `validation_dist` apart.
@@ -152,32 +150,33 @@ def shortcut(
         A path with direct connections between each adjacent waypoint.
     """
     data = mujoco.MjData(jg.model)
-    if q_init is not None:
-        data.qpos = q_init
+    data.qpos = path.q_init
     rng = np.random.default_rng(seed=seed)
 
     # sanity check: can we shortcut directly between the start/end of the path?
-    shortened_path = _connect_waypoints(
-        path=path,
+    shortened_waypoints = _connect_waypoints(
+        waypoints=path.waypoints,
         start_idx=0,
-        end_idx=len(path) - 1,
+        end_idx=len(path.waypoints) - 1,
         validation_dist=validation_dist,
         jg=jg,
         data=data,
         cr=cr,
     )
     for _ in range(max_attempts):
-        if len(shortened_path) == 2:
+        if len(shortened_waypoints) == 2:
             # we can go directly from start to goal, so no more shortcutting can be done
-            return shortened_path
+            return Path(
+                q_init=path.q_init, waypoints=shortened_waypoints, joints=path.joints
+            )
         # randomly pick 2 waypoints
         start, end = 0, 0
         while start == end:
-            start, end = rng.integers(len(shortened_path), size=2)
+            start, end = rng.integers(len(shortened_waypoints), size=2)
         if start > end:
             start, end = end, start
-        shortened_path = _connect_waypoints(
-            path=shortened_path,
+        shortened_waypoints = _connect_waypoints(
+            waypoints=shortened_waypoints,
             start_idx=start,
             end_idx=end,
             validation_dist=validation_dist,
@@ -186,4 +185,4 @@ def shortcut(
             cr=cr,
         )
 
-    return shortened_path
+    return Path(q_init=path.q_init, waypoints=shortened_waypoints, joints=path.joints)
