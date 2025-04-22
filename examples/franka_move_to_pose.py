@@ -48,7 +48,7 @@ def main():
     rng = np.random.default_rng(seed=seed)
     data = mujoco.MjData(model)
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
-    q_rand = mjpl.random_valid_config(rng, model, arm_joints, cr)
+    q_rand = mjpl.random_valid_config(rng, model, arm_joints, cr, data)
     data.qpos[q_idx] = q_rand
     mujoco.mj_kinematics(model, data)
     goal_pose = mjpl.site_pose(data, _PANDA_EE_SITE)
@@ -78,7 +78,7 @@ def main():
 
     # The trajectory limits used here are for demonstration purposes only.
     # In practice, consult your hardware spec sheet for this information.
-    dof = len(arm_joints)
+    dof = len(path.waypoints[0])
     traj_generator = mjpl.RuckigTrajectoryGenerator(
         dt=model.opt.timestep,
         max_velocity=np.ones(dof) * np.pi,

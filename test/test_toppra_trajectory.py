@@ -3,9 +3,10 @@ import unittest
 import numpy as np
 
 import mjpl
+import mjpl.types
 
 
-class TestRuckigTrajectoryGenerator(unittest.TestCase):
+class TestToppraTrajectoryGenerator(unittest.TestCase):
     def test_generate_trajectory(self):
         dof = 7
 
@@ -24,11 +25,13 @@ class TestRuckigTrajectoryGenerator(unittest.TestCase):
         np.testing.assert_equal(acc_limit_min, -acc_limit_max)
 
         rng = np.random.default_rng(seed=5)
-        path = [
+        waypoints = [
             rng.random(dof),
             rng.random(dof),
         ]
-        t = traj_generator.generate_trajectory(path)
+        t = traj_generator.generate_trajectory(
+            mjpl.types.Path(q_init=waypoints[0], waypoints=waypoints, joints=[])
+        )
 
         # Ensure limits are enforced, with some tolerance for floating point error.
         tolerance = 1e-8
@@ -40,7 +43,7 @@ class TestRuckigTrajectoryGenerator(unittest.TestCase):
             self.assertTrue(np.all(a <= acc_limit_max + tolerance))
 
         # Ensure trajectory achieves the goal state.
-        np.testing.assert_allclose(path[-1], t.positions[-1], rtol=1e-5, atol=1e-8)
+        np.testing.assert_allclose(waypoints[-1], t.positions[-1], rtol=1e-5, atol=1e-8)
         # The final velocity of the trajectory should be zero.
         np.testing.assert_allclose(np.zeros(dof), t.velocities[-1], rtol=0, atol=1e-8)
 

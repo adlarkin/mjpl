@@ -164,25 +164,28 @@ class TestCartesianPlanner(unittest.TestCase):
         path = mjpl.cartesian_plan(
             q_init_world, poses, site, solver, lin_threshold=0.01, ori_threshold=0.1
         )
-        self.assertEqual(len(path), 4)
+        self.assertIsNotNone(path)
+        self.assertEqual(len(path.waypoints), 4)
+        self.assertListEqual(path.joints, [])
         # The first element in the path should match the initial configuration.
-        np.testing.assert_equal(path[0], q_init_world)
+        np.testing.assert_equal(path.q_init, q_init_world)
+        np.testing.assert_equal(path.waypoints[0], q_init_world)
         # The other joint configurations in the path should satisfy the poses
         # within the IK solver's tolerance.
-        data.qpos = path[1]
+        data.qpos = path.waypoints[1]
         mujoco.mj_kinematics(model, data)
         actual_site_pose = mjpl.site_pose(data, site)
         err = poses[0].minus(actual_site_pose)
         self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
         self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
         # An interpolated pose should have been added to the Cartesian path (`poses`)
-        data.qpos = path[2]
+        data.qpos = path.waypoints[2]
         mujoco.mj_kinematics(model, data)
         actual_site_pose = mjpl.site_pose(data, site)
         err = interpolated_pose.minus(actual_site_pose)
         self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
         self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
-        data.qpos = path[3]
+        data.qpos = path.waypoints[3]
         mujoco.mj_kinematics(model, data)
         actual_site_pose = mjpl.site_pose(data, site)
         err = poses[1].minus(actual_site_pose)

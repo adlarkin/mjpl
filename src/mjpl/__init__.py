@@ -2,7 +2,6 @@
 
 from .collision_ruleset import CollisionRuleset
 from .inverse_kinematics import MinkIKSolver
-from .joint_group import JointGroup
 from .planning.cartesian_planner import cartesian_plan
 from .planning.rrt import RRT
 from .trajectory import (
@@ -15,7 +14,6 @@ from .utils import qpos_idx, random_valid_config, shortcut, site_pose
 __all__ = (
     "CollisionRuleset",
     "MinkIKSolver",
-    "JointGroup",
     "RRT",
     "RuckigTrajectoryGenerator",
     "ToppraTrajectoryGenerator",

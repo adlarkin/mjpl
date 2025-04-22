@@ -29,8 +29,7 @@ def main():
         "wrist_2_joint",
         "wrist_3_joint",
     ]
-    arm_joint_ids = [model.joint(joint).id for joint in arm_joints]
-    arm_jg = mjpl.JointGroup(model, arm_joint_ids)
+    q_idx = mjpl.qpos_idx(model, arm_joints)
 
     cr = mjpl.CollisionRuleset(model)
 
@@ -42,10 +41,10 @@ def main():
     rng = np.random.default_rng(seed=seed)
     data = mujoco.MjData(model)
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
-    q_goal = mjpl.random_valid_config(rng, arm_jg, data, cr)
+    q_goal = mjpl.random_valid_config(rng, model, arm_joints, cr, data)
 
     # Set up the planner.
-    planner = mjpl.RRT(arm_jg, cr, seed=seed, goal_biasing_probability=0.1)
+    planner = mjpl.RRT(model, arm_joints, cr, seed=seed, goal_biasing_probability=0.1)
 
     print("Planning...")
     start = time.time()
@@ -59,18 +58,17 @@ def main():
     start = time.time()
     shortcut_path = mjpl.shortcut(
         path,
-        arm_jg,
+        model,
         cr,
-        q_init=q_init,
         validation_dist=planner.epsilon,
-        max_attempts=len(path),
+        max_attempts=len(path.waypoints),
         seed=seed,
     )
     print(f"Shortcutting took {(time.time() - start):.4f}s")
 
     # The trajectory limits used here are for demonstration purposes only.
     # In practice, consult your hardware spec sheet for this information.
-    dof = len(arm_joints)
+    dof = len(path.waypoints[0])
     traj_generator = mjpl.RuckigTrajectoryGenerator(
         dt=model.opt.timestep,
         max_velocity=np.ones(dof) * np.pi,
@@ -81,7 +79,7 @@ def main():
     print("Generating trajectory...")
     start = time.time()
     trajectory = mjpl.generate_collision_free_trajectory(
-        shortcut_path, traj_generator, arm_jg, cr, q_init
+        model, shortcut_path, traj_generator, cr
     )
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
@@ -128,7 +126,8 @@ def main():
             )
 
             # Visualize the goal EE pose (derived from the goal config).
-            arm_jg.fk(q_goal, data)
+            data.qpos[q_idx] = q_goal
+            mujoco.mj_kinematics(model, data)
             goal_pose = mjpl.site_pose(data, _UR5_EE_SITE)
             viz.add_frame(
                 viewer.user_scn,
@@ -139,7 +138,8 @@ def main():
             # Visualize the trajectory. The trajectory is of high resolution,
             # so plotting every other timestep should be sufficient.
             for q_ref in trajectory.positions[::2]:
-                arm_jg.fk(q_ref, data)
+                data.qpos[q_idx] = q_ref
+                mujoco.mj_kinematics(model, data)
                 pos = data.site(_UR5_EE_SITE).xpos
                 viz.add_sphere(
                     viewer.user_scn, pos, radius=0.004, rgba=[0.2, 0.6, 0.2, 0.2]
