@@ -20,7 +20,7 @@ class MinkIKSolver(IKSolver):
         seed: int | None = None,
         max_attempts: int = 1,
         iterations: int = 500,
-        solver: str = "quadprog",
+        solver: str = "daqp",
     ):
         """Constructor.
 
