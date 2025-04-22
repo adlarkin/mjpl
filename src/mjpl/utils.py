@@ -65,22 +65,18 @@ def site_pose(data: mujoco.MjData, site_name: str) -> mink.SE3:
 
 
 def is_valid_config(
-    q: np.ndarray,
     model: mujoco.MjModel,
-    q_idx: list[int] = [],
+    data: mujoco.MjData,
     cr: CollisionRuleset | None = None,
-    data: mujoco.MjData | None = None,
 ) -> bool:
-    q_idx = q_idx or list(range(model.nq))
-
     # Check joint limits.
-    if not np.all((q >= model.jnt_range[q_idx, 0]) & (q <= model.jnt_range[q_idx, 1])):
+    if not np.all(
+        (data.qpos >= model.jnt_range[:, 0]) & (data.qpos <= model.jnt_range[:, 1])
+    ):
         return False
 
     if cr:
         # Check for collisions.
-        data = data or mujoco.MjData(model)
-        data.qpos[q_idx] = q
         mujoco.mj_kinematics(model, data)
         mujoco.mj_collision(model, data)
         return cr.obeys_ruleset(data.contact.geom)
@@ -89,17 +85,22 @@ def is_valid_config(
 
 
 def random_valid_config(
-    rng: np.random.Generator,
     model: mujoco.MjModel,
+    q_init: np.ndarray,
+    seed: int | None = None,
     joints: list[str] = [],
     cr: CollisionRuleset | None = None,
-    data: mujoco.MjData | None = None,
 ) -> np.ndarray:
+    data = mujoco.MjData(model)
+    data.qpos = q_init
+
+    rng = np.random.default_rng(seed=seed)
     q_idx = qpos_idx(model, joints) if joints else list(range(model.nq))
-    q_rand = rng.uniform(*model.jnt_range.T)[q_idx]
-    while not is_valid_config(q_rand, model, q_idx, cr, data):
-        q_rand = rng.uniform(*model.jnt_range.T)[q_idx]
-    return q_rand
+    data.qpos[q_idx] = rng.uniform(*model.jnt_range.T)[q_idx]
+    while not is_valid_config(model, data, cr):
+        data.qpos[q_idx] = rng.uniform(*model.jnt_range.T)[q_idx]
+
+    return data.qpos
 
 
 def shortcut(
@@ -205,7 +206,9 @@ def _connect_waypoints(
 
     q_curr = step(q_start, q_target, validation_dist)
     while not np.array_equal(q_curr, q_target):
-        if data is not None and not is_valid_config(q_curr, model, q_idx, cr, data):
-            return waypoints
+        if data is not None:
+            data.qpos[q_idx] = q_curr
+            if not is_valid_config(model, data, cr):
+                return waypoints
         q_curr = step(q_curr, q_target, validation_dist)
     return waypoints[: start_idx + 1] + waypoints[end_idx:]

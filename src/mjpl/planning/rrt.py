@@ -175,16 +175,17 @@ class RRT:
 
         data = mujoco.MjData(self.model)
         data.qpos = q_init_world
-        q_init = q_init_world[self.q_idx]
-        if not utils.is_valid_config(q_init, self.model, self.q_idx, self.cr, data):
-            print("q_init is not a valid configuration")
+        if not utils.is_valid_config(self.model, data, self.cr):
+            print("q_init_world is not a valid configuration")
             return None
         for q in q_goals:
-            if not utils.is_valid_config(q, self.model, self.q_idx, self.cr, data):
+            data.qpos[self.q_idx] = q
+            if not utils.is_valid_config(self.model, data, self.cr):
                 print(f"The following goal config is not a valid configuration: {q}")
                 return None
 
         # Is there a direct connection to any of the goals from q_init?
+        q_init = q_init_world[self.q_idx]
         for q in q_goals:
             if np.linalg.norm(q - q_init) <= self.epsilon:
                 return Path(

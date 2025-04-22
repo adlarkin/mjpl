@@ -45,11 +45,9 @@ def main():
 
     # From the initial state, generate a valid goal pose that's derived from a
     # valid joint configuration.
-    rng = np.random.default_rng(seed=seed)
     data = mujoco.MjData(model)
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
-    q_rand = mjpl.random_valid_config(rng, model, arm_joints, cr, data)
-    data.qpos[q_idx] = q_rand
+    data.qpos = mjpl.random_valid_config(model, q_init, seed, arm_joints, cr)
     mujoco.mj_kinematics(model, data)
     goal_pose = mjpl.site_pose(data, _PANDA_EE_SITE)
 

@@ -38,10 +38,9 @@ def main():
     q_init = home_keyframe.qpos.copy()
 
     # From the initial state, generate a valid goal configuration.
-    rng = np.random.default_rng(seed=seed)
     data = mujoco.MjData(model)
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
-    q_goal = mjpl.random_valid_config(rng, model, arm_joints, cr, data)
+    q_goal = mjpl.random_valid_config(model, q_init, seed, arm_joints, cr)
 
     # Set up the planner.
     planner = mjpl.RRT(model, arm_joints, cr, seed=seed, goal_biasing_probability=0.1)

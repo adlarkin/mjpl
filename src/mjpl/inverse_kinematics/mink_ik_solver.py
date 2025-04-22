@@ -45,11 +45,10 @@ class MinkIKSolver(IKSolver):
             raise ValueError("`iterations` must be > 0.")
         self.model = model
         self.joints = joints
-        self.q_idx = utils.qpos_idx(model, joints)
         self.cr = cr
         self.pos_tolerance = pos_tolerance
         self.ori_tolerance = ori_tolerance
-        self.rng = np.random.default_rng(seed=seed)
+        self.seed = seed
         self.max_attempts = max_attempts
         self.iterations = iterations
         self.solver = solver
@@ -80,9 +79,8 @@ class MinkIKSolver(IKSolver):
                 pos_achieved = np.linalg.norm(err[:3]) <= self.pos_tolerance
                 ori_achieved = np.linalg.norm(err[3:]) <= self.ori_tolerance
                 if pos_achieved and ori_achieved:
-                    if utils.is_valid_config(
-                        configuration.q, self.model, cr=self.cr, data=data
-                    ):
+                    data.qpos = configuration.q
+                    if utils.is_valid_config(self.model, data, self.cr):
                         return configuration.q
                     break
                 vel = mink.solve_ik(
@@ -95,9 +93,8 @@ class MinkIKSolver(IKSolver):
                 )
                 configuration.integrate_inplace(vel, self.model.opt.timestep)
 
-            next_guess = configuration.q
-            next_guess[self.q_idx] = utils.random_valid_config(
-                self.rng, self.model, self.joints, self.cr, data
+            next_guess = utils.random_valid_config(
+                self.model, configuration.q, self.seed, self.joints, self.cr
             )
             configuration.update(next_guess)
         return None

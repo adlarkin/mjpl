@@ -226,7 +226,6 @@ class TestUtils(unittest.TestCase):
     def test_shortcut_6dof(self):
         model = load_robot_description("ur5e_mj_description")
 
-        data = mujoco.MjData(model)
         arm_joints = [
             "shoulder_pan_joint",
             "shoulder_lift_joint",
@@ -241,11 +240,14 @@ class TestUtils(unittest.TestCase):
 
         # Make a path starting from the home config that connects to various random valid configs.
         waypoints = [model.keyframe("home").qpos.copy()]
-        rng = np.random.default_rng(seed=seed)
-        random_waypoints = [
-            mjpl.random_valid_config(rng, model, arm_joints, cr, data) for _ in range(5)
-        ]
-        waypoints.extend(random_waypoints)
+        unique_waypoints = {tuple(waypoints[0])}
+        for i in range(5):
+            q_rand = mjpl.random_valid_config(
+                model, np.zeros(model.nq), seed + i, arm_joints, cr
+            )
+            waypoints.append(q_rand)
+            unique_waypoints.add(tuple(q_rand))
+        self.assertEqual(len(unique_waypoints), len(waypoints))
         path = mjpl.types.Path(
             q_init=waypoints[0], waypoints=waypoints, joints=arm_joints
         )

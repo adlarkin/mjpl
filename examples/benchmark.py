@@ -58,10 +58,7 @@ if __name__ == "__main__":
 
         # From the initial state, generate a goal pose.
         data = mujoco.MjData(model)
-        mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
-        rng = np.random.default_rng(seed=seed)
-        q_goal = mjpl.random_valid_config(rng, model, planning_joints, cr, data)
-        data.qpos[q_idx] = q_goal
+        data.qpos = mjpl.random_valid_config(model, q_init, seed, planning_joints, cr)
         mujoco.mj_kinematics(model, data)
         goal_pose = mjpl.site_pose(data, _PANDA_EE_SITE)
 
