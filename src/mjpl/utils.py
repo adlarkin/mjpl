@@ -176,6 +176,7 @@ def _connect_waypoints(
     start_idx: int,
     end_idx: int,
     validation_dist: float = 0.05,
+    # TODO: re-visit this and see if it makes sense to have empty default
     q_idx: list[int] = [],
     data: mujoco.MjData | None = None,
     cr: CollisionRuleset | None = None,

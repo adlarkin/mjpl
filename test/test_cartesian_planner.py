@@ -124,8 +124,6 @@ class TestCartesianPlanner(unittest.TestCase):
             "wrist_2_joint",
             "wrist_3_joint",
         ]
-        arm_joint_ids = [model.joint(joint).id for joint in arm_joints]
-        jg = mjpl.JointGroup(model, arm_joint_ids)
         cr = mjpl.CollisionRuleset(model)
 
         # Use the "home" keyframe as the initial configuration.
@@ -154,7 +152,7 @@ class TestCartesianPlanner(unittest.TestCase):
         ori_tolerance = 1e-3
         solver = mjpl.MinkIKSolver(
             model=model,
-            jg=jg,
+            joints=arm_joints,
             cr=cr,
             pos_tolerance=pos_tolerance,
             ori_tolerance=ori_tolerance,

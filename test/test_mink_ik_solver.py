@@ -12,7 +12,7 @@ class TestMinkIKSolver(unittest.TestCase):
         self.model = load_robot_description("ur5e_mj_description")
         self.site_name = "attachment_site"
 
-        arm_joints = [
+        self.arm_joints = [
             "shoulder_pan_joint",
             "shoulder_lift_joint",
             "elbow_joint",
@@ -20,8 +20,6 @@ class TestMinkIKSolver(unittest.TestCase):
             "wrist_2_joint",
             "wrist_3_joint",
         ]
-        arm_joint_ids = [self.model.joint(joint).id for joint in arm_joints]
-        self.jg = mjpl.JointGroup(self.model, arm_joint_ids)
         self.cr = mjpl.CollisionRuleset(self.model)
 
     def test_ik(self):
@@ -40,7 +38,7 @@ class TestMinkIKSolver(unittest.TestCase):
         ori_tolerance = 1e-3
         solver = mjpl.MinkIKSolver(
             model=self.model,
-            jg=self.jg,
+            joints=self.arm_joints,
             cr=self.cr,
             pos_tolerance=pos_tolerance,
             ori_tolerance=ori_tolerance,
@@ -79,13 +77,13 @@ class TestMinkIKSolver(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "`max_attempts` must be > 0"):
             mjpl.MinkIKSolver(
                 model=self.model,
-                jg=self.jg,
+                joints=self.arm_joints,
                 cr=self.cr,
                 max_attempts=-2,
             )
             mjpl.MinkIKSolver(
                 model=self.model,
-                jg=self.jg,
+                joints=self.arm_joints,
                 cr=self.cr,
                 max_attempts=0,
             )
@@ -93,13 +91,13 @@ class TestMinkIKSolver(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "`iterations` must be > 0"):
             mjpl.MinkIKSolver(
                 model=self.model,
-                jg=self.jg,
+                joints=self.arm_joints,
                 cr=self.cr,
                 iterations=-2,
             )
             mjpl.MinkIKSolver(
                 model=self.model,
-                jg=self.jg,
+                joints=self.arm_joints,
                 cr=self.cr,
                 iterations=0,
             )

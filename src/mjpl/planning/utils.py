@@ -33,7 +33,7 @@ def _extend(
     if np.array_equal(start_node.q, q_target):
         return start_node
     q_extend = utils.step(start_node.q, q_target, eps)
-    if utils.is_valid_config(q_target, model, q_idx, cr, data):
+    if utils.is_valid_config(q_extend, model, q_idx, cr, data):
         extended_node = Node(q_extend, start_node)
         tree.add_node(extended_node)
         return extended_node

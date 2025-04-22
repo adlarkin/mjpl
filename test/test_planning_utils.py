@@ -17,7 +17,7 @@ class TestPlanningUtils(unittest.TestCase):
     def test_extend(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
         data = mujoco.MjData(model)
-        jg = mjpl.JointGroup(model, [model.joint("ball_slide_x").id])
+        q_idx = mjpl.qpos_idx(model, ["ball_slide_x"])
         cr = mjpl.CollisionRuleset(model)
         epsilon = 0.1
 
@@ -28,7 +28,9 @@ class TestPlanningUtils(unittest.TestCase):
         # Test a valid EXTEND.
         q_goal = np.array([0.5])
         expected_q_extended = np.array([0.0])
-        extended_node = _extend(q_goal, tree, root_node, epsilon, jg, cr, data)
+        extended_node = _extend(
+            q_goal, model, q_idx, tree, root_node, epsilon, cr, data
+        )
         self.assertIsNotNone(extended_node)
         self.assertSetEqual(tree.nodes, {root_node, extended_node})
         np.testing.assert_allclose(
@@ -39,7 +41,7 @@ class TestPlanningUtils(unittest.TestCase):
         # Running EXTEND when q_target == start_node.q should do nothing.
         existing_nodes = tree.nodes.copy()
         same_extended_node = _extend(
-            extended_node.q, tree, extended_node, epsilon, jg, cr, data
+            extended_node.q, model, q_idx, tree, extended_node, epsilon, cr, data
         )
         self.assertIsNotNone(same_extended_node)
         self.assertIn(same_extended_node, existing_nodes)
@@ -50,14 +52,16 @@ class TestPlanningUtils(unittest.TestCase):
         q_init = np.array([0.75])
         root_node = Node(q_init)
         tree = Tree(root_node)
-        extended_node = _extend(np.array([0.9]), tree, root_node, epsilon, jg, cr, data)
+        extended_node = _extend(
+            np.array([0.9]), model, q_idx, tree, root_node, epsilon, cr, data
+        )
         self.assertIsNone(extended_node)
         self.assertSetEqual(tree.nodes, {root_node})
 
     def test_connect(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
         data = mujoco.MjData(model)
-        jg = mjpl.JointGroup(model, [model.joint("ball_slide_x").id])
+        q_idx = mjpl.qpos_idx(model, ["ball_slide_x"])
         cr = mjpl.CollisionRuleset(model)
         epsilon = 0.1
 
@@ -67,7 +71,7 @@ class TestPlanningUtils(unittest.TestCase):
 
         # Test a valid CONNECT.
         q_goal = np.array([0.15])
-        connected_node = _connect(q_goal, tree, epsilon, np.inf, jg, cr, data)
+        connected_node = _connect(q_goal, model, q_idx, tree, epsilon, np.inf, cr, data)
         np.testing.assert_allclose(connected_node.q, q_goal, rtol=0, atol=1e-9)
         # Check the path from the last connected node.
         # This implicitly checks each connected node's parent.
@@ -86,7 +90,7 @@ class TestPlanningUtils(unittest.TestCase):
         # in the tree should do nothing.
         existing_nodes = tree.nodes.copy()
         same_connected_node = _connect(
-            connected_node.q, tree, epsilon, np.inf, jg, cr, data
+            connected_node.q, model, q_idx, tree, epsilon, np.inf, cr, data
         )
         self.assertIn(same_connected_node, existing_nodes)
         self.assertSetEqual(tree.nodes, existing_nodes)
@@ -99,7 +103,7 @@ class TestPlanningUtils(unittest.TestCase):
         max_connection_dist = 0.45
         max_connected_q = q_init + max_connection_dist
         connected_node = _connect(
-            q_goal, tree, epsilon, max_connection_dist, jg, cr, data
+            q_goal, model, q_idx, tree, epsilon, max_connection_dist, cr, data
         )
         np.testing.assert_allclose(connected_node.q, max_connected_q, rtol=0, atol=1e-9)
         # Check the path from the last connected node.
@@ -125,7 +129,7 @@ class TestPlanningUtils(unittest.TestCase):
         obstacle = model.geom("wall_obstacle")
         obstacle_min_x = obstacle.pos[0] - obstacle.size[0]
         q_goal = np.array([1.0])
-        connected_node = _connect(q_goal, tree, epsilon, np.inf, jg, cr, data)
+        connected_node = _connect(q_goal, model, q_idx, tree, epsilon, np.inf, cr, data)
         self.assertNotEqual(connected_node, root_node)
         self.assertGreater(len(tree.nodes), 1)
         np.testing.assert_array_less(connected_node.q, obstacle_min_x)
