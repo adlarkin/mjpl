@@ -6,7 +6,8 @@ build-backend = "hatchling.build"
 name = "mjpl"
 version = "0.0.1"
 dependencies = [
-  "mink",
+  # 0.0.8 for daqp: https://github.com/kevinzakka/mink/releases/tag/v0.0.8
+  "mink >= 0.0.8",
   "mujoco >= 3",
   "numpy",
   "ruckig",
