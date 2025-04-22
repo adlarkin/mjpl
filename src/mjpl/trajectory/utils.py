@@ -1,16 +1,16 @@
 import mujoco
 import numpy as np
 
+from .. import utils
 from ..collision_ruleset import CollisionRuleset
-from ..joint_group import JointGroup
 from ..types import Path
 from .trajectory_interface import Trajectory, TrajectoryGenerator
 
 
 def generate_collision_free_trajectory(
+    model: mujoco.MjModel,
     path: Path,
     generator: TrajectoryGenerator,
-    jg: JointGroup,
     cr: CollisionRuleset,
 ) -> Trajectory:
     """Generate a trajectory that follows a path and obeys a collision ruleset.
@@ -30,23 +30,23 @@ def generate_collision_free_trajectory(
     Args:
         path: The path the trajectory must follow.
         generator: Trajectory generator.
-        jg: The joints used for the path and trajectory.
         cr: The collision ruleset the trajectory must adhere to.
-        q_init: Full initial configuration. Used to set values of joints that are
-            not in `jg`.
 
     Returns:
         A trajectory that follows `path` without violating `cr`.
     """
-    data = mujoco.MjData(jg.model)
+    q_idx = utils.qpos_idx(model, path.joints)
+
+    data = mujoco.MjData(model)
     data.qpos = path.q_init
     filled_path = path
     while True:
         traj = generator.generate_trajectory(filled_path)
         for i in range(len(traj.positions)):
             q = traj.positions[i]
-            jg.fk(q, data)
-            mujoco.mj_collision(jg.model, data)
+            data.qpos[q_idx] = q
+            mujoco.mj_kinematics(model, data)
+            mujoco.mj_collision(model, data)
             if not cr.obeys_ruleset(data.contact.geom):
                 # Add an intermediate waypoint to the section of the path
                 # that corresponds to the trajectory position that's in collision.
@@ -72,7 +72,7 @@ def _path_timing(waypoints: list[np.ndarray], trajectory: Trajectory) -> list[fl
         trajectory: The trajectory that follows `path`.
 
     Returns:
-        A list of timestamps that correspond to [path.q_init, path.waypoints] based on `trajectory`.
+        A list of timestamps that correspond to path.waypoints based on `trajectory`.
     """
     if not waypoints:
         return []

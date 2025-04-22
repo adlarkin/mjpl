@@ -10,6 +10,7 @@ import mjpl
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
 _BALL_XY_PLANE_XML = _MODEL_DIR / "two_dof_ball.xml"
+_JOINTS_XML = _MODEL_DIR / "joints.xml"
 
 
 def directly_connectable_path() -> list[np.ndarray]:
@@ -240,6 +241,31 @@ class TestUtils(unittest.TestCase):
         original_intermediate_qs = {tuple(q) for q in path[1:-1]}
         for intermediate_q in shortcut_path[1:-1]:
             self.assertIn(tuple(intermediate_q), original_intermediate_qs)
+
+    def test_qpos_idx(self):
+        model = mujoco.MjModel.from_xml_path(_JOINTS_XML.as_posix())
+
+        # Querying all joints in the model should correspond to the full mujoco.MjData.qpos
+        indices = mjpl.qpos_idx(
+            model, ["slide_joint", "free_joint", "hinge_joint", "ball_joint"]
+        )
+        self.assertListEqual(indices, list(range(model.nq)))
+
+        indices = mjpl.qpos_idx(model, ["slide_joint"])
+        self.assertListEqual(indices, [0])
+
+        indices = mjpl.qpos_idx(model, ["free_joint"])
+        self.assertListEqual(indices, [1, 2, 3, 4, 5, 6, 7])
+
+        indices = mjpl.qpos_idx(model, ["hinge_joint"])
+        self.assertListEqual(indices, [8])
+
+        indices = mjpl.qpos_idx(model, ["ball_joint"])
+        self.assertListEqual(indices, [9, 10, 11, 12])
+
+        # Make sure index order matches order of joints in the query.
+        indices = mjpl.qpos_idx(model, ["ball_joint", "hinge_joint", "free_joint"])
+        self.assertListEqual(indices, [9, 10, 11, 12, 8, 1, 2, 3, 4, 5, 6, 7])
 
 
 if __name__ == "__main__":

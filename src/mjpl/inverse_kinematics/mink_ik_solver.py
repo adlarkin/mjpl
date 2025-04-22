@@ -4,7 +4,6 @@ import numpy as np
 
 from .. import utils
 from ..collision_ruleset import CollisionRuleset
-from ..joint_group import JointGroup
 from .ik_solver import IKSolver
 
 
@@ -14,7 +13,7 @@ class MinkIKSolver(IKSolver):
     def __init__(
         self,
         model: mujoco.MjModel,
-        jg: JointGroup,
+        joints: list[str],
         cr: CollisionRuleset | None = None,
         pos_tolerance: float = 1e-3,
         ori_tolerance: float = 1e-3,
@@ -27,7 +26,7 @@ class MinkIKSolver(IKSolver):
 
         Args:
             model: MuJoCo model.
-            jg: The joints to use when generating initial states for new solve
+            joints: The joints to use when generating initial states for new solve
                 attempts and validating configurations.
             cr: The collision rules to enforce. If defined, IK solutions must
                 also obey this ruleset.
@@ -45,7 +44,8 @@ class MinkIKSolver(IKSolver):
         if iterations < 1:
             raise ValueError("`iterations` must be > 0.")
         self.model = model
-        self.jg = jg
+        self.joints = joints
+        self.q_idx = utils.qpos_idx(model, joints)
         self.cr = cr
         self.pos_tolerance = pos_tolerance
         self.ori_tolerance = ori_tolerance
@@ -81,7 +81,7 @@ class MinkIKSolver(IKSolver):
                 ori_achieved = np.linalg.norm(err[3:]) <= self.ori_tolerance
                 if pos_achieved and ori_achieved:
                     if utils.is_valid_config(
-                        configuration.q[self.jg.qpos_addrs], self.jg, data, self.cr
+                        configuration.q, self.model, cr=self.cr, data=data
                     ):
                         return configuration.q
                     break
@@ -96,8 +96,8 @@ class MinkIKSolver(IKSolver):
                 configuration.integrate_inplace(vel, self.model.opt.timestep)
 
             next_guess = configuration.q
-            next_guess[self.jg.qpos_addrs] = utils.random_valid_config(
-                self.rng, self.jg, data, self.cr
+            next_guess[self.q_idx] = utils.random_valid_config(
+                self.rng, self.model, self.joints, self.cr, data
             )
             configuration.update(next_guess)
         return None

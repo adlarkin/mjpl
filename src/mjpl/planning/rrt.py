@@ -8,7 +8,6 @@ from .. import utils
 from ..collision_ruleset import CollisionRuleset
 from ..inverse_kinematics.ik_solver import IKSolver
 from ..inverse_kinematics.mink_ik_solver import MinkIKSolver
-from ..joint_group import JointGroup
 from ..types import Path
 from .tree import Node, Tree
 from .utils import _combine_paths, _connect
@@ -24,7 +23,8 @@ class RRT:
 
     def __init__(
         self,
-        jg: JointGroup,
+        model: mujoco.MjModel,
+        planning_joints: list[str],
         cr: CollisionRuleset,
         max_planning_time: float = 10.0,
         epsilon: float = 0.05,
@@ -35,7 +35,7 @@ class RRT:
         """Constructor.
 
         Args:
-            jg: The JointGroup used for planning.
+            planning_joints: The joints used for planning.
             cr: The CollisionRuleset the sampled configurations must obey.
             max_planning_time: Maximum planning time, in seconds.
             epsilon: The maximum distance allowed between nodes in the tree.
@@ -54,7 +54,9 @@ class RRT:
         if goal_biasing_probability < 0.0 or goal_biasing_probability > 1.0:
             raise ValueError("`goal_biasing_probability` must be within [0.0, 1.0].")
 
-        self.jg = jg
+        self.model = model
+        self.planning_joints = planning_joints
+        self.q_idx = utils.qpos_idx(model, planning_joints)
         self.cr = cr
         self.max_planning_time = max_planning_time
         self.epsilon = epsilon
@@ -132,8 +134,8 @@ class RRT:
         """
         if solver is None:
             solver = MinkIKSolver(
-                model=self.jg.model,
-                jg=self.jg,
+                model=self.model,
+                joints=self.planning_joints,
                 cr=self.cr,
                 seed=self.seed,
                 max_attempts=5,
@@ -146,7 +148,7 @@ class RRT:
             print("Unable to find at least one configuration from the target poses.")
             return None
 
-        goal_configs = [q[self.jg.qpos_addrs] for q in valid_solutions]
+        goal_configs = [q[self.q_idx] for q in valid_solutions]
         return self.plan_to_configs(q_init_world, goal_configs)
 
     def plan_to_configs(
@@ -167,25 +169,29 @@ class RRT:
             A path is defined as a list of configurations that correspond to the
             joints in the planner's JointGroup.
         """
-        assert q_init_world.size == self.jg.model.nq
+        assert q_init_world.size == self.model.nq
         for q in q_goals:
-            assert q.size == len(self.jg.joint_ids)
+            assert q.size == len(self.q_idx)
 
-        data = mujoco.MjData(self.jg.model)
+        data = mujoco.MjData(self.model)
         data.qpos = q_init_world
-        q_init = self.jg.qpos(data)
-        if not utils.is_valid_config(q_init, self.jg, data, self.cr):
+        q_init = q_init_world[self.q_idx]
+        if not utils.is_valid_config(q_init, self.model, self.q_idx, self.cr, data):
             print("q_init is not a valid configuration")
             return None
         for q in q_goals:
-            if not utils.is_valid_config(q, self.jg, data, self.cr):
+            if not utils.is_valid_config(q, self.model, self.q_idx, self.cr, data):
                 print(f"The following goal config is not a valid configuration: {q}")
                 return None
 
         # Is there a direct connection to any of the goals from q_init?
         for q in q_goals:
             if np.linalg.norm(q - q_init) <= self.epsilon:
-                return Path(q_init=q_init_world, waypoints=[q_init, q], joints=[])
+                return Path(
+                    q_init=q_init_world,
+                    waypoints=[q_init, q],
+                    joints=self.planning_joints,
+                )
 
         start_tree = Tree(Node(q_init))
         # To support multiple goals, the root of the goal tree is a sink node
@@ -204,23 +210,25 @@ class RRT:
                 random_goal_idx = self.rng.integers(0, len(goal_nodes))
                 q_rand = goal_nodes[random_goal_idx].q
             else:
-                q_rand = self.jg.random_config(self.rng)
+                q_rand = self.rng.uniform(*self.model.jnt_range.T)[self.q_idx]
 
             new_start_tree_node = _connect(
                 q_rand,
+                self.model,
+                self.q_idx,
                 start_tree,
                 self.epsilon,
                 self.max_connection_distance,
-                self.jg,
                 self.cr,
                 data,
             )
             new_goal_tree_node = _connect(
                 new_start_tree_node.q,
+                self.model,
+                self.q_idx,
                 goal_tree,
                 self.epsilon,
                 self.max_connection_distance,
-                self.jg,
                 self.cr,
                 data,
             )
@@ -231,24 +239,30 @@ class RRT:
                 waypoints = _combine_paths(
                     start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
                 )
-                return Path(q_init=q_init_world, waypoints=waypoints, joints=[])
+                return Path(
+                    q_init=q_init_world,
+                    waypoints=waypoints,
+                    joints=self.planning_joints,
+                )
 
             if not np.array_equal(new_start_tree_node.q, q_rand):
                 new_goal_tree_node = _connect(
                     q_rand,
+                    self.model,
+                    self.q_idx,
                     goal_tree,
                     self.epsilon,
                     self.max_connection_distance,
-                    self.jg,
                     self.cr,
                     data,
                 )
                 new_start_tree_node = _connect(
                     new_goal_tree_node.q,
+                    self.model,
+                    self.q_idx,
                     start_tree,
                     self.epsilon,
                     self.max_connection_distance,
-                    self.jg,
                     self.cr,
                     data,
                 )
@@ -259,6 +273,10 @@ class RRT:
                     waypoints = _combine_paths(
                         start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
                     )
-                    return Path(q_init=q_init_world, waypoints=waypoints, joints=[])
+                    return Path(
+                        q_init=q_init_world,
+                        waypoints=waypoints,
+                        joints=self.planning_joints,
+                    )
 
         return None

@@ -10,5 +10,5 @@ class Path:
     # Configurations for `joints` that define a path, starting at `q_init`.
     waypoints: list[np.ndarray]
     # The joints corresponding to `waypoints`.
-    # None means all joints are used.
-    joints: list[str] | None
+    # An empty list means all joints are used.
+    joints: list[str]

@@ -3,16 +3,16 @@ import numpy as np
 
 from .. import utils
 from ..collision_ruleset import CollisionRuleset
-from ..joint_group import JointGroup
 from .tree import Node, Tree
 
 
 def _extend(
     q_target: np.ndarray,
+    model: mujoco.MjModel,
+    q_idx: list[int],
     tree: Tree,
     start_node: Node,
     eps: float,
-    jg: JointGroup,
     cr: CollisionRuleset,
     data: mujoco.MjData,
 ) -> Node | None:
@@ -23,7 +23,6 @@ def _extend(
         tree: The tree with a node to extend towards `q_target`.
         start_node: The node in `tree` to extend towards `q_target`.
         eps: The maximum distance `start_node` will extend towards `q_target`.
-        jg: The JointGroup corresponding to the configurations of interest.
         cr: The CollisionRuleset configurations must obey.
         data: MuJoCo data. Used for validation checking.
 
@@ -34,7 +33,7 @@ def _extend(
     if np.array_equal(start_node.q, q_target):
         return start_node
     q_extend = utils.step(start_node.q, q_target, eps)
-    if utils.is_valid_config(q_extend, jg, data, cr):
+    if utils.is_valid_config(q_target, model, q_idx, cr, data):
         extended_node = Node(q_extend, start_node)
         tree.add_node(extended_node)
         return extended_node
@@ -43,10 +42,11 @@ def _extend(
 
 def _connect(
     q_target: np.ndarray,
+    model: mujoco.MjModel,
+    q_idx: list[int],
     tree: Tree,
     eps: float,
     max_connection_distance: float,
-    jg: JointGroup,
     cr: CollisionRuleset,
     data: mujoco.MjData,
 ) -> Node:
@@ -61,7 +61,6 @@ def _connect(
             than `eps`, multiple nodes will be added to `tree`.
         max_connection_distance: The maximum distance to cover before terminating
             the connect operation.
-        jg: The JointGroup corresponding to the configurations of interest.
         cr: The CollisionRuleset configurations must obey.
         data: MuJoCo data. Used for validation checking.
 
@@ -73,7 +72,9 @@ def _connect(
     total_distance = 0.0
     while not np.array_equal(nearest_node.q, q_target):
         max_eps = min(eps, max_connection_distance - total_distance)
-        next_node = _extend(q_target, tree, nearest_node, max_eps, jg, cr, data)
+        next_node = _extend(
+            q_target, model, q_idx, tree, nearest_node, max_eps, cr, data
+        )
         if not next_node:
             break
         nearest_node = next_node
