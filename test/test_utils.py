@@ -296,7 +296,10 @@ class TestUtils(unittest.TestCase):
         indices = mjpl.qpos_idx(model, ["ball_joint", "hinge_joint", "free_joint"])
         self.assertListEqual(indices, [9, 10, 11, 12, 8, 1, 2, 3, 4, 5, 6, 7])
 
-        self.assertListEqual(mjpl.qpos_idx(model, []), [])
+        self.assertListEqual(mjpl.qpos_idx(model, [], default_to_full=False), [])
+        self.assertListEqual(
+            mjpl.qpos_idx(model, [], default_to_full=True), list(range(model.nq))
+        )
 
     def test_is_valid_config(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())

@@ -40,9 +40,7 @@ def generate_collision_free_trajectory(
     while True:
         traj = generator.generate_trajectory(path)
         data.qpos = traj.q_init
-        q_idx = (
-            utils.qpos_idx(model, traj.joints) if traj.joints else list(range(model.nq))
-        )
+        q_idx = utils.qpos_idx(model, traj.joints, default_to_full=True)
         for i in range(len(traj.positions)):
             q = traj.positions[i]
             data.qpos[q_idx] = q

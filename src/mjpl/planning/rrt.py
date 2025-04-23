@@ -58,11 +58,7 @@ class RRT:
 
         self.model = model
         self.planning_joints = planning_joints
-        self.q_idx = (
-            utils.qpos_idx(model, planning_joints)
-            if planning_joints
-            else list(range(model.nq))
-        )
+        self.q_idx = utils.qpos_idx(model, planning_joints, default_to_full=True)
         self.cr = cr
         self.max_planning_time = max_planning_time
         self.epsilon = epsilon

@@ -52,11 +52,7 @@ class TestRRT(unittest.TestCase):
             data = mujoco.MjData(model)
             data.qpos = path.q_init
             self.assertTrue(mjpl.utils.is_valid_config(model, data, cr))
-            q_idx = (
-                mjpl.qpos_idx(model, planning_joints)
-                if planning_joints
-                else list(range(model.nq))
-            )
+            q_idx = mjpl.qpos_idx(model, planning_joints, default_to_full=True)
             for wp in path.waypoints:
                 data.qpos[q_idx] = wp
                 self.assertTrue(mjpl.utils.is_valid_config(model, data, cr))

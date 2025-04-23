@@ -27,16 +27,23 @@ def step(start: np.ndarray, target: np.ndarray, max_step_dist: float) -> np.ndar
     return start + (unit_vec * min(max_step_dist, magnitude))
 
 
-def qpos_idx(model: mujoco.MjModel, joints: list[str]) -> list[int]:
+def qpos_idx(
+    model: mujoco.MjModel, joints: list[str], default_to_full: bool = False
+) -> list[int]:
     """Get the indices in mujoco.MjData.qpos that correspond to specific joints.
 
     Args:
         model: MuJoCo model.
         joints: The names of the joints in `model`.
+        default_to_full: Whether or not all indices in mujoco.MjData.qpos should be
+            returned if `joints` is an empty list.
 
     Returns:
         A list of indices that correspond to `joints` in mujoco.MjData.qpos.
     """
+    if not joints and default_to_full:
+        return list(range(model.nq))
+
     idx: list[int] = []
     for j in joints:
         jnt_id = model.joint(j).id
@@ -127,7 +134,7 @@ def random_valid_config(
     data.qpos = q_init
 
     rng = np.random.default_rng(seed=seed)
-    q_idx = qpos_idx(model, joints) if joints else list(range(model.nq))
+    q_idx = qpos_idx(model, joints, default_to_full=True)
     data.qpos[q_idx] = rng.uniform(*model.jnt_range.T)[q_idx]
     while not is_valid_config(model, data, cr):
         data.qpos[q_idx] = rng.uniform(*model.jnt_range.T)[q_idx]
@@ -165,7 +172,7 @@ def shortcut(
     data.qpos = path.q_init
     rng = np.random.default_rng(seed=seed)
 
-    q_idx = qpos_idx(model, path.joints) if path.joints else list(range(model.nq))
+    q_idx = qpos_idx(model, path.joints, default_to_full=True)
 
     # sanity check: can we shortcut directly between the start/end of the path?
     shortened_waypoints = _connect_waypoints(
