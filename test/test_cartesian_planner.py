@@ -115,15 +115,6 @@ class TestCartesianPlanner(unittest.TestCase):
         model = load_robot_description("ur5e_mj_description")
         data = mujoco.MjData(model)
         site = "attachment_site"
-
-        arm_joints = [
-            "shoulder_pan_joint",
-            "shoulder_lift_joint",
-            "elbow_joint",
-            "wrist_1_joint",
-            "wrist_2_joint",
-            "wrist_3_joint",
-        ]
         cr = mjpl.CollisionRuleset(model)
 
         # Use the "home" keyframe as the initial configuration.
@@ -147,50 +138,64 @@ class TestCartesianPlanner(unittest.TestCase):
             SE3.from_translation(np.array([0.02, 0.01, 0.0]))
         )
 
-        # Define an IK solver.
-        pos_tolerance = 1e-3
-        ori_tolerance = 1e-3
-        solver = mjpl.MinkIKSolver(
-            model=model,
-            joints=arm_joints,
-            cr=cr,
-            pos_tolerance=pos_tolerance,
-            ori_tolerance=ori_tolerance,
-            seed=12345,
-            max_attempts=5,
-        )
+        # Define an IK solver. We are using all of the model's joints to solve IK,
+        # so `joints` can be an empty list or a list that includes all joints.
+        arm_joints = [
+            "shoulder_pan_joint",
+            "shoulder_lift_joint",
+            "elbow_joint",
+            "wrist_1_joint",
+            "wrist_2_joint",
+            "wrist_3_joint",
+        ]
+        for joints in ([], arm_joints):
+            pos_tolerance = 1e-3
+            ori_tolerance = 1e-3
+            solver = mjpl.MinkIKSolver(
+                model=model,
+                joints=joints,
+                cr=cr,
+                pos_tolerance=pos_tolerance,
+                ori_tolerance=ori_tolerance,
+                seed=12345,
+                max_attempts=5,
+            )
 
-        # Plan a Cartesian path.
-        path = mjpl.cartesian_plan(
-            q_init_world, poses, site, solver, lin_threshold=0.01, ori_threshold=0.1
-        )
-        self.assertIsNotNone(path)
-        self.assertEqual(len(path.waypoints), 4)
-        self.assertListEqual(path.joints, [])
-        # The first element in the path should match the initial configuration.
-        np.testing.assert_equal(path.q_init, q_init_world)
-        np.testing.assert_equal(path.waypoints[0], q_init_world)
-        # The other joint configurations in the path should satisfy the poses
-        # within the IK solver's tolerance.
-        data.qpos = path.waypoints[1]
-        mujoco.mj_kinematics(model, data)
-        actual_site_pose = mjpl.site_pose(data, site)
-        err = poses[0].minus(actual_site_pose)
-        self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
-        self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
-        # An interpolated pose should have been added to the Cartesian path (`poses`)
-        data.qpos = path.waypoints[2]
-        mujoco.mj_kinematics(model, data)
-        actual_site_pose = mjpl.site_pose(data, site)
-        err = interpolated_pose.minus(actual_site_pose)
-        self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
-        self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
-        data.qpos = path.waypoints[3]
-        mujoco.mj_kinematics(model, data)
-        actual_site_pose = mjpl.site_pose(data, site)
-        err = poses[1].minus(actual_site_pose)
-        self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
-        self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
+            # Plan a Cartesian path.
+            path = mjpl.cartesian_plan(
+                q_init_world, poses, site, solver, lin_threshold=0.01, ori_threshold=0.1
+            )
+            self.assertIsNotNone(path)
+            self.assertEqual(len(path.waypoints), 4)
+            # (cartesian path gives waypoints that are a full configuration)
+            self.assertListEqual(path.joints, [])
+
+            # The first element in the path should match the initial configuration.
+            np.testing.assert_equal(path.q_init, q_init_world)
+            np.testing.assert_equal(path.waypoints[0], q_init_world)
+
+            # The other joint configurations in the path should satisfy the poses
+            # within the IK solver's tolerance.
+            data.qpos = path.waypoints[1]
+            mujoco.mj_kinematics(model, data)
+            actual_site_pose = mjpl.site_pose(data, site)
+            err = poses[0].minus(actual_site_pose)
+            self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
+            self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
+
+            # An interpolated pose should have been added to the Cartesian path
+            data.qpos = path.waypoints[2]
+            mujoco.mj_kinematics(model, data)
+            actual_site_pose = mjpl.site_pose(data, site)
+            err = interpolated_pose.minus(actual_site_pose)
+            self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
+            self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
+            data.qpos = path.waypoints[3]
+            mujoco.mj_kinematics(model, data)
+            actual_site_pose = mjpl.site_pose(data, site)
+            err = poses[1].minus(actual_site_pose)
+            self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
+            self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
 
 
 if __name__ == "__main__":

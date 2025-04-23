@@ -211,8 +211,8 @@ def _connect_waypoints(
     q_idx: list[int],
     start_idx: int,
     end_idx: int,
-    validation_dist: float = 0.05,
-    cr: CollisionRuleset | None = None,
+    validation_dist: float,
+    cr: CollisionRuleset | None,
 ) -> list[np.ndarray]:
     """If possible, directly connect two specific waypoints from a list of waypoints.
 

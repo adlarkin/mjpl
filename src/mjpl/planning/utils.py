@@ -28,7 +28,6 @@ def _extend(
         start_node: The node in `tree` to extend towards `q_target`.
         eps: The maximum distance `start_node` will extend towards `q_target`.
         cr: The CollisionRuleset configurations must obey.
-        data: MuJoCo data. Used for validation checking.
 
     Returns:
         The node that was the result of extending `start_node` towards `q_target`,

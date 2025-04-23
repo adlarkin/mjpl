@@ -74,7 +74,7 @@ class MinkIKSolver(IKSolver):
         configuration = mink.Configuration(self.model)
         configuration.update(q_init_guess)
 
-        for _ in range(self.max_attempts):
+        for attempt in range(self.max_attempts):
             for _ in range(self.iterations):
                 err = end_effector_task.compute_error(configuration)
                 pos_achieved = np.linalg.norm(err[:3]) <= self.pos_tolerance
@@ -94,8 +94,10 @@ class MinkIKSolver(IKSolver):
                 )
                 configuration.integrate_inplace(vel, self.model.opt.timestep)
 
+            # Make sure a different seed is used for each randomly generated config.
+            _seed = self.seed + attempt if self.seed is not None else self.seed
             next_guess = utils.random_valid_config(
-                self.model, configuration.q, self.seed, self.joints, self.cr
+                self.model, configuration.q, _seed, self.joints, self.cr
             )
             configuration.update(next_guess)
         return None

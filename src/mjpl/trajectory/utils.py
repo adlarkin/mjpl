@@ -36,12 +36,13 @@ def generate_collision_free_trajectory(
     Returns:
         A trajectory that follows `path` without violating `cr`.
     """
-    q_idx = utils.qpos_idx(model, path.joints)
-
     data = mujoco.MjData(model)
-    data.qpos = path.q_init
     while True:
         traj = generator.generate_trajectory(path)
+        data.qpos = traj.q_init
+        q_idx = (
+            utils.qpos_idx(model, traj.joints) if traj.joints else list(range(model.nq))
+        )
         for i in range(len(traj.positions)):
             q = traj.positions[i]
             data.qpos[q_idx] = q
@@ -50,7 +51,7 @@ def generate_collision_free_trajectory(
             if not cr.obeys_ruleset(data.contact.geom):
                 # Add an intermediate waypoint to the section of the path
                 # that corresponds to the trajectory position that's in collision.
-                path_timestamps = _path_timing(path.waypoints, traj)
+                path_timestamps = _waypoint_timing(path.waypoints, traj)
                 collision_timestamp = (i + 1) * traj.dt
                 _add_intermediate_waypoint(
                     path.waypoints, path_timestamps, collision_timestamp
@@ -60,7 +61,9 @@ def generate_collision_free_trajectory(
             return traj
 
 
-def _path_timing(waypoints: list[np.ndarray], trajectory: Trajectory) -> list[float]:
+def _waypoint_timing(
+    waypoints: list[np.ndarray], trajectory: Trajectory
+) -> list[float]:
     """Assign timestamps to waypoints that correspond to a trajectory.
 
     Args:

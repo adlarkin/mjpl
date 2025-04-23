@@ -14,9 +14,9 @@ _BALL_XY_PLANE_XML = _MODEL_DIR / "two_dof_ball.xml"
 _JOINTS_XML = _MODEL_DIR / "joints.xml"
 
 
-def directly_connectable_path() -> list[np.ndarray]:
+def directly_connectable_waypoints() -> list[np.ndarray]:
     """
-    Path that can be directly connected between the start and end.
+    Waypoints that can be directly connected between the start and end.
     "X" represents an obstacle.
 
                   p2 -> p3 --> p4
@@ -37,9 +37,9 @@ def directly_connectable_path() -> list[np.ndarray]:
     return [p0, p1, p2, p3, p4, p5, p6]
 
 
-def shortcuttable_path() -> list[np.ndarray]:
+def shortcuttable_waypoints() -> list[np.ndarray]:
     """
-    Path that can benefit from shortcutting.
+    Waypoints that can benefit from shortcutting.
     "X" represents an obstacle.
 
                   p2 -> p3 --> p4
@@ -95,20 +95,20 @@ class TestUtils(unittest.TestCase):
         cr = mjpl.CollisionRuleset(model)
 
         # Waypoint connection should fail if an obstacle is present.
-        path = shortcuttable_path()
-        connected_path = mjpl.utils._connect_waypoints(
+        waypoints = shortcuttable_waypoints()
+        connected_waypoints = mjpl.utils._connect_waypoints(
             model,
             mujoco.MjData(model),
-            path,
+            waypoints,
             q_idx,
             start_idx=1,
             end_idx=5,
             validation_dist=0.1,
             cr=cr,
         )
-        self.assertListEqual(path, connected_path)
+        self.assertListEqual(waypoints, connected_waypoints)
 
-        path = [
+        waypoints = [
             np.array([0.0, 1.0]),
             np.array([1.0, 1.0]),
             np.array([2.0, 1.0]),
@@ -117,40 +117,56 @@ class TestUtils(unittest.TestCase):
         ]
 
         # Test a valid waypoint connection.
-        connected_path = mjpl.utils._connect_waypoints(
+        connected_waypoints = mjpl.utils._connect_waypoints(
             model,
             mujoco.MjData(model),
-            path,
+            waypoints,
             q_idx,
             start_idx=0,
             end_idx=2,
             validation_dist=0.25,
             cr=cr,
         )
-        self.assertListEqual(connected_path, [path[0], path[2], path[3]])
+        self.assertListEqual(
+            connected_waypoints, [waypoints[0], waypoints[2], waypoints[3]]
+        )
 
         # Test an invalid waypoint connection. `end_idx` corresponds to a waypoint
-        # that violates joint limits, so the returned path should be an unmodified
-        # copy of the original).
-        connected_path = mjpl.utils._connect_waypoints(
+        # that violates joint limits, so this call should do nothing (i.e., the
+        # returned waypoints should be an unmodified copy of the original).
+        connected_waypoints = mjpl.utils._connect_waypoints(
             model,
             mujoco.MjData(model),
-            path,
+            waypoints,
             q_idx,
             start_idx=1,
             end_idx=3,
             validation_dist=0.25,
             cr=cr,
         )
-        self.assertListEqual(connected_path, path)
+        self.assertListEqual(connected_waypoints, waypoints)
 
         data = mujoco.MjData(model)
         with self.assertRaisesRegex(ValueError, "`validation_dist` must be > 0"):
             mjpl.utils._connect_waypoints(
-                model, data, path, q_idx, start_idx=0, end_idx=2, validation_dist=0.0
+                model,
+                data,
+                waypoints,
+                q_idx,
+                start_idx=0,
+                end_idx=2,
+                validation_dist=0.0,
+                cr=cr,
             )
             mjpl.utils._connect_waypoints(
-                model, data, path, q_idx, start_idx=0, end_idx=2, validation_dist=-1.0
+                model,
+                data,
+                waypoints,
+                q_idx,
+                start_idx=0,
+                end_idx=2,
+                validation_dist=-1.0,
+                cr=cr,
             )
 
     def test_shortcut(self):
@@ -158,7 +174,7 @@ class TestUtils(unittest.TestCase):
         planning_joints = ["ball_slide_x", "ball_slide_y"]
         cr = mjpl.CollisionRuleset(model)
 
-        waypoints = directly_connectable_path()
+        waypoints = directly_connectable_waypoints()
         path = mjpl.types.Path(
             q_init=waypoints[0], waypoints=waypoints, joints=planning_joints
         )
@@ -171,7 +187,7 @@ class TestUtils(unittest.TestCase):
         )
         self.assertListEqual(shortened_path.joints, path.joints)
 
-        # Add a final point to the path that violates joint limits.
+        # Add a final waypoint to the path that violates joint limits.
         # This means that after enough tries, the first and penultimate
         # (i.e., last valid) waypoints can be directly connected
         invalid_waypoints = waypoints + [np.array([3.0, -5.0])]
@@ -194,7 +210,7 @@ class TestUtils(unittest.TestCase):
 
         # Test shortcutting on a path that can be shortened, but is not
         # directly connectable from the start to end.
-        waypoints = shortcuttable_path()
+        waypoints = shortcuttable_waypoints()
         path = mjpl.types.Path(
             q_init=waypoints[0], waypoints=waypoints, joints=planning_joints
         )
@@ -213,7 +229,10 @@ class TestUtils(unittest.TestCase):
 
     def test_shortcut_6dof(self):
         model = load_robot_description("ur5e_mj_description")
+        cr = mjpl.CollisionRuleset(model)
+        seed = 42
 
+        # All joints can be represented explicitly or as an empty list.
         arm_joints = [
             "shoulder_pan_joint",
             "shoulder_lift_joint",
@@ -222,37 +241,35 @@ class TestUtils(unittest.TestCase):
             "wrist_2_joint",
             "wrist_3_joint",
         ]
-        cr = mjpl.CollisionRuleset(model)
-
-        seed = 42
-
-        # Make a path starting from the home config that connects to various random valid configs.
-        waypoints = [model.keyframe("home").qpos.copy()]
-        unique_waypoints = {tuple(waypoints[0])}
-        for i in range(5):
-            q_rand = mjpl.random_valid_config(
-                model, np.zeros(model.nq), seed + i, arm_joints, cr
+        for joints in ([], arm_joints):
+            # Make a path starting from the home config that connects to various random valid configs.
+            waypoints = [model.keyframe("home").qpos.copy()]
+            unique_waypoints = {tuple(waypoints[0])}
+            for i in range(5):
+                q_rand = mjpl.random_valid_config(
+                    model, np.zeros(model.nq), seed + i, joints, cr
+                )
+                waypoints.append(q_rand)
+                hashable_q_rand = tuple(q_rand)
+                self.assertNotIn(hashable_q_rand, unique_waypoints)
+                unique_waypoints.add(tuple(q_rand))
+            path = mjpl.types.Path(
+                q_init=waypoints[0], waypoints=waypoints, joints=joints
             )
-            waypoints.append(q_rand)
-            unique_waypoints.add(tuple(q_rand))
-        self.assertEqual(len(unique_waypoints), len(waypoints))
-        path = mjpl.types.Path(
-            q_init=waypoints[0], waypoints=waypoints, joints=arm_joints
-        )
 
-        # Perform shortcutting. The path should now be shorter, but still start
-        # and end at the same waypoints.
-        shortcut_path = mjpl.shortcut(model, path, cr, seed=seed)
-        np.testing.assert_equal(shortcut_path.q_init, path.q_init)
-        self.assertLess(len(shortcut_path.waypoints), len(path.waypoints))
-        self.assertGreaterEqual(len(shortcut_path.waypoints), 2)
-        np.testing.assert_equal(shortcut_path.waypoints[0], path.waypoints[0])
-        np.testing.assert_equal(shortcut_path.waypoints[-1], path.waypoints[-1])
-        # (must convert numpy arrays to tuples to make them hashable)
-        original_intermediate_qs = {tuple(q) for q in path.waypoints[1:-1]}
-        for intermediate_q in shortcut_path.waypoints[1:-1]:
-            self.assertIn(tuple(intermediate_q), original_intermediate_qs)
-        self.assertListEqual(shortcut_path.joints, path.joints)
+            # Perform shortcutting. The path should now be shorter, but still start
+            # and end at the same waypoints.
+            shortcut_path = mjpl.shortcut(model, path, cr, seed=seed)
+            np.testing.assert_equal(shortcut_path.q_init, path.q_init)
+            self.assertLess(len(shortcut_path.waypoints), len(path.waypoints))
+            self.assertGreaterEqual(len(shortcut_path.waypoints), 2)
+            np.testing.assert_equal(shortcut_path.waypoints[0], path.waypoints[0])
+            np.testing.assert_equal(shortcut_path.waypoints[-1], path.waypoints[-1])
+            # (must convert numpy arrays to tuples to make them hashable)
+            original_intermediate_qs = {tuple(q) for q in path.waypoints[1:-1]}
+            for intermediate_q in shortcut_path.waypoints[1:-1]:
+                self.assertIn(tuple(intermediate_q), original_intermediate_qs)
+            self.assertListEqual(shortcut_path.joints, path.joints)
 
     def test_qpos_idx(self):
         model = mujoco.MjModel.from_xml_path(_JOINTS_XML.as_posix())
@@ -278,6 +295,55 @@ class TestUtils(unittest.TestCase):
         # Make sure index order matches order of joints in the query.
         indices = mjpl.qpos_idx(model, ["ball_joint", "hinge_joint", "free_joint"])
         self.assertListEqual(indices, [9, 10, 11, 12, 8, 1, 2, 3, 4, 5, 6, 7])
+
+        self.assertListEqual(mjpl.qpos_idx(model, []), [])
+
+    def test_is_valid_config(self):
+        model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
+        data = mujoco.MjData(model)
+        cr = mjpl.CollisionRuleset(model)
+
+        # Valid configuration (within joint limits, obeys CollisionRuleset)
+        data.qpos = np.zeros(model.nq)
+        self.assertTrue(mjpl.utils.is_valid_config(model, data, cr))
+
+        # Invalid configuration (violates joint limits)
+        data.qpos = np.array([2.5, 0.0])
+        self.assertFalse(mjpl.utils.is_valid_config(model, data, cr))
+
+        # Invalid configuration (within joint limits, violates CollisionRuleset)
+        data.qpos = np.array([0.6, 0.0])
+        self.assertFalse(mjpl.utils.is_valid_config(model, data, cr))
+
+        # Disabling the CollisionRuleset in the validity check makes a configuration
+        # that is within joint limits but in collision a valid configuration.
+        data.qpos = np.array([0.6, 0.0])
+        self.assertTrue(mjpl.utils.is_valid_config(model, data, None))
+
+    def test_random_valid_config(self):
+        model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
+        data = mujoco.MjData(model)
+        cr = mjpl.CollisionRuleset(model)
+
+        seed = 42
+
+        # Using the same seed should give the same result across multiple calls if all
+        # other args are consistent.
+        q_init = np.zeros(model.nq)
+        q_rand_first = mjpl.random_valid_config(model, q_init, seed, [], cr)
+        q_rand_second = mjpl.random_valid_config(model, q_init, seed, [], cr)
+        np.testing.assert_equal(q_rand_first, q_rand_second)
+        data.qpos = q_rand_first
+        self.assertTrue(mjpl.utils.is_valid_config(model, data, cr))
+
+        # Specifying a subset of joints means some values in q_init shouldn't be modified.
+        q_init = np.zeros(model.nq)
+        modifiable_joints = ["ball_slide_y"]
+        q_rand = mjpl.random_valid_config(model, q_init, seed, modifiable_joints, cr)
+        unchanged_idx = mjpl.qpos_idx(model, ["ball_slide_x"])
+        np.testing.assert_equal(q_rand[unchanged_idx], q_init[unchanged_idx])
+        data.qpos = q_rand
+        self.assertTrue(mjpl.utils.is_valid_config(model, data, cr))
 
 
 if __name__ == "__main__":
