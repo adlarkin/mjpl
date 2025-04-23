@@ -28,6 +28,7 @@ def generate_collision_free_trajectory(
     This is taken from section 3.5 of https://groups.csail.mit.edu/rrg/papers/Richter_ISRR13.pdf
 
     Args:
+        model: MuJoCo model.
         path: The path the trajectory must follow.
         generator: Trajectory generator.
         cr: The collision ruleset the trajectory must adhere to.
@@ -39,9 +40,8 @@ def generate_collision_free_trajectory(
 
     data = mujoco.MjData(model)
     data.qpos = path.q_init
-    filled_path = path
     while True:
-        traj = generator.generate_trajectory(filled_path)
+        traj = generator.generate_trajectory(path)
         for i in range(len(traj.positions)):
             q = traj.positions[i]
             data.qpos[q_idx] = q
@@ -50,14 +50,10 @@ def generate_collision_free_trajectory(
             if not cr.obeys_ruleset(data.contact.geom):
                 # Add an intermediate waypoint to the section of the path
                 # that corresponds to the trajectory position that's in collision.
-                waypoints = [wp for wp in filled_path.waypoints]
-                path_timestamps = _path_timing(waypoints, traj)
+                path_timestamps = _path_timing(path.waypoints, traj)
                 collision_timestamp = (i + 1) * traj.dt
                 _add_intermediate_waypoint(
-                    waypoints, path_timestamps, collision_timestamp
-                )
-                filled_path = Path(
-                    q_init=path.q_init, waypoints=waypoints, joints=path.joints
+                    path.waypoints, path_timestamps, collision_timestamp
                 )
                 break
         else:
@@ -65,14 +61,14 @@ def generate_collision_free_trajectory(
 
 
 def _path_timing(waypoints: list[np.ndarray], trajectory: Trajectory) -> list[float]:
-    """Assign timestamps to waypoints in a path that correspond to a trajectory.
+    """Assign timestamps to waypoints that correspond to a trajectory.
 
     Args:
-        path: The path.
-        trajectory: The trajectory that follows `path`.
+        waypoints: The waypoints.
+        trajectory: The trajectory that follows `waypoints`.
 
     Returns:
-        A list of timestamps that correspond to path.waypoints based on `trajectory`.
+        A list of timestamps for each waypoint in `waypoints` based on `trajectory`.
     """
     if not waypoints:
         return []
@@ -91,21 +87,21 @@ def _path_timing(waypoints: list[np.ndarray], trajectory: Trajectory) -> list[fl
 
 
 def _add_intermediate_waypoint(
-    waypoints: list[np.ndarray], path_timing: list[float], timestamp: float
+    waypoints: list[np.ndarray], timing: list[float], timestamp: float
 ) -> None:
     """Insert an intermediate waypoint into a segment that contains a timestamp.
 
     Args:
         waypoints: The waypoints that will have an intermediate waypoint added to it.
-        path_timing: Timing information for the waypoints in `path`.
-        timestamp: The timestamp that defines the segment of `path` that needs to have
-            an intermediate waypoint added. If no segments in `path` contain this
-            timestamp, no waypoint is added to `path`.
+        timing: Timing information for `waypoints`.
+        timestamp: The timestamp that defines the segment of `waypoints` that needs to
+            have an intermediate waypoint added. If no segments in `waypoints` contain
+            this timestamp, no waypoint is added to `waypoints`.
     """
-    if len(waypoints) != len(path_timing):
-        raise ValueError("`waypoints` and `path_timing` must be the same length.")
+    if len(waypoints) != len(timing):
+        raise ValueError("`waypoints` and `timing` must be the same length.")
     for i in range(len(waypoints) - 1):
-        if path_timing[i] <= timestamp <= path_timing[i + 1]:
+        if timing[i] <= timestamp <= timing[i + 1]:
             intermediate_waypoint = (waypoints[i] + waypoints[i + 1]) / 2
             waypoints.insert(i + 1, intermediate_waypoint)
             return

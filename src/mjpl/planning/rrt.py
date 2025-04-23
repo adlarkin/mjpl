@@ -35,6 +35,7 @@ class RRT:
         """Constructor.
 
         Args:
+            model: MuJoCo model.
             planning_joints: The joints used for planning.
             cr: The CollisionRuleset the sampled configurations must obey.
             max_planning_time: Maximum planning time, in seconds.
@@ -82,11 +83,8 @@ class RRT:
             solver: Solver used to compute IK for `pose` and `site`.
 
         Returns:
-            A path from `q_init_world` to `pose`. If a path cannot be found, an
-            empty list is returned.
-
-            A path is defined as a list of configurations that correspond to the
-            joints in the planner's JointGroup.
+            A path from `q_init_world` to `pose`. If a path cannot be found,
+            None is returned.
         """
         return self.plan_to_poses(q_init_world, [pose], site, solver)
 
@@ -101,11 +99,8 @@ class RRT:
                 each joint in the planner's JointGroup.
 
         Returns:
-            A path from `q_init_world` to `q_goal`. If a path cannot be found, an
-            empty list is returned.
-
-            A path is defined as a list of configurations that correspond to the
-            joints in the planner's joint group.
+            A path from `q_init_world` to `pose`. If a path cannot be found,
+            None is returned.
         """
         return self.plan_to_configs(q_init_world, [q_goal])
 
@@ -125,12 +120,8 @@ class RRT:
             solver: Solver used to compute IK for `poses` and `site`.
 
         Returns:
-            A path from `q_init_world` to a pose in `poses`. The planner will
-            return the first path that is found. If a path cannot be found to
-            any of the poses, an empty list is returned.
-
-            A path is defined as a list of configurations that correspond to the
-            joints in the planner's JointGroup.
+            A path from `q_init_world` to `pose`. If a path cannot be found,
+            None is returned.
         """
         if solver is None:
             solver = MinkIKSolver(
@@ -164,10 +155,7 @@ class RRT:
         Returns:
             A path from `q_init_world` to a configuration in `q_goals`. The
             planner will return the first path that is found. If a path cannot
-            be found to any of the configurations, an empty list is returned.
-
-            A path is defined as a list of configurations that correspond to the
-            joints in the planner's JointGroup.
+            be found to any of the configurations, None is returned.
         """
         assert q_init_world.size == self.model.nq
         for q in q_goals:
@@ -214,24 +202,24 @@ class RRT:
                 q_rand = self.rng.uniform(*self.model.jnt_range.T)[self.q_idx]
 
             new_start_tree_node = _connect(
-                q_rand,
                 self.model,
+                data,
+                q_rand,
                 self.q_idx,
                 start_tree,
                 self.epsilon,
                 self.max_connection_distance,
                 self.cr,
-                data,
             )
             new_goal_tree_node = _connect(
-                new_start_tree_node.q,
                 self.model,
+                data,
+                new_start_tree_node.q,
                 self.q_idx,
                 goal_tree,
                 self.epsilon,
                 self.max_connection_distance,
                 self.cr,
-                data,
             )
             if (
                 np.linalg.norm(new_goal_tree_node.q - new_start_tree_node.q)
@@ -248,24 +236,24 @@ class RRT:
 
             if not np.array_equal(new_start_tree_node.q, q_rand):
                 new_goal_tree_node = _connect(
-                    q_rand,
                     self.model,
+                    data,
+                    q_rand,
                     self.q_idx,
                     goal_tree,
                     self.epsilon,
                     self.max_connection_distance,
                     self.cr,
-                    data,
                 )
                 new_start_tree_node = _connect(
-                    new_goal_tree_node.q,
                     self.model,
+                    data,
+                    new_goal_tree_node.q,
                     self.q_idx,
                     start_tree,
                     self.epsilon,
                     self.max_connection_distance,
                     self.cr,
-                    data,
                 )
                 if (
                     np.linalg.norm(new_goal_tree_node.q - new_start_tree_node.q)

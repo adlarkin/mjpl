@@ -29,7 +29,7 @@ class TestPlanningUtils(unittest.TestCase):
         q_goal = np.array([0.5])
         expected_q_extended = np.array([0.0])
         extended_node = _extend(
-            q_goal, model, q_idx, tree, root_node, epsilon, cr, data
+            model, data, q_goal, q_idx, tree, root_node, epsilon, cr
         )
         self.assertIsNotNone(extended_node)
         self.assertSetEqual(tree.nodes, {root_node, extended_node})
@@ -41,7 +41,7 @@ class TestPlanningUtils(unittest.TestCase):
         # Running EXTEND when q_target == start_node.q should do nothing.
         existing_nodes = tree.nodes.copy()
         same_extended_node = _extend(
-            extended_node.q, model, q_idx, tree, extended_node, epsilon, cr, data
+            model, data, extended_node.q, q_idx, tree, extended_node, epsilon, cr
         )
         self.assertIsNotNone(same_extended_node)
         self.assertIn(same_extended_node, existing_nodes)
@@ -53,7 +53,7 @@ class TestPlanningUtils(unittest.TestCase):
         root_node = Node(q_init)
         tree = Tree(root_node)
         extended_node = _extend(
-            np.array([0.9]), model, q_idx, tree, root_node, epsilon, cr, data
+            model, data, np.array([0.9]), q_idx, tree, root_node, epsilon, cr
         )
         self.assertIsNone(extended_node)
         self.assertSetEqual(tree.nodes, {root_node})
@@ -71,7 +71,7 @@ class TestPlanningUtils(unittest.TestCase):
 
         # Test a valid CONNECT.
         q_goal = np.array([0.15])
-        connected_node = _connect(q_goal, model, q_idx, tree, epsilon, np.inf, cr, data)
+        connected_node = _connect(model, data, q_goal, q_idx, tree, epsilon, np.inf, cr)
         np.testing.assert_allclose(connected_node.q, q_goal, rtol=0, atol=1e-9)
         # Check the path from the last connected node.
         # This implicitly checks each connected node's parent.
@@ -90,7 +90,7 @@ class TestPlanningUtils(unittest.TestCase):
         # in the tree should do nothing.
         existing_nodes = tree.nodes.copy()
         same_connected_node = _connect(
-            connected_node.q, model, q_idx, tree, epsilon, np.inf, cr, data
+            model, data, connected_node.q, q_idx, tree, epsilon, np.inf, cr
         )
         self.assertIn(same_connected_node, existing_nodes)
         self.assertSetEqual(tree.nodes, existing_nodes)
@@ -103,7 +103,7 @@ class TestPlanningUtils(unittest.TestCase):
         max_connection_dist = 0.45
         max_connected_q = q_init + max_connection_dist
         connected_node = _connect(
-            q_goal, model, q_idx, tree, epsilon, max_connection_dist, cr, data
+            model, data, q_goal, q_idx, tree, epsilon, max_connection_dist, cr
         )
         np.testing.assert_allclose(connected_node.q, max_connected_q, rtol=0, atol=1e-9)
         # Check the path from the last connected node.
@@ -129,7 +129,7 @@ class TestPlanningUtils(unittest.TestCase):
         obstacle = model.geom("wall_obstacle")
         obstacle_min_x = obstacle.pos[0] - obstacle.size[0]
         q_goal = np.array([1.0])
-        connected_node = _connect(q_goal, model, q_idx, tree, epsilon, np.inf, cr, data)
+        connected_node = _connect(model, data, q_goal, q_idx, tree, epsilon, np.inf, cr)
         self.assertNotEqual(connected_node, root_node)
         self.assertGreater(len(tree.nodes), 1)
         np.testing.assert_array_less(connected_node.q, obstacle_min_x)
@@ -154,7 +154,7 @@ class TestPlanningUtils(unittest.TestCase):
         path = _combine_paths(start_tree, child_start, goal_tree, child_goal)
         self.assertTrue(len(path), len(expected_path))
         for i in range(len(path)):
-            np.testing.assert_array_equal(path[i], expected_path[i])
+            np.testing.assert_equal(path[i], expected_path[i])
 
         # Add a duplicate "merge node".
         q_new = np.array([0.15])
@@ -174,7 +174,7 @@ class TestPlanningUtils(unittest.TestCase):
         path = _combine_paths(start_tree, grandchild_start, goal_tree, grandchild_goal)
         self.assertTrue(len(path), len(expected_path))
         for i in range(len(path)):
-            np.testing.assert_array_equal(path[i], expected_path[i])
+            np.testing.assert_equal(path[i], expected_path[i])
 
 
 if __name__ == "__main__":

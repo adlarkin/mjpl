@@ -56,6 +56,8 @@ class ToppraTrajectoryGenerator(TrajectoryGenerator):
         if not np.isclose(t[-1], trajectory.duration, rtol=0.0, atol=1e-8):
             t = np.append(t, trajectory.duration)
         return Trajectory(
+            path.q_init,
+            path.joints,
             self.dt,
             [position for position in trajectory(t)],
             [velocity for velocity in trajectory(t, order=1)],

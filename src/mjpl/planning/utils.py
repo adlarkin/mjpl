@@ -7,19 +7,23 @@ from .tree import Node, Tree
 
 
 def _extend(
-    q_target: np.ndarray,
     model: mujoco.MjModel,
+    data: mujoco.MjData,
+    q_target: np.ndarray,
     q_idx: list[int],
     tree: Tree,
     start_node: Node,
     eps: float,
     cr: CollisionRuleset,
-    data: mujoco.MjData,
 ) -> Node | None:
     """Extend a node in a tree towards a target configuration.
 
     Args:
+        model: MuJoCo model.
+        data: MuJoCo data. Used for validation checking. This should have values
+            initialized in MjData.qpos that do not correspond to `q_target`/`q_idx`.
         q_target: The target configuration.
+        q_idx: The indices in MjData.qpos that correspond to the values in `q_target`.
         tree: The tree with a node to extend towards `q_target`.
         start_node: The node in `tree` to extend towards `q_target`.
         eps: The maximum distance `start_node` will extend towards `q_target`.
@@ -42,19 +46,23 @@ def _extend(
 
 
 def _connect(
-    q_target: np.ndarray,
     model: mujoco.MjModel,
+    data: mujoco.MjData,
+    q_target: np.ndarray,
     q_idx: list[int],
     tree: Tree,
     eps: float,
     max_connection_distance: float,
     cr: CollisionRuleset,
-    data: mujoco.MjData,
 ) -> Node:
     """Attempt to connect a node in a tree to a target configuration.
 
     Args:
+        model: MuJoCo model.
+        data: MuJoCo data. Used for validation checking. This should have values
+            initialized in MjData.qpos that do not correspond to `q_target`/`q_idx`.
         q_target: The target configuration.
+        q_idx: The indices in MjData.qpos that correspond to the values in `q_target`.
         tree: The tree with a node that serves as the basis of the connection
             to `q_target`.
         eps: The maximum distance between nodes added to `tree`. If the
@@ -63,7 +71,6 @@ def _connect(
         max_connection_distance: The maximum distance to cover before terminating
             the connect operation.
         cr: The CollisionRuleset configurations must obey.
-        data: MuJoCo data. Used for validation checking.
 
     Returns:
         The node that is the result of connecting a node from `tree` towards
@@ -74,7 +81,7 @@ def _connect(
     while not np.array_equal(nearest_node.q, q_target):
         max_eps = min(eps, max_connection_distance - total_distance)
         next_node = _extend(
-            q_target, model, q_idx, tree, nearest_node, max_eps, cr, data
+            model, data, q_target, q_idx, tree, nearest_node, max_eps, cr
         )
         if not next_node:
             break

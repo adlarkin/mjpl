@@ -14,8 +14,11 @@ class Trajectory:
     The trajectory duration (with final time t_f) is `dt` * n.
     """
 
-    # TODO: add q_init and joints? (see Path in types.py)
-
+    # Initial configuration of all joints.
+    q_init: np.ndarray
+    # The joints corresponding to `positions`, `velocities`, and `accelerations`.
+    # An empty list means all joints are used.
+    joints: list[str]
     # The timestep between each position, velocity, and acceleration snapshot.
     dt: float
     # Position snapshots at increments of dt, ranging from t = [dt, t_f].

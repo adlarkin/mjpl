@@ -46,7 +46,6 @@ if __name__ == "__main__":
     goal_biasing_probability = 0.1
     number_of_attempts = 15
 
-    q_idx = mjpl.qpos_idx(model, planning_joints)
     cr = mjpl.CollisionRuleset(model, allowed_collisions)
 
     # Plan number_of_attempts times and record benchmarks.

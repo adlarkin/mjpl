@@ -29,9 +29,11 @@ class TestToppraTrajectoryGenerator(unittest.TestCase):
             rng.random(dof),
             rng.random(dof),
         ]
-        t = traj_generator.generate_trajectory(
-            mjpl.types.Path(q_init=waypoints[0], waypoints=waypoints, joints=[])
-        )
+        path = mjpl.types.Path(q_init=waypoints[0], waypoints=waypoints, joints=[])
+
+        t = traj_generator.generate_trajectory(path)
+        np.testing.assert_equal(t.q_init, path.q_init)
+        self.assertListEqual(t.joints, path.joints)
 
         # Ensure limits are enforced, with some tolerance for floating point error.
         tolerance = 1e-8

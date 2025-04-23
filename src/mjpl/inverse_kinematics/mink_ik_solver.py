@@ -13,7 +13,7 @@ class MinkIKSolver(IKSolver):
     def __init__(
         self,
         model: mujoco.MjModel,
-        joints: list[str],
+        joints: list[str] = [],
         cr: CollisionRuleset | None = None,
         pos_tolerance: float = 1e-3,
         ori_tolerance: float = 1e-3,
@@ -27,7 +27,8 @@ class MinkIKSolver(IKSolver):
         Args:
             model: MuJoCo model.
             joints: The joints to use when generating initial states for new solve
-                attempts and validating configurations.
+                attempts and validating configurations. An empty list means all
+                joints will be used.
             cr: The collision rules to enforce. If defined, IK solutions must
                 also obey this ruleset.
             pos_tolerance: Allowed position error.

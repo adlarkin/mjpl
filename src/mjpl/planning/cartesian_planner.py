@@ -81,9 +81,8 @@ def cartesian_plan(
             is exceeded.
 
     Returns:
-        A list of joint configurations, starting at `q_init_world`, that adhere
-        to a Cartesian path defined by `poses`. If a configuration cannot be
-        found for a pose in the Cartesian path, an empty list is returned.
+        A path that adheres to a Cartesian path defined by `poses`, starting from
+        `q_init_world`. None is returned if a path cannot be formed.
     """
     interpolated_poses = [poses[0]]
     for i in range(0, len(poses) - 1):

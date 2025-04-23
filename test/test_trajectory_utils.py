@@ -21,6 +21,8 @@ class TestTrajectoryUtils(unittest.TestCase):
         num_trajectory_points = 100
         positions_array = self.spline(np.linspace(0, 1, num_trajectory_points))
         self.trajectory = Trajectory(
+            q_init=positions_array[0],
+            joints=[],
             dt=1 / num_trajectory_points,
             positions=[row for row in positions_array],
             velocities=[],

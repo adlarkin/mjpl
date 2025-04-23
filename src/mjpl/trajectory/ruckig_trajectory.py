@@ -77,4 +77,6 @@ class RuckigTrajectoryGenerator(TrajectoryGenerator):
         if res != Result.Finished:
             raise ValueError("Trajectory generation failed.")
 
-        return Trajectory(self.dt, positions, velocities, accelerations)
+        return Trajectory(
+            path.q_init, path.joints, self.dt, positions, velocities, accelerations
+        )

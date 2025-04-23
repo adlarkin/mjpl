@@ -91,19 +91,19 @@ class TestUtils(unittest.TestCase):
 
     def test_connect_waypoints(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
-        q_idx = mjpl.qpos_idx(model, ["ball_slide_x", "ball_slide_y"])
+        q_idx = list(range(model.nq))
         cr = mjpl.CollisionRuleset(model)
 
         # Waypoint connection should fail if an obstacle is present.
         path = shortcuttable_path()
         connected_path = mjpl.utils._connect_waypoints(
-            path,
             model,
+            mujoco.MjData(model),
+            path,
+            q_idx,
             start_idx=1,
             end_idx=5,
             validation_dist=0.1,
-            q_idx=q_idx,
-            data=mujoco.MjData(model),
             cr=cr,
         )
         self.assertListEqual(path, connected_path)
@@ -116,53 +116,41 @@ class TestUtils(unittest.TestCase):
             np.array([3.0, 1.0]),
         ]
 
-        # Connect waypoints with validation checking.
+        # Test a valid waypoint connection.
         connected_path = mjpl.utils._connect_waypoints(
-            path,
             model,
+            mujoco.MjData(model),
+            path,
+            q_idx,
             start_idx=0,
             end_idx=2,
             validation_dist=0.25,
-            q_idx=q_idx,
-            data=mujoco.MjData(model),
             cr=cr,
         )
         self.assertListEqual(connected_path, [path[0], path[2], path[3]])
 
-        # Connect with validation checking. Since `end_idx` corresponds to
-        # a waypoint that violates the joint limits, this should fail
-        # (i.e., the returned path is an unmodified copy of the original).
+        # Test an invalid waypoint connection. `end_idx` corresponds to a waypoint
+        # that violates joint limits, so the returned path should be an unmodified
+        # copy of the original).
         connected_path = mjpl.utils._connect_waypoints(
-            path,
             model,
+            mujoco.MjData(model),
+            path,
+            q_idx,
             start_idx=1,
             end_idx=3,
             validation_dist=0.25,
-            q_idx=q_idx,
-            data=mujoco.MjData(model),
             cr=cr,
         )
         self.assertListEqual(connected_path, path)
 
-        # Connecting without validation checking on the waypoint that violates
-        # joint limits should work.
-        connected_path = mjpl.utils._connect_waypoints(
-            path,
-            model,
-            start_idx=1,
-            end_idx=3,
-            validation_dist=0.1,
-            q_idx=q_idx,
-            data=None,
-        )
-        self.assertListEqual(connected_path, [path[0], path[1], path[3]])
-
+        data = mujoco.MjData(model)
         with self.assertRaisesRegex(ValueError, "`validation_dist` must be > 0"):
             mjpl.utils._connect_waypoints(
-                path, model, start_idx=0, end_idx=2, validation_dist=0.0
+                model, data, path, q_idx, start_idx=0, end_idx=2, validation_dist=0.0
             )
             mjpl.utils._connect_waypoints(
-                path, model, start_idx=0, end_idx=2, validation_dist=-1.0
+                model, data, path, q_idx, start_idx=0, end_idx=2, validation_dist=-1.0
             )
 
     def test_shortcut(self):
@@ -176,8 +164,8 @@ class TestUtils(unittest.TestCase):
         )
 
         # The first and last waypoints in the path can be connected directly.
-        shortened_path = mjpl.shortcut(path, model, cr, seed=5)
-        np.testing.assert_array_equal(shortened_path.q_init, path.q_init)
+        shortened_path = mjpl.shortcut(model, path, cr, seed=5)
+        np.testing.assert_equal(shortened_path.q_init, path.q_init)
         self.assertListEqual(
             shortened_path.waypoints, [path.waypoints[0], path.waypoints[-1]]
         )
@@ -191,9 +179,9 @@ class TestUtils(unittest.TestCase):
             q_init=waypoints[0], waypoints=invalid_waypoints, joints=planning_joints
         )
         shortened_path = mjpl.shortcut(
-            invalid_path, model, cr, max_attempts=20, seed=42
+            model, invalid_path, cr, max_attempts=20, seed=42
         )
-        np.testing.assert_array_equal(shortened_path.q_init, path.q_init)
+        np.testing.assert_equal(shortened_path.q_init, path.q_init)
         self.assertListEqual(
             shortened_path.waypoints,
             [
@@ -210,8 +198,8 @@ class TestUtils(unittest.TestCase):
         path = mjpl.types.Path(
             q_init=waypoints[0], waypoints=waypoints, joints=planning_joints
         )
-        shortened_path = mjpl.shortcut(path, model, cr, seed=5)
-        np.testing.assert_array_equal(shortened_path.q_init, path.q_init)
+        shortened_path = mjpl.shortcut(model, path, cr, seed=5)
+        np.testing.assert_equal(shortened_path.q_init, path.q_init)
         self.assertListEqual(
             shortened_path.waypoints,
             [
@@ -254,8 +242,8 @@ class TestUtils(unittest.TestCase):
 
         # Perform shortcutting. The path should now be shorter, but still start
         # and end at the same waypoints.
-        shortcut_path = mjpl.shortcut(path, model, cr, seed=seed)
-        np.testing.assert_array_equal(shortcut_path.q_init, path.q_init)
+        shortcut_path = mjpl.shortcut(model, path, cr, seed=seed)
+        np.testing.assert_equal(shortcut_path.q_init, path.q_init)
         self.assertLess(len(shortcut_path.waypoints), len(path.waypoints))
         self.assertGreaterEqual(len(shortcut_path.waypoints), 2)
         np.testing.assert_equal(shortcut_path.waypoints[0], path.waypoints[0])

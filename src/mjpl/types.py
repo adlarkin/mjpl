@@ -5,6 +5,8 @@ import numpy as np
 
 @dataclass(frozen=True)
 class Path:
+    """Path data."""
+
     # Initial configuration of all joints.
     q_init: np.ndarray
     # Configurations for `joints` that define a path, starting at `q_init`.

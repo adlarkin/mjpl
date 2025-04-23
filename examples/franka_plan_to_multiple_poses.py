@@ -71,8 +71,8 @@ def main():
     print("Shortcutting...")
     start = time.time()
     shortcut_path = mjpl.shortcut(
-        path,
         model,
+        path,
         cr,
         validation_dist=planner.epsilon,
         max_attempts=len(path.waypoints),
