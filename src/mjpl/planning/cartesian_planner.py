@@ -35,10 +35,10 @@ def _interpolate_poses(
     ori_steps = int(np.ceil(ori_dist / ori_threshold))
     num_steps = max(lin_steps, ori_steps, 1)
 
-    poses = []
-    for alpha in np.linspace(0, 1, num_steps + 1):
-        poses.append(pose_from.interpolate(pose_to, alpha))
-    return poses
+    return [
+        pose_from.interpolate(pose_to, alpha)
+        for alpha in np.linspace(0, 1, num_steps + 1)
+    ]
 
 
 def cartesian_plan(
