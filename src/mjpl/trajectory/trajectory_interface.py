@@ -3,6 +3,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ..types import Path
+
 
 @dataclass(frozen=True)
 class Trajectory:
@@ -12,6 +14,11 @@ class Trajectory:
     The trajectory duration (with final time t_f) is `dt` * n.
     """
 
+    # Initial configuration of all joints.
+    q_init: np.ndarray
+    # The joints corresponding to `positions`, `velocities`, and `accelerations`.
+    # An empty list means all joints are used.
+    joints: list[str]
     # The timestep between each position, velocity, and acceleration snapshot.
     dt: float
     # Position snapshots at increments of dt, ranging from t = [dt, t_f].
@@ -26,11 +33,11 @@ class TrajectoryGenerator(ABC):
     """Abstract base class for generating trajectories."""
 
     @abstractmethod
-    def generate_trajectory(self, path: list[np.ndarray]) -> Trajectory:
+    def generate_trajectory(self, path: Path) -> Trajectory:
         """Generate a trajectory.
 
         Args:
-            path: A sequence of waypoints the trajectory should follow.
+            path: The path for the trajectory to follow.
 
         Returns:
             A trajectory that follows `path`.

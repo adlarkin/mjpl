@@ -3,6 +3,7 @@ from mink.lie import SE3, SO3
 from scipy.spatial.transform import Rotation, Slerp
 
 from ..inverse_kinematics.ik_solver import IKSolver
+from ..types import Path
 
 
 def _interpolate_poses(
@@ -64,7 +65,7 @@ def cartesian_plan(
     solver: IKSolver,
     lin_threshold: float = 0.01,
     ori_threshold: float = 0.1,
-) -> list[np.ndarray]:
+) -> Path | None:
     """Plan joint configurations that satisfy a Cartesian path.
 
     Args:
@@ -80,20 +81,19 @@ def cartesian_plan(
             is exceeded.
 
     Returns:
-        A list of joint configurations, starting at `q_init_world`, that adhere
-        to a Cartesian path defined by `poses`. If a configuration cannot be
-        found for a pose in the Cartesian path, an empty list is returned.
+        A path that adheres to a Cartesian path defined by `poses`, starting from
+        `q_init_world`. None is returned if a path cannot be formed.
     """
     interpolated_poses = [poses[0]]
     for i in range(0, len(poses) - 1):
         batch = _interpolate_poses(poses[i], poses[i + 1], lin_threshold, ori_threshold)
         interpolated_poses.extend(batch[1:])
 
-    path = [q_init_world]
+    waypoints = [q_init_world]
     for p in interpolated_poses:
-        q = solver.solve_ik(p, site, path[-1])
+        q = solver.solve_ik(p, site, waypoints[-1])
         if q is None:
             print(f"Unable to find a joint configuration for pose {p}")
-            return []
-        path.append(q)
-    return path
+            return None
+        waypoints.append(q)
+    return Path(q_init=q_init_world, waypoints=waypoints, joints=[])

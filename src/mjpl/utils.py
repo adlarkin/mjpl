@@ -1,9 +1,9 @@
+import mink
 import mujoco
 import numpy as np
-from mink.lie import SE3, SO3
 
 from .collision_ruleset import CollisionRuleset
-from .joint_group import JointGroup
+from .types import Path
 
 
 def step(start: np.ndarray, target: np.ndarray, max_step_dist: float) -> np.ndarray:
@@ -27,7 +27,33 @@ def step(start: np.ndarray, target: np.ndarray, max_step_dist: float) -> np.ndar
     return start + (unit_vec * min(max_step_dist, magnitude))
 
 
-def site_pose(data: mujoco.MjData, site_name: str) -> SE3:
+def qpos_idx(
+    model: mujoco.MjModel, joints: list[str], default_to_full: bool = False
+) -> list[int]:
+    """Get the indices in mujoco.MjData.qpos that correspond to specific joints.
+
+    Args:
+        model: MuJoCo model.
+        joints: The names of the joints in `model`.
+        default_to_full: Whether or not all indices in mujoco.MjData.qpos should be
+            returned if `joints` is an empty list.
+
+    Returns:
+        A list of indices that correspond to `joints` in mujoco.MjData.qpos.
+    """
+    if not joints and default_to_full:
+        return list(range(model.nq))
+
+    idx: list[int] = []
+    for j in joints:
+        jnt_id = model.joint(j).id
+        jnt_dim = mink.constants.qpos_width(model.jnt_type[jnt_id])
+        q_start = model.jnt_qposadr[jnt_id]
+        idx.extend(range(q_start, q_start + jnt_dim))
+    return idx
+
+
+def site_pose(data: mujoco.MjData, site_name: str) -> mink.SE3:
     """Get the pose of a site in the world frame.
 
     Args:
@@ -39,106 +65,97 @@ def site_pose(data: mujoco.MjData, site_name: str) -> SE3:
     """
     position = data.site(site_name).xpos.copy()
     rotation = data.site(site_name).xmat.copy()
-    return SE3.from_rotation_and_translation(
-        SO3.from_matrix(rotation.reshape(3, 3)),
+    return mink.SE3.from_rotation_and_translation(
+        mink.SO3.from_matrix(rotation.reshape(3, 3)),
         position,
     )
 
 
 def is_valid_config(
-    q: np.ndarray,
-    jg: JointGroup,
+    model: mujoco.MjModel,
     data: mujoco.MjData,
     cr: CollisionRuleset | None,
 ) -> bool:
+    """Check if the configuration stored in MjData.qpos is valid.
+
+    "Valid" in this case means joint limits and an (optional) CollisionRuleset
+    are not violated.
+
+    Args:
+        model: MuJoCo model.
+        data: MuJoCo data, which has the configuration to validate.
+        cr: CollisionRuleset the configuration must obey. Set this to None if no
+            CollisionRuleset should be enforced.
+
+    Returns:
+        True if the configuration in `data` does not violate joint limits and obeys
+        `cr` (if `cr` is defined). False otherwise.
+    """
     # Check joint limits.
-    if not np.all((q >= jg.lower_limits) & (q <= jg.upper_limits)):
+    if not np.all(
+        (data.qpos >= model.jnt_range[:, 0]) & (data.qpos <= model.jnt_range[:, 1])
+    ):
         return False
 
     if cr:
         # Check for collisions.
-        # We have to run FK once data.qpos is updated before running the collision checker.
-        jg.fk(q, data)
-        mujoco.mj_collision(jg.model, data)
+        mujoco.mj_kinematics(model, data)
+        mujoco.mj_collision(model, data)
         return cr.obeys_ruleset(data.contact.geom)
 
     return True
 
 
 def random_valid_config(
-    rng: np.random.Generator,
-    jg: JointGroup,
-    data: mujoco.MjData,
-    cr: CollisionRuleset | None,
-) -> np.ndarray:
-    q_rand = jg.random_config(rng)
-    while not is_valid_config(q_rand, jg, data, cr):
-        q_rand = jg.random_config(rng)
-    return q_rand
-
-
-def _connect_waypoints(
-    path: list[np.ndarray],
-    start_idx: int,
-    end_idx: int,
-    validation_dist: float = 0.05,
-    jg: JointGroup | None = None,
-    data: mujoco.MjData | None = None,
+    model: mujoco.MjModel,
+    q_init: np.ndarray,
+    seed: int | None = None,
+    joints: list[str] = [],
     cr: CollisionRuleset | None = None,
-) -> list[np.ndarray]:
-    """If possible, directly connect two specific waypoints from a path.
+) -> np.ndarray:
+    """Generate a random valid configuration.
+
+    See `is_valid_config` for notes about "validity" of a configration.
 
     Args:
-        path: The path with waypoints to connect.
-        start_idx: The index of the first waypoint.
-        end_idx: The index of the second waypoint.
-        validation_dist: The distance increment that is used for performing intermediate
-            validation checks (see `jg`, `data`, and `cr`). This must be > 0.
-        jg: The JointGroup to apply validation checks on.
-            To disable validation checking, set this to None.
-        data: MuJoCo MjData. Used for validation checking.
-            To disable validation checking, set this to None.
-        cr: The CollisionRuleset to enforce (if any) for validation checks.
+        model: MuJoCo model.
+        q_init: Initial joint configuration. Used to set values for joints that are
+            not in `joints`.
+        seed: Seed used for random number generation.
+        joints: The joints to set random values for. Set this to an empty list if all
+            joints should be set randomly.
+        cr: CollisionRuleset the randomly generated configuration must obey. Set this
+            to None if no CollisionRuleset should be enforced.
 
     Returns:
-        A path with a direct connection between the waypoints at indices
-        (`start_idx`, `end_idx`) if the waypoints at these indices can be connected.
+        A random valid configuration.
     """
-    if validation_dist <= 0.0:
-        raise ValueError("`validation_dist` must be > 0")
+    data = mujoco.MjData(model)
+    data.qpos = q_init
 
-    if (jg is None and data is not None) or (jg is not None and data is None):
-        raise ValueError("Both `jg` and `data` must either be None or not None.")
-    validate = jg is not None and data is not None
+    rng = np.random.default_rng(seed=seed)
+    q_idx = qpos_idx(model, joints, default_to_full=True)
+    data.qpos[q_idx] = rng.uniform(*model.jnt_range.T)[q_idx]
+    while not is_valid_config(model, data, cr):
+        data.qpos[q_idx] = rng.uniform(*model.jnt_range.T)[q_idx]
 
-    q_start = path[start_idx]
-    q_target = path[end_idx]
-
-    q_curr = step(q_start, q_target, validation_dist)
-    while not np.array_equal(q_curr, q_target):
-        if validate and not is_valid_config(q_curr, jg, data, cr):
-            return path
-        q_curr = step(q_curr, q_target, validation_dist)
-    return path[: start_idx + 1] + path[end_idx:]
+    return data.qpos
 
 
 def shortcut(
-    path: list[np.ndarray],
-    jg: JointGroup,
+    model: mujoco.MjModel,
+    path: Path,
     cr: CollisionRuleset | None,
-    q_init: np.ndarray | None = None,
     validation_dist: float = 0.05,
     max_attempts: int = 100,
     seed: int | None = None,
-) -> list[np.ndarray]:
+) -> Path:
     """Perform shortcutting on a path.
 
     Args:
+        model: MuJoCo model.
         path: The path to shortcut.
-        jg: The JointGroup to apply validation checks on when shortcutting.
         cr: The CollisionRuleset to enforce (if any) for validation checks.
-        q_init: Full initial configuration. Used to set values of joints that are
-            not in `jg`.
         validation_dist: The distance between each validation check, which occurs
             between a pair of waypoints that are trying to be directly connected
             if these waypoints are further than `validation_dist` apart.
@@ -151,39 +168,87 @@ def shortcut(
     Returns:
         A path with direct connections between each adjacent waypoint.
     """
-    data = mujoco.MjData(jg.model)
-    if q_init is not None:
-        data.qpos = q_init
+    data = mujoco.MjData(model)
+    data.qpos = path.q_init
     rng = np.random.default_rng(seed=seed)
 
+    q_idx = qpos_idx(model, path.joints, default_to_full=True)
+
     # sanity check: can we shortcut directly between the start/end of the path?
-    shortened_path = _connect_waypoints(
-        path=path,
+    shortened_waypoints = _connect_waypoints(
+        model,
+        data,
+        path.waypoints,
+        q_idx,
         start_idx=0,
-        end_idx=len(path) - 1,
+        end_idx=len(path.waypoints) - 1,
         validation_dist=validation_dist,
-        jg=jg,
-        data=data,
         cr=cr,
     )
     for _ in range(max_attempts):
-        if len(shortened_path) == 2:
+        if len(shortened_waypoints) == 2:
             # we can go directly from start to goal, so no more shortcutting can be done
-            return shortened_path
+            return Path(
+                q_init=path.q_init, waypoints=shortened_waypoints, joints=path.joints
+            )
         # randomly pick 2 waypoints
         start, end = 0, 0
         while start == end:
-            start, end = rng.integers(len(shortened_path), size=2)
+            start, end = rng.integers(len(shortened_waypoints), size=2)
         if start > end:
             start, end = end, start
-        shortened_path = _connect_waypoints(
-            path=shortened_path,
+        shortened_waypoints = _connect_waypoints(
+            model,
+            data,
+            shortened_waypoints,
+            q_idx,
             start_idx=start,
             end_idx=end,
             validation_dist=validation_dist,
-            jg=jg,
-            data=data,
             cr=cr,
         )
 
-    return shortened_path
+    return Path(q_init=path.q_init, waypoints=shortened_waypoints, joints=path.joints)
+
+
+def _connect_waypoints(
+    model: mujoco.MjModel,
+    data: mujoco.MjData,
+    waypoints: list[np.ndarray],
+    q_idx: list[int],
+    start_idx: int,
+    end_idx: int,
+    validation_dist: float,
+    cr: CollisionRuleset | None,
+) -> list[np.ndarray]:
+    """If possible, directly connect two specific waypoints from a list of waypoints.
+
+    Args:
+        model: MuJoCo model.
+        data: MuJoCo data. Used for validation checking. This should have values
+            initialized in MjData.qpos that do not correspond to `waypoints`/`q_idx`.
+        waypoints: The list of waypoints.
+        q_idx: The indices in MjData.qpos that correspond to the arrays in `waypoints`.
+        start_idx: The index of the first waypoint.
+        end_idx: The index of the second waypoint.
+        validation_dist: The distance increment used for performing intermediate
+            validation checks. This must be > 0.
+        cr: The CollisionRuleset to enforce (if any) for validation checks.
+
+    Returns:
+        A waypoint list with a direct connection between the waypoints at indices
+        (`start_idx`, `end_idx`) if the waypoints at these indices can be connected.
+    """
+    if validation_dist <= 0.0:
+        raise ValueError("`validation_dist` must be > 0")
+
+    q_start = waypoints[start_idx]
+    q_target = waypoints[end_idx]
+
+    q_curr = step(q_start, q_target, validation_dist)
+    while not np.array_equal(q_curr, q_target):
+        data.qpos[q_idx] = q_curr
+        if not is_valid_config(model, data, cr):
+            return waypoints
+        q_curr = step(q_curr, q_target, validation_dist)
+    return waypoints[: start_idx + 1] + waypoints[end_idx:]

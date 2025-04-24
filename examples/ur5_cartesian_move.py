@@ -41,8 +41,7 @@ def main():
         "wrist_2_joint",
         "wrist_3_joint",
     ]
-    arm_joint_ids = [model.joint(joint).id for joint in arm_joints]
-    arm_jg = mjpl.JointGroup(model, arm_joint_ids)
+    q_idx = mjpl.qpos_idx(model, arm_joints)
 
     cr = mjpl.CollisionRuleset(model)
 
@@ -65,7 +64,7 @@ def main():
 
     solver = mjpl.MinkIKSolver(
         model=model,
-        jg=arm_jg,
+        joints=arm_joints,
         cr=cr,
         seed=seed,
         max_attempts=5,
@@ -74,18 +73,14 @@ def main():
     print("Planning...")
     start = time.time()
     path = mjpl.cartesian_plan(q_init, poses, _UR5_EE_SITE, solver)
-    if not path:
+    if path is None:
         print("Planning failed")
         return
     print(f"Planning took {(time.time() - start):.4f}s")
 
-    # Cartesian plan gives full world configuration.
-    # We only need the joints in the JointGroup for trajectory generation.
-    path_jg = [q[arm_jg.qpos_addrs] for q in path]
-
     # The trajectory limits used here are for demonstration purposes only.
     # In practice, consult your hardware spec sheet for this information.
-    dof = len(arm_joints)
+    dof = len(path.waypoints[0])
     traj_generator = mjpl.ToppraTrajectoryGenerator(
         dt=model.opt.timestep,
         max_velocity=np.ones(dof) * 0.5 * np.pi,
@@ -94,7 +89,7 @@ def main():
 
     print("Generating trajectory...")
     start = time.time()
-    trajectory = traj_generator.generate_trajectory(path_jg)
+    trajectory = traj_generator.generate_trajectory(path)
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
     # Actuator indices in data.ctrl that correspond to the joints in the trajectory.
@@ -140,7 +135,8 @@ def main():
             # Visualize the trajectory. The trajectory is of high resolution,
             # so plotting every other timestep should be sufficient.
             for q_ref in trajectory.positions[::2]:
-                arm_jg.fk(q_ref, data)
+                data.qpos[q_idx] = q_ref
+                mujoco.mj_kinematics(model, data)
                 pos = data.site(_UR5_EE_SITE).xpos
                 viz.add_sphere(
                     viewer.user_scn, pos, radius=0.002, rgba=[0.2, 0.6, 0.2, 0.2]

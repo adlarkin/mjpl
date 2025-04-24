@@ -3,29 +3,31 @@ import numpy as np
 
 from .. import utils
 from ..collision_ruleset import CollisionRuleset
-from ..joint_group import JointGroup
 from .tree import Node, Tree
 
 
 def _extend(
+    model: mujoco.MjModel,
+    data: mujoco.MjData,
     q_target: np.ndarray,
+    q_idx: list[int],
     tree: Tree,
     start_node: Node,
     eps: float,
-    jg: JointGroup,
     cr: CollisionRuleset,
-    data: mujoco.MjData,
 ) -> Node | None:
     """Extend a node in a tree towards a target configuration.
 
     Args:
+        model: MuJoCo model.
+        data: MuJoCo data. Used for validation checking. This should have values
+            initialized in MjData.qpos that do not correspond to `q_target`/`q_idx`.
         q_target: The target configuration.
+        q_idx: The indices in MjData.qpos that correspond to the values in `q_target`.
         tree: The tree with a node to extend towards `q_target`.
         start_node: The node in `tree` to extend towards `q_target`.
         eps: The maximum distance `start_node` will extend towards `q_target`.
-        jg: The JointGroup corresponding to the configurations of interest.
         cr: The CollisionRuleset configurations must obey.
-        data: MuJoCo data. Used for validation checking.
 
     Returns:
         The node that was the result of extending `start_node` towards `q_target`,
@@ -34,7 +36,8 @@ def _extend(
     if np.array_equal(start_node.q, q_target):
         return start_node
     q_extend = utils.step(start_node.q, q_target, eps)
-    if utils.is_valid_config(q_extend, jg, data, cr):
+    data.qpos[q_idx] = q_extend
+    if utils.is_valid_config(model, data, cr):
         extended_node = Node(q_extend, start_node)
         tree.add_node(extended_node)
         return extended_node
@@ -42,18 +45,23 @@ def _extend(
 
 
 def _connect(
+    model: mujoco.MjModel,
+    data: mujoco.MjData,
     q_target: np.ndarray,
+    q_idx: list[int],
     tree: Tree,
     eps: float,
     max_connection_distance: float,
-    jg: JointGroup,
     cr: CollisionRuleset,
-    data: mujoco.MjData,
 ) -> Node:
     """Attempt to connect a node in a tree to a target configuration.
 
     Args:
+        model: MuJoCo model.
+        data: MuJoCo data. Used for validation checking. This should have values
+            initialized in MjData.qpos that do not correspond to `q_target`/`q_idx`.
         q_target: The target configuration.
+        q_idx: The indices in MjData.qpos that correspond to the values in `q_target`.
         tree: The tree with a node that serves as the basis of the connection
             to `q_target`.
         eps: The maximum distance between nodes added to `tree`. If the
@@ -61,9 +69,7 @@ def _connect(
             than `eps`, multiple nodes will be added to `tree`.
         max_connection_distance: The maximum distance to cover before terminating
             the connect operation.
-        jg: The JointGroup corresponding to the configurations of interest.
         cr: The CollisionRuleset configurations must obey.
-        data: MuJoCo data. Used for validation checking.
 
     Returns:
         The node that is the result of connecting a node from `tree` towards
@@ -73,7 +79,9 @@ def _connect(
     total_distance = 0.0
     while not np.array_equal(nearest_node.q, q_target):
         max_eps = min(eps, max_connection_distance - total_distance)
-        next_node = _extend(q_target, tree, nearest_node, max_eps, jg, cr, data)
+        next_node = _extend(
+            model, data, q_target, q_idx, tree, nearest_node, max_eps, cr
+        )
         if not next_node:
             break
         nearest_node = next_node
