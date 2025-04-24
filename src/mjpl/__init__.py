@@ -9,7 +9,7 @@ from .trajectory import (
     ToppraTrajectoryGenerator,
     generate_collision_free_trajectory,
 )
-from .utils import qpos_idx, random_valid_config, shortcut, site_pose
+from .utils import all_joints, qpos_idx, random_valid_config, shortcut, site_pose
 
 __all__ = (
     "CollisionRuleset",
@@ -17,6 +17,7 @@ __all__ = (
     "RRT",
     "RuckigTrajectoryGenerator",
     "ToppraTrajectoryGenerator",
+    "all_joints",
     "cartesian_plan",
     "generate_collision_free_trajectory",
     "qpos_idx",

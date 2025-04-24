@@ -21,14 +21,7 @@ def main():
 
     model = mujoco.MjModel.from_xml_path(_UR5_XML.as_posix())
 
-    arm_joints = [
-        "shoulder_pan_joint",
-        "shoulder_lift_joint",
-        "elbow_joint",
-        "wrist_1_joint",
-        "wrist_2_joint",
-        "wrist_3_joint",
-    ]
+    arm_joints = mjpl.all_joints(model)
     q_idx = mjpl.qpos_idx(model, arm_joints)
 
     cr = mjpl.CollisionRuleset(model)
@@ -40,7 +33,7 @@ def main():
     # From the initial state, generate a valid goal configuration.
     data = mujoco.MjData(model)
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
-    q_goal = mjpl.random_valid_config(model, q_init, seed, arm_joints, cr)
+    q_goal = mjpl.random_valid_config(model, q_init, arm_joints, seed, cr)
 
     # Set up the planner.
     planner = mjpl.RRT(model, arm_joints, cr, seed=seed, goal_biasing_probability=0.1)

@@ -27,23 +27,28 @@ def step(start: np.ndarray, target: np.ndarray, max_step_dist: float) -> np.ndar
     return start + (unit_vec * min(max_step_dist, magnitude))
 
 
-def qpos_idx(
-    model: mujoco.MjModel, joints: list[str], default_to_full: bool = False
-) -> list[int]:
+def all_joints(model: mujoco.MjModel) -> list[str]:
+    """Get all joint names in a MuJoCo model.
+
+    Args:
+        model: MuJoCo model.
+
+    Returns:
+        A list of all of the joint names in `model`.
+    """
+    return [model.joint(j).name for j in range(model.njnt)]
+
+
+def qpos_idx(model: mujoco.MjModel, joints: list[str]) -> list[int]:
     """Get the indices in mujoco.MjData.qpos that correspond to specific joints.
 
     Args:
         model: MuJoCo model.
         joints: The names of the joints in `model`.
-        default_to_full: Whether or not all indices in mujoco.MjData.qpos should be
-            returned if `joints` is an empty list.
 
     Returns:
         A list of indices that correspond to `joints` in mujoco.MjData.qpos.
     """
-    if not joints and default_to_full:
-        return list(range(model.nq))
-
     idx: list[int] = []
     for j in joints:
         jnt_id = model.joint(j).id
@@ -109,8 +114,8 @@ def is_valid_config(
 def random_valid_config(
     model: mujoco.MjModel,
     q_init: np.ndarray,
+    joints: list[str],
     seed: int | None = None,
-    joints: list[str] = [],
     cr: CollisionRuleset | None = None,
 ) -> np.ndarray:
     """Generate a random valid configuration.
@@ -121,9 +126,8 @@ def random_valid_config(
         model: MuJoCo model.
         q_init: Initial joint configuration. Used to set values for joints that are
             not in `joints`.
+        joints: The joints to set random values for.
         seed: Seed used for random number generation.
-        joints: The joints to set random values for. Set this to an empty list if all
-            joints should be set randomly.
         cr: CollisionRuleset the randomly generated configuration must obey. Set this
             to None if no CollisionRuleset should be enforced.
 
@@ -134,7 +138,7 @@ def random_valid_config(
     data.qpos = q_init
 
     rng = np.random.default_rng(seed=seed)
-    q_idx = qpos_idx(model, joints, default_to_full=True)
+    q_idx = qpos_idx(model, joints)
     data.qpos[q_idx] = rng.uniform(*model.jnt_range.T)[q_idx]
     while not is_valid_config(model, data, cr):
         data.qpos[q_idx] = rng.uniform(*model.jnt_range.T)[q_idx]
@@ -172,7 +176,7 @@ def shortcut(
     data.qpos = path.q_init
     rng = np.random.default_rng(seed=seed)
 
-    q_idx = qpos_idx(model, path.joints, default_to_full=True)
+    q_idx = qpos_idx(model, path.joints)
 
     # sanity check: can we shortcut directly between the start/end of the path?
     shortened_waypoints = _connect_waypoints(

@@ -17,7 +17,6 @@ class Trajectory:
     # Initial configuration of all joints.
     q_init: np.ndarray
     # The joints corresponding to `positions`, `velocities`, and `accelerations`.
-    # An empty list means all joints are used.
     joints: list[str]
     # The timestep between each position, velocity, and acceleration snapshot.
     dt: float
@@ -27,6 +26,10 @@ class Trajectory:
     velocities: list[np.ndarray]
     # Acceleration snapshots at increments of dt, ranging from t = [dt, t_f]
     accelerations: list[np.ndarray]
+
+    def __post_init__(self) -> None:
+        if not self.joints:
+            raise ValueError("`joints` cannot be empty.")
 
 
 class TrajectoryGenerator(ABC):

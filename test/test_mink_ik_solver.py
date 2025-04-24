@@ -24,67 +24,58 @@ class TestMinkIKSolver(unittest.TestCase):
         mujoco.mj_kinematics(self.model, data)
         target_pose = mjpl.site_pose(data, self.site_name)
 
-        # Test the IK solver. When using all joints for IK, the joints can be
-        # an empty list, or a list that includes each joint.
-        explicit_full_joints = [
-            "shoulder_pan_joint",
-            "shoulder_lift_joint",
-            "elbow_joint",
-            "wrist_1_joint",
-            "wrist_2_joint",
-            "wrist_3_joint",
+        pos_tolerance = 1e-3
+        ori_tolerance = 1e-3
+        solver = mjpl.MinkIKSolver(
+            model=self.model,
+            joints=mjpl.all_joints(self.model),
+            cr=self.cr,
+            pos_tolerance=pos_tolerance,
+            ori_tolerance=ori_tolerance,
+            seed=12345,
+            max_attempts=5,
+        )
+
+        # Solve IK (test both with/without an initial guess config)
+        ik_solutions = [
+            solver.solve_ik(
+                pose=target_pose,
+                site=self.site_name,
+                q_init_guess=q_init_world,
+            ),
+            solver.solve_ik(
+                pose=target_pose,
+                site=self.site_name,
+                q_init_guess=None,
+            ),
         ]
-        for joints in ([], explicit_full_joints):
-            pos_tolerance = 1e-3
-            ori_tolerance = 1e-3
-            solver = mjpl.MinkIKSolver(
-                model=self.model,
-                joints=joints,
-                cr=self.cr,
-                pos_tolerance=pos_tolerance,
-                ori_tolerance=ori_tolerance,
-                seed=12345,
-                max_attempts=5,
-            )
+        self.assertIsNotNone(ik_solutions[0])
+        self.assertIsNotNone(ik_solutions[1])
 
-            # Solve IK (test both with/without an initial guess config)
-            ik_solutions = [
-                solver.solve_ik(
-                    pose=target_pose,
-                    site=self.site_name,
-                    q_init_guess=q_init_world,
-                ),
-                solver.solve_ik(
-                    pose=target_pose,
-                    site=self.site_name,
-                    q_init_guess=None,
-                ),
-            ]
-            self.assertIsNotNone(ik_solutions[0])
-            self.assertIsNotNone(ik_solutions[1])
-
-            # Confirm that the IK solution gives a site pose within the specified error.
-            # We cannot rely on checking similarity between q_candidate and the randomly
-            # generated config since there may be multiple solutions to the IK problem!
-            for solution in ik_solutions:
-                data.qpos = solution.copy()
-                mujoco.mj_kinematics(self.model, data)
-                actual_site_pose = mjpl.site_pose(data, self.site_name)
-                err = target_pose.minus(actual_site_pose)
-                self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
-                self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
+        # Confirm that the IK solution gives a site pose within the specified error.
+        # We cannot rely on checking similarity between q_candidate and the randomly
+        # generated config since there may be multiple solutions to the IK problem!
+        for solution in ik_solutions:
+            data.qpos = solution.copy()
+            mujoco.mj_kinematics(self.model, data)
+            actual_site_pose = mjpl.site_pose(data, self.site_name)
+            err = target_pose.minus(actual_site_pose)
+            self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
+            self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
 
     def test_invalid_args(self):
+        joints = mjpl.all_joints(self.model)
+
         with self.assertRaisesRegex(ValueError, "`max_attempts` must be > 0"):
             mjpl.MinkIKSolver(
                 model=self.model,
-                joints=[],
+                joints=joints,
                 cr=self.cr,
                 max_attempts=-2,
             )
             mjpl.MinkIKSolver(
                 model=self.model,
-                joints=[],
+                joints=joints,
                 cr=self.cr,
                 max_attempts=0,
             )
@@ -92,15 +83,21 @@ class TestMinkIKSolver(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "`iterations` must be > 0"):
             mjpl.MinkIKSolver(
                 model=self.model,
-                joints=[],
+                joints=joints,
                 cr=self.cr,
                 iterations=-2,
             )
             mjpl.MinkIKSolver(
                 model=self.model,
-                joints=[],
+                joints=joints,
                 cr=self.cr,
                 iterations=0,
+            )
+
+        with self.assertRaisesRegex(ValueError, "cannot be empty"):
+            mjpl.MinkIKSolver(
+                model=self.model,
+                joints=[],
             )
 
 

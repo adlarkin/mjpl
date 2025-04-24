@@ -36,8 +36,7 @@ class RRT:
 
         Args:
             model: MuJoCo model.
-            planning_joints: The joints used for planning. An empty list means all
-                joints will be used.
+            planning_joints: The joints used for planning.
             cr: The CollisionRuleset the sampled configurations must obey.
             max_planning_time: Maximum planning time, in seconds.
             epsilon: The maximum distance allowed between nodes in the tree.
@@ -47,6 +46,8 @@ class RRT:
                 This must be a value between [0.0, 1.0].
             max_connection_distance: The maximum distance for extending a tree using CONNECT.
         """
+        if not planning_joints:
+            raise ValueError("`planning_joints` cannot be empty.")
         if max_planning_time <= 0.0:
             raise ValueError("`max_planning_time` must be > 0.0")
         if epsilon <= 0.0:
@@ -58,7 +59,7 @@ class RRT:
 
         self.model = model
         self.planning_joints = planning_joints
-        self.q_idx = utils.qpos_idx(model, planning_joints, default_to_full=True)
+        self.q_idx = utils.qpos_idx(model, planning_joints)
         self.cr = cr
         self.max_planning_time = max_planning_time
         self.epsilon = epsilon

@@ -40,7 +40,7 @@ def generate_collision_free_trajectory(
     while True:
         traj = generator.generate_trajectory(path)
         data.qpos = traj.q_init
-        q_idx = utils.qpos_idx(model, traj.joints, default_to_full=True)
+        q_idx = utils.qpos_idx(model, traj.joints)
         for i in range(len(traj.positions)):
             q = traj.positions[i]
             data.qpos[q_idx] = q
@@ -71,8 +71,8 @@ def _waypoint_timing(
     Returns:
         A list of timestamps for each waypoint in `waypoints` based on `trajectory`.
     """
-    if not waypoints:
-        return []
+    if len(waypoints) < 2:
+        raise ValueError("There must be at least two waypoints defined.")
 
     # The first waypoint maps to time 0.0
     timestamps = [0.0]

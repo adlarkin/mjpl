@@ -53,7 +53,7 @@ def main():
     for i in range(_NUM_GOALS):
         # Make sure a different seed is used for each randomly generated config
         _seed = seed + i if seed is not None else seed
-        data.qpos = mjpl.random_valid_config(model, q_init, _seed, arm_joints, cr)
+        data.qpos = mjpl.random_valid_config(model, q_init, arm_joints, _seed, cr)
         mujoco.mj_kinematics(model, data)
         goal_poses.append(mjpl.site_pose(data, _PANDA_EE_SITE))
 
