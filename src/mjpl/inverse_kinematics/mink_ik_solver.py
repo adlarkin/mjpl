@@ -13,7 +13,7 @@ class MinkIKSolver(IKSolver):
     def __init__(
         self,
         model: mujoco.MjModel,
-        joints: list[str] = [],
+        joints: list[str],
         cr: CollisionRuleset | None = None,
         pos_tolerance: float = 1e-3,
         ori_tolerance: float = 1e-3,
@@ -27,8 +27,7 @@ class MinkIKSolver(IKSolver):
         Args:
             model: MuJoCo model.
             joints: The joints to use when generating initial states for new solve
-                attempts and validating configurations. An empty list means all
-                joints will be used.
+                attempts and validating configurations.
             cr: The collision rules to enforce. If defined, IK solutions must
                 also obey this ruleset.
             pos_tolerance: Allowed position error.
@@ -40,6 +39,8 @@ class MinkIKSolver(IKSolver):
             solver: Solver to use, which comes from the qpsolvers package:
                 https://github.com/qpsolvers/qpsolvers
         """
+        if not joints:
+            raise ValueError("`joints` cannot be empty.")
         if max_attempts < 1:
             raise ValueError("`max_attempts` must be > 0.")
         if iterations < 1:
@@ -97,7 +98,7 @@ class MinkIKSolver(IKSolver):
             # Make sure a different seed is used for each randomly generated config.
             _seed = self.seed + attempt if self.seed is not None else self.seed
             next_guess = utils.random_valid_config(
-                self.model, configuration.q, _seed, self.joints, self.cr
+                self.model, configuration.q, self.joints, _seed, self.cr
             )
             configuration.update(next_guess)
         return None

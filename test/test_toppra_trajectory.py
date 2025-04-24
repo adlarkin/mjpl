@@ -29,7 +29,9 @@ class TestToppraTrajectoryGenerator(unittest.TestCase):
             rng.random(dof),
             rng.random(dof),
         ]
-        path = mjpl.types.Path(q_init=waypoints[0], waypoints=waypoints, joints=[])
+        path = mjpl.types.Path(
+            q_init=waypoints[0], waypoints=waypoints, joints=["dummy_joint"]
+        )
 
         t = traj_generator.generate_trajectory(path)
         np.testing.assert_equal(t.q_init, path.q_init)

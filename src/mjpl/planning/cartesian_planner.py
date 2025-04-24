@@ -1,9 +1,11 @@
+import mujoco
 import numpy as np
 from mink.lie import SE3, SO3
 from scipy.spatial.transform import Rotation, Slerp
 
 from ..inverse_kinematics.ik_solver import IKSolver
 from ..types import Path
+from ..utils import all_joints
 
 
 def _interpolate_poses(
@@ -59,6 +61,7 @@ def _interpolate_poses(
 
 
 def cartesian_plan(
+    model: mujoco.MjModel,
     q_init_world: np.ndarray,
     poses: list[SE3],
     site: str,
@@ -69,6 +72,7 @@ def cartesian_plan(
     """Plan joint configurations that satisfy a Cartesian path.
 
     Args:
+        model: MuJoCo model.
         q_init_world: Initial joint configuration of the world.
         poses: The Cartesian path. These poses should be in the world frame.
         site: The site (i.e., frame) that should follow the Cartesian path.
@@ -96,4 +100,4 @@ def cartesian_plan(
             print(f"Unable to find a joint configuration for pose {p}")
             return None
         waypoints.append(q)
-    return Path(q_init=q_init_world, waypoints=waypoints, joints=[])
+    return Path(q_init=q_init_world, waypoints=waypoints, joints=all_joints(model))

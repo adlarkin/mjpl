@@ -33,14 +33,7 @@ def main():
     model = mujoco.MjModel.from_xml_path(_UR5_XML.as_posix())
     data = mujoco.MjData(model)
 
-    arm_joints = [
-        "shoulder_pan_joint",
-        "shoulder_lift_joint",
-        "elbow_joint",
-        "wrist_1_joint",
-        "wrist_2_joint",
-        "wrist_3_joint",
-    ]
+    arm_joints = mjpl.all_joints(model)
     q_idx = mjpl.qpos_idx(model, arm_joints)
 
     cr = mjpl.CollisionRuleset(model)
@@ -72,7 +65,7 @@ def main():
 
     print("Planning...")
     start = time.time()
-    path = mjpl.cartesian_plan(q_init, poses, _UR5_EE_SITE, solver)
+    path = mjpl.cartesian_plan(model, q_init, poses, _UR5_EE_SITE, solver)
     if path is None:
         print("Planning failed")
         return

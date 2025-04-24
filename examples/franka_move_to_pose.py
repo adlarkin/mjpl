@@ -47,7 +47,7 @@ def main():
     # valid joint configuration.
     data = mujoco.MjData(model)
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
-    data.qpos = mjpl.random_valid_config(model, q_init, seed, arm_joints, cr)
+    data.qpos = mjpl.random_valid_config(model, q_init, arm_joints, seed, cr)
     mujoco.mj_kinematics(model, data)
     goal_pose = mjpl.site_pose(data, _PANDA_EE_SITE)
 
