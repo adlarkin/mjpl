@@ -6,13 +6,13 @@ build-backend = "hatchling.build"
 name = "mjpl"
 version = "0.0.1"
 dependencies = [
-  # 0.0.8 for daqp: https://github.com/kevinzakka/mink/releases/tag/v0.0.8
+  # 0.0.8 for daqp and matrix Lie group interpolation:
+  # https://github.com/kevinzakka/mink/releases/tag/v0.0.8
   "mink >= 0.0.8",
   "mujoco >= 3",
   "numpy",
   "ruckig",
-  "scipy",
-  # toppra 0.6.3 adds support for numpy > 2.0:
+  # 0.6.3 adds support for numpy > 2.0:
   # https://github.com/hungpham2511/toppra/pull/259
   "toppra >= 0.6.3",
 ]
@@ -41,6 +41,7 @@ classifiers = [
 [project.optional-dependencies]
 test = [
   "robot_descriptions",
+  "scipy",
 ]
 dev = [
   "mjpl[test]",
