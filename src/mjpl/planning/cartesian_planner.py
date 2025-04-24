@@ -1,7 +1,6 @@
 import mujoco
 import numpy as np
-from mink.lie import SE3, SO3
-from scipy.spatial.transform import Rotation, Slerp
+from mink.lie import SE3
 
 from ..inverse_kinematics.ik_solver import IKSolver
 from ..types import Path
@@ -36,28 +35,10 @@ def _interpolate_poses(
     ori_steps = int(np.ceil(ori_dist / ori_threshold))
     num_steps = max(lin_steps, ori_steps, 1)
 
-    slerp = Slerp(
-        [0, 1],
-        Rotation.from_matrix(
-            [
-                pose_from.rotation().as_matrix(),
-                pose_to.rotation().as_matrix(),
-            ]
-        ),
-    )
-
-    poses = []
-    for alpha in np.linspace(0, 1, num_steps + 1):
-        interp_translation = (
-            1 - alpha
-        ) * pose_from.translation() + alpha * pose_to.translation()
-        interp_rotmat = slerp(alpha).as_matrix()
-        poses.append(
-            SE3.from_rotation_and_translation(
-                SO3.from_matrix(interp_rotmat), interp_translation
-            )
-        )
-    return poses
+    return [
+        pose_from.interpolate(pose_to, alpha)
+        for alpha in np.linspace(0, 1, num_steps + 1)
+    ]
 
 
 def cartesian_plan(

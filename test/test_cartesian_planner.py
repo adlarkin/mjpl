@@ -9,11 +9,6 @@ import mjpl
 from mjpl.planning.cartesian_planner import _interpolate_poses
 
 
-def poses_exactly_equal(p1: SE3, p2: SE3) -> None:
-    np.testing.assert_equal(p1.translation(), p2.translation())
-    np.testing.assert_equal(p1.rotation().parameters(), p2.rotation().parameters())
-
-
 def poses_approximately_equal(
     p1: SE3, p2: SE3, pos_tolerance: float = 1e-9, ori_tolerance: float = 1e-9
 ) -> None:
@@ -43,16 +38,16 @@ class TestCartesianPlanner(unittest.TestCase):
             start_pose, end_pose, lin_threshold=np.inf, ori_threshold=np.inf
         )
         self.assertEqual(len(poses), 2)
-        poses_exactly_equal(poses[0], start_pose)
-        poses_exactly_equal(poses[1], end_pose)
+        self.assertEqual(poses[0], start_pose)
+        self.assertEqual(poses[1], end_pose)
 
         # Interpolate based on position
         poses = _interpolate_poses(
             start_pose, end_pose, lin_threshold=0.65, ori_threshold=np.inf
         )
         self.assertEqual(len(poses), 3)
-        poses_exactly_equal(poses[0], start_pose)
-        poses_exactly_equal(poses[2], end_pose)
+        self.assertEqual(poses[0], start_pose)
+        self.assertEqual(poses[2], end_pose)
         halfway_pose = SE3.from_rotation_and_translation(
             SO3.from_x_radians(np.pi / 2), np.array([0.5, 0.0, 0.0])
         )
@@ -63,8 +58,8 @@ class TestCartesianPlanner(unittest.TestCase):
             start_pose, end_pose, lin_threshold=np.inf, ori_threshold=np.pi * 0.3
         )
         self.assertEqual(len(poses), 5)
-        poses_exactly_equal(poses[0], start_pose)
-        poses_exactly_equal(poses[4], end_pose)
+        self.assertEqual(poses[0], start_pose)
+        self.assertEqual(poses[4], end_pose)
         # There should be three evenly spaced intermediate poses
         intermediate_poses = [
             SE3.from_rotation_and_translation(
@@ -90,8 +85,8 @@ class TestCartesianPlanner(unittest.TestCase):
             start_pose, end_pose, lin_threshold=0.65, ori_threshold=np.pi * 0.3
         )
         self.assertEqual(len(poses), 5)
-        poses_exactly_equal(poses[0], start_pose)
-        poses_exactly_equal(poses[4], end_pose)
+        self.assertEqual(poses[0], start_pose)
+        self.assertEqual(poses[4], end_pose)
         poses_approximately_equal(poses[1], intermediate_poses[0])
         poses_approximately_equal(poses[2], intermediate_poses[1])
         poses_approximately_equal(poses[3], intermediate_poses[2])
