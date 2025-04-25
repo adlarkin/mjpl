@@ -10,60 +10,64 @@ class CollisionRuleset:
 
     def __init__(
         self,
-        model: mujoco.MjModel,
-        allowed_collision_bodies: np.ndarray = np.empty((0, 2)),
+        model: mujoco.MjModel | None = None,
+        allowed_collision_bodies: list[tuple[str, str]] = [],
     ) -> None:
         """Constructor.
 
         Args:
-            model: MuJoCo model.
-            allowed_collision_bodies: Bodies that are allowed to be in collision.
-                                      This should be a nx2 matrix, where each row
-                                      specifies a pair of bodies that are allowed
-                                      to be in collision.
+            model: MuJoCo model. If no bodies are allowed to be in collision, this
+                can be set to None.
+            allowed_collision_bodies: List of body pairs that are allowed to be in
+                collision. An empty list means no bodies are allowed to be in collision.
         """
+        if allowed_collision_bodies and model is None:
+            raise ValueError(
+                "`model` must be defined if `allowed_collision_bodies` is not empty."
+            )
+
         self.model = model
-        assert allowed_collision_bodies.shape[1] == 2
-        self._allowed_collision_bodies = allowed_collision_bodies
-        # Convert allowed body matrix to a set of tuples. Sort matrix rows
-        # since equivalence between two collision ID pairs is order independent.
-        self.allowed_set = {
-            tuple(row) for row in np.sort(allowed_collision_bodies, axis=1)
-        }
+        self.allowed_collisions = None
+        if allowed_collision_bodies:
+            # Create a sorted body ID allowed collision matrix.
+            # Sort since collisions between bodies a and b can be represented as
+            # (a,b) or (b,a).
+            body_ids = [
+                (self.model.body(a).id, self.model.body(b).id)
+                for a, b in allowed_collision_bodies
+            ]
+            self.allowed_collisions = np.sort(body_ids, axis=1)
 
     def obeys_ruleset(self, collision_matrix: np.ndarray) -> bool:
         """Check if a collision matrix adheres to the allowed body collisions.
 
         A collision matrix defines geometries that are in collision.
-        Note that this is different from the allowed collision matrix, which
-        specifies bodies.
-
         In MuJoCo, the collision matrix is stored in MjData.contact.geom
 
         Args:
             collision_matrix: A nx2 matrix, where n=number of collisions. Each row
-                              represents a pair of geometries that are in collision.
+                is a pair of geometry IDs that are in collision.
 
         Returns:
             True if the geometry pairs in the collision matrix map to allowed body
             collision pairs. False otherwise.
         """
-        assert collision_matrix.shape[1] == 2
+        if collision_matrix.shape[1] != 2:
+            raise ValueError("`collision_matrix` must be a nx2 matrix.")
+
         if collision_matrix.shape[0] == 0:
             # No collisions
             return True
-        elif self._allowed_collision_bodies.shape[0] == 0:
+        elif self.allowed_collisions is None:
             # Collisions are present, but the ruleset doesn't allow any collisions
             return False
-        # Map geometry IDs to their respective body IDs. Sort matrix rows since
-        # equivalence between two collision ID pairs is order independent.
-        collision_bodies = self.model.geom_bodyid[np.sort(collision_matrix, axis=1)]
-        # Convert the collision matrix to a set of tuples.
-        # The collision matrix obeys the ruleset if the collision body set is
-        # a subset of the allowed body set.
-        return all(tuple(row) in self.allowed_set for row in collision_bodies)
 
-    @property
-    def allowed_collision_bodies(self) -> np.ndarray:
-        """The matrix of allowed collision bodies."""
-        return self._allowed_collision_bodies.copy()
+        # Map geometry IDs to their respective body IDs, and then check if all body
+        # collisions are part of the allowed collision matrix.
+        # Sort since collisions between bodies a and b can be represented as
+        # (a,b) or (b,a).
+        collision_bodies = np.sort(self.model.geom_bodyid[collision_matrix], axis=1)
+        matches = (
+            collision_bodies[:, None, :] == self.allowed_collisions[None, :, :]
+        ).all(axis=2)
+        return np.all(matches.any(axis=1))

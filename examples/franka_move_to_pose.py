@@ -36,11 +36,7 @@ def main():
     home_keyframe = model.keyframe("home")
     q_init = home_keyframe.qpos.copy()
 
-    allowed_collisions = np.array(
-        [
-            [model.body("left_finger").id, model.body("right_finger").id],
-        ]
-    )
+    allowed_collisions = [("left_finger", "right_finger")]
     cr = mjpl.CollisionRuleset(model, allowed_collisions)
 
     # From the initial state, generate a valid goal pose that's derived from a

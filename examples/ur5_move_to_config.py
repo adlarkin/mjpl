@@ -24,7 +24,7 @@ def main():
     arm_joints = mjpl.all_joints(model)
     q_idx = mjpl.qpos_idx(model, arm_joints)
 
-    cr = mjpl.CollisionRuleset(model)
+    cr = mjpl.CollisionRuleset()
 
     # Let the "home" keyframe in the MJCF be the initial state.
     home_keyframe = model.keyframe("home")
