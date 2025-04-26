@@ -14,7 +14,7 @@ class MinkIKSolver(IKSolver):
         self,
         model: mujoco.MjModel,
         joints: list[str],
-        cr: CollisionRuleset | None = None,
+        cr: CollisionRuleset | None = CollisionRuleset(),
         pos_tolerance: float = 1e-3,
         ori_tolerance: float = 1e-3,
         seed: int | None = None,

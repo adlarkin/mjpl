@@ -113,7 +113,7 @@ class TestUtils(unittest.TestCase):
     def test_connect_waypoints(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
         q_idx = mjpl.qpos_idx(model, mjpl.all_joints(model))
-        cr = mjpl.CollisionRuleset(model)
+        cr = mjpl.CollisionRuleset()
 
         # Waypoint connection should fail if an obstacle is present.
         waypoints = shortcuttable_waypoints()
@@ -193,7 +193,7 @@ class TestUtils(unittest.TestCase):
     def test_shortcut(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
         planning_joints = ["ball_slide_x", "ball_slide_y"]
-        cr = mjpl.CollisionRuleset(model)
+        cr = mjpl.CollisionRuleset()
 
         waypoints = directly_connectable_waypoints()
         path = mjpl.types.Path(
@@ -250,7 +250,7 @@ class TestUtils(unittest.TestCase):
 
     def test_shortcut_6dof(self):
         model = load_robot_description("ur5e_mj_description")
-        cr = mjpl.CollisionRuleset(model)
+        cr = mjpl.CollisionRuleset()
         seed = 42
 
         # Make a path starting from the home config that connects to various random valid configs.
@@ -312,7 +312,7 @@ class TestUtils(unittest.TestCase):
     def test_is_valid_config(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
         data = mujoco.MjData(model)
-        cr = mjpl.CollisionRuleset(model)
+        cr = mjpl.CollisionRuleset()
 
         # Valid configuration (within joint limits, obeys CollisionRuleset)
         data.qpos = np.zeros(model.nq)
@@ -334,7 +334,7 @@ class TestUtils(unittest.TestCase):
     def test_random_valid_config(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
         data = mujoco.MjData(model)
-        cr = mjpl.CollisionRuleset(model)
+        cr = mjpl.CollisionRuleset()
 
         seed = 42
 

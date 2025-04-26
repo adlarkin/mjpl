@@ -38,24 +38,24 @@ class CollisionRuleset:
             ]
             self.allowed_collisions = np.sort(body_ids, axis=1)
 
-    def obeys_ruleset(self, collision_matrix: np.ndarray) -> bool:
+    def obeys_ruleset(self, collision_geometries: np.ndarray) -> bool:
         """Check if a collision matrix adheres to the allowed body collisions.
 
         A collision matrix defines geometries that are in collision.
         In MuJoCo, the collision matrix is stored in MjData.contact.geom
 
         Args:
-            collision_matrix: A nx2 matrix, where n=number of collisions. Each row
+            collision_geometries: A nx2 matrix, where n=number of collisions. Each row
                 is a pair of geometry IDs that are in collision.
 
         Returns:
-            True if the geometry pairs in the collision matrix map to allowed body
+            True if all geometry pairs in the collision matrix map to allowed body
             collision pairs. False otherwise.
         """
-        if collision_matrix.shape[1] != 2:
-            raise ValueError("`collision_matrix` must be a nx2 matrix.")
+        if collision_geometries.shape[1] != 2:
+            raise ValueError("`collision_geometries` must be a nx2 matrix.")
 
-        if collision_matrix.shape[0] == 0:
+        if collision_geometries.shape[0] == 0:
             # No collisions
             return True
         elif self.allowed_collisions is None:
@@ -66,7 +66,7 @@ class CollisionRuleset:
         # collisions are part of the allowed collision matrix.
         # Sort since collisions between bodies a and b can be represented as
         # (a,b) or (b,a).
-        collision_bodies = np.sort(self.model.geom_bodyid[collision_matrix], axis=1)
+        collision_bodies = np.sort(self.model.geom_bodyid[collision_geometries], axis=1)
         matches = (
             collision_bodies[:, None, :] == self.allowed_collisions[None, :, :]
         ).all(axis=2)

@@ -14,7 +14,7 @@ _BALL_XML = _MODEL_DIR / "one_dof_ball.xml"
 class TestRRT(unittest.TestCase):
     def test_run_rrt(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
-        cr = mjpl.CollisionRuleset(model)
+        cr = mjpl.CollisionRuleset()
         epsilon = 0.1
 
         q_init = np.array([-0.2])
@@ -56,7 +56,7 @@ class TestRRT(unittest.TestCase):
 
     def test_trivial_rrt(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
-        cr = mjpl.CollisionRuleset(model)
+        cr = mjpl.CollisionRuleset()
         epsilon = 0.1
 
         q_init = np.array([0.0])
@@ -81,7 +81,7 @@ class TestRRT(unittest.TestCase):
     def test_invalid_args(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
         joints = mjpl.all_joints(model)
-        cr = mjpl.CollisionRuleset(model)
+        cr = mjpl.CollisionRuleset()
 
         with self.assertRaisesRegex(ValueError, "max_planning_time"):
             mjpl.RRT(model, joints, cr, max_planning_time=0.0)

@@ -18,7 +18,7 @@ class TestPlanningUtils(unittest.TestCase):
         model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
         data = mujoco.MjData(model)
         q_idx = mjpl.qpos_idx(model, ["ball_slide_x"])
-        cr = mjpl.CollisionRuleset(model)
+        cr = mjpl.CollisionRuleset()
         epsilon = 0.1
 
         q_init = np.array([-0.1])
@@ -62,7 +62,7 @@ class TestPlanningUtils(unittest.TestCase):
         model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
         data = mujoco.MjData(model)
         q_idx = mjpl.qpos_idx(model, ["ball_slide_x"])
-        cr = mjpl.CollisionRuleset(model)
+        cr = mjpl.CollisionRuleset()
         epsilon = 0.1
 
         q_init = np.array([-0.1])

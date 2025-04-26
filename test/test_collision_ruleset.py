@@ -1,6 +1,5 @@
 import unittest
 
-import mujoco
 import numpy as np
 from robot_descriptions.loaders.mujoco import load_robot_description
 
@@ -10,32 +9,25 @@ import mjpl
 class TestCollisionRuleset(unittest.TestCase):
     def setUp(self):
         self.model = load_robot_description("panda_mj_description")
-        self.data = mujoco.MjData(self.model)
-
-        link1 = self.model.body("link1").id
-        link2 = self.model.body("link2").id
-        link3 = self.model.body("link3").id
-        link4 = self.model.body("link4").id
-        link5 = self.model.body("link5").id
-        link6 = self.model.body("link6").id
-        link7 = self.model.body("link7").id
-        left_finger = self.model.body("left_finger").id
-        right_finger = self.model.body("right_finger").id
 
         # Geometry ids that can be used for creating a collision matrix.
         # A body may have multiple geometries associated with it.
         # Here, we are using the first geometry tied to a body.
         # To get all geometries tied to a body, see:
         # https://github.com/kevinzakka/mink/blob/cce9cf4ed13e461dc1b3d38fe88f245700aa98c2/mink/utils.py#L137
-        self.link1_geom = self.model.body_geomadr[link1]
-        self.link2_geom = self.model.body_geomadr[link2]
-        self.link3_geom = self.model.body_geomadr[link3]
-        self.link4_geom = self.model.body_geomadr[link4]
-        self.link5_geom = self.model.body_geomadr[link5]
-        self.link6_geom = self.model.body_geomadr[link6]
-        self.link7_geom = self.model.body_geomadr[link7]
-        self.left_finger_geom = self.model.body_geomadr[left_finger]
-        self.right_finger_geom = self.model.body_geomadr[right_finger]
+        self.link1_geom = self.model.body_geomadr[self.model.body("link1").id]
+        self.link2_geom = self.model.body_geomadr[self.model.body("link2").id]
+        self.link3_geom = self.model.body_geomadr[self.model.body("link3").id]
+        self.link4_geom = self.model.body_geomadr[self.model.body("link4").id]
+        self.link5_geom = self.model.body_geomadr[self.model.body("link5").id]
+        self.link6_geom = self.model.body_geomadr[self.model.body("link6").id]
+        self.link7_geom = self.model.body_geomadr[self.model.body("link7").id]
+        self.left_finger_geom = self.model.body_geomadr[
+            self.model.body("left_finger").id
+        ]
+        self.right_finger_geom = self.model.body_geomadr[
+            self.model.body("right_finger").id
+        ]
 
     def test_single_valid_collision(self):
         valid_collision_bodies = [("link1", "link2")]

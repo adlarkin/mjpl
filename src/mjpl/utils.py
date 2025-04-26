@@ -116,7 +116,7 @@ def random_valid_config(
     q_init: np.ndarray,
     joints: list[str],
     seed: int | None = None,
-    cr: CollisionRuleset | None = None,
+    cr: CollisionRuleset | None = CollisionRuleset(),
 ) -> np.ndarray:
     """Generate a random valid configuration.
 
