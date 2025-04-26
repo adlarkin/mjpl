@@ -164,6 +164,11 @@ class TestCollisionRuleset(unittest.TestCase):
                 model=None, allowed_collision_bodies=[("body1", "body2")]
             )
 
+        cr = mjpl.CollisionRuleset()
+        with self.assertRaisesRegex(ValueError, "nx2"):
+            cr.obeys_ruleset(np.zeros((1, 3)))
+            cr.obeys_ruleset(np.zeros((1, 2, 1)))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -52,7 +52,7 @@ class CollisionRuleset:
             True if all geometry pairs in the collision matrix map to allowed body
             collision pairs. False otherwise.
         """
-        if collision_geometries.shape[1] != 2:
+        if collision_geometries.ndim != 2 or collision_geometries.shape[1] != 2:
             raise ValueError("`collision_geometries` must be a nx2 matrix.")
 
         if collision_geometries.shape[0] == 0:
