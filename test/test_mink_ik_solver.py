@@ -11,7 +11,7 @@ class TestMinkIKSolver(unittest.TestCase):
     def setUp(self):
         self.model = load_robot_description("ur5e_mj_description")
         self.site_name = "attachment_site"
-        self.cr = mjpl.CollisionRuleset(self.model)
+        self.cr = mjpl.CollisionRuleset()
 
     def test_ik(self):
         q_init_world = self.model.keyframe("home").qpos.copy()
