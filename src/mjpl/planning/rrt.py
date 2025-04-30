@@ -71,7 +71,7 @@ class RRT:
 
     def plan_to_pose(
         self,
-        q_init_world: np.ndarray,
+        q_init: np.ndarray,
         pose: SE3,
         site: str,
         solver: IKSolver | None = None,
@@ -79,36 +79,33 @@ class RRT:
         """Plan to a pose.
 
         Args:
-            q_init_world: Initial joint configuration of the world.
+            q_init: Initial joint configuration.
             pose: Target pose, in the world frame.
             site: The site (i.e., frame) that must satisfy `pose`.
             solver: Solver used to compute IK for `pose` and `site`.
 
         Returns:
-            A path from `q_init_world` to `pose`. If a path cannot be found,
+            A path from `q_init` to `pose`. If a path cannot be found,
             None is returned.
         """
-        return self.plan_to_poses(q_init_world, [pose], site, solver)
+        return self.plan_to_poses(q_init, [pose], site, solver)
 
-    def plan_to_config(
-        self, q_init_world: np.ndarray, q_goal: np.ndarray
-    ) -> Path | None:
+    def plan_to_config(self, q_init: np.ndarray, q_goal: np.ndarray) -> Path | None:
         """Plan to a configuration.
 
         Args:
-            q_init_world: Initial joint configuration of the world.
-            q_goals: Goal joint configuration, which should specify values for
-                each joint in the planner's JointGroup.
+            q_init: Initial joint configuration.
+            q_goals: Goal joint configuration.
 
         Returns:
-            A path from `q_init_world` to `pose`. If a path cannot be found,
+            A path from `q_init` to `pose`. If a path cannot be found,
             None is returned.
         """
-        return self.plan_to_configs(q_init_world, [q_goal])
+        return self.plan_to_configs(q_init, [q_goal])
 
     def plan_to_poses(
         self,
-        q_init_world: np.ndarray,
+        q_init: np.ndarray,
         poses: list[SE3],
         site: str,
         solver: IKSolver | None = None,
@@ -116,13 +113,13 @@ class RRT:
         """Plan to a list of poses.
 
         Args:
-            q_init_world: Initial joint configuration of the world.
+            q_init: Initial joint configuration.
             poses: Target poses, in the world frame.
             site: The site (i.e., frame) that must satisfy each pose in `poses`.
             solver: Solver used to compute IK for `poses` and `site`.
 
         Returns:
-            A path from `q_init_world` to `pose`. If a path cannot be found,
+            A path from `q_init` to `pose`. If a path cannot be found,
             None is returned.
         """
         if solver is None:
@@ -134,62 +131,66 @@ class RRT:
                 max_attempts=5,
             )
         potential_solutions = [
-            solver.solve_ik(p, site, q_init_guess=q_init_world) for p in poses
+            solver.solve_ik(p, site, q_init_guess=q_init) for p in poses
         ]
         valid_solutions = [q for q in potential_solutions if q is not None]
         if not valid_solutions:
             print("Unable to find at least one configuration from the target poses.")
             return None
-
-        goal_configs = [q[self.q_idx] for q in valid_solutions]
-        return self.plan_to_configs(q_init_world, goal_configs)
+        return self.plan_to_configs(q_init, valid_solutions)
 
     def plan_to_configs(
-        self, q_init_world: np.ndarray, q_goals: list[np.ndarray]
+        self, q_init: np.ndarray, q_goals: list[np.ndarray]
     ) -> Path | None:
         """Plan to a list of configurations.
 
         Args:
-            q_init_world: Initial joint configuration of the world.
-            q_goals: Goal joint configurations, which should specify values for
-                each joint in the planner's JointGroup.
+            q_init: Initial joint configuration.
+            q_goals: Goal joint configurations.
 
         Returns:
-            A path from `q_init_world` to a configuration in `q_goals`. The
+            A path from `q_init` to a configuration in `q_goals`. The
             planner will return the first path that is found. If a path cannot
             be found to any of the configurations, None is returned.
         """
-        assert q_init_world.size == self.model.nq
-        for q in q_goals:
-            assert q.size == len(self.q_idx)
-
         data = mujoco.MjData(self.model)
-        data.qpos = q_init_world
+
+        data.qpos = q_init
         if not utils.is_valid_config(self.model, data, self.cr):
-            print("q_init_world is not a valid configuration")
-            return None
+            raise ValueError("q_init is not a valid configuration")
         for q in q_goals:
-            data.qpos[self.q_idx] = q
+            data.qpos = q
             if not utils.is_valid_config(self.model, data, self.cr):
-                print(f"The following goal config is not a valid configuration: {q}")
-                return None
+                raise ValueError(
+                    f"The following goal config is not a valid configuration: {q}"
+                )
+
+        fixed_jnt_idx = [i for i in range(self.model.nq) if i not in self.q_idx]
+        for q in q_goals:
+            if not np.allclose(
+                q_init[fixed_jnt_idx], q[fixed_jnt_idx], rtol=0, atol=1e-12
+            ):
+                raise ValueError(
+                    f"The following goal config has values for joints outside of "
+                    f"the planner's planning joints that don't match q_init: {q}. "
+                    f"q_init is {q_init}, and the planning joints are {self.planning_joints}"
+                )
 
         # Is there a direct connection to any of the goals from q_init?
-        q_init = q_init_world[self.q_idx]
         for q in q_goals:
             if np.linalg.norm(q - q_init) <= self.epsilon:
                 return Path(
-                    q_init=q_init_world,
-                    waypoints=[q_init, q],
+                    q_init=q_init,
+                    waypoints=[q_init[self.q_idx], q[self.q_idx]],
                     joints=self.planning_joints,
                 )
 
-        start_tree = Tree(Node(q_init))
+        start_tree = Tree(Node(q_init[self.q_idx]))
         # To support multiple goals, the root of the goal tree is a sink node
         # (i.e., a node with an empty numpy array) and all goal configs are
         # children of this sink node.
         sink_node = Node(np.array([]))
-        goal_nodes = [Node(q, sink_node) for q in q_goals]
+        goal_nodes = [Node(q[self.q_idx], sink_node) for q in q_goals]
         goal_tree = Tree(sink_node, is_sink=True)
         for n in goal_nodes:
             goal_tree.add_node(n)
@@ -231,7 +232,7 @@ class RRT:
                     start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
                 )
                 return Path(
-                    q_init=q_init_world,
+                    q_init=q_init,
                     waypoints=waypoints,
                     joints=self.planning_joints,
                 )
@@ -265,7 +266,7 @@ class RRT:
                         start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
                     )
                     return Path(
-                        q_init=q_init_world,
+                        q_init=q_init,
                         waypoints=waypoints,
                         joints=self.planning_joints,
                     )
