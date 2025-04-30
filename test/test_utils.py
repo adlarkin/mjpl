@@ -286,9 +286,7 @@ class TestUtils(unittest.TestCase):
         model = mujoco.MjModel.from_xml_path(_JOINTS_XML.as_posix())
 
         # Querying all joints in the model should correspond to the full mujoco.MjData.qpos
-        indices = mjpl.qpos_idx(
-            model, ["slide_joint", "free_joint", "hinge_joint", "ball_joint"]
-        )
+        indices = mjpl.qpos_idx(model, mjpl.all_joints(model))
         self.assertListEqual(indices, list(range(model.nq)))
 
         indices = mjpl.qpos_idx(model, ["slide_joint"])
@@ -308,6 +306,31 @@ class TestUtils(unittest.TestCase):
         self.assertListEqual(indices, [9, 10, 11, 12, 8, 1, 2, 3, 4, 5, 6, 7])
 
         self.assertListEqual(mjpl.qpos_idx(model, []), [])
+
+    def test_qvel_idx(self):
+        model = mujoco.MjModel.from_xml_path(_JOINTS_XML.as_posix())
+
+        # Querying all joints in the model should correspond to the full mujoco.MjData.qvel
+        indices = mjpl.qvel_idx(model, mjpl.all_joints(model))
+        self.assertListEqual(indices, list(range(model.nv)))
+
+        indices = mjpl.qvel_idx(model, ["slide_joint"])
+        self.assertListEqual(indices, [0])
+
+        indices = mjpl.qvel_idx(model, ["free_joint"])
+        self.assertListEqual(indices, [1, 2, 3, 4, 5, 6])
+
+        indices = mjpl.qvel_idx(model, ["hinge_joint"])
+        self.assertListEqual(indices, [7])
+
+        indices = mjpl.qvel_idx(model, ["ball_joint"])
+        self.assertListEqual(indices, [8, 9, 10])
+
+        # Make sure index order matches order of joints in the query.
+        indices = mjpl.qvel_idx(model, ["ball_joint", "hinge_joint", "free_joint"])
+        self.assertListEqual(indices, [8, 9, 10, 7, 1, 2, 3, 4, 5, 6])
+
+        self.assertListEqual(mjpl.qvel_idx(model, []), [])
 
     def test_is_valid_config(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())

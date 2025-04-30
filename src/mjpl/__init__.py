@@ -9,7 +9,14 @@ from .trajectory import (
     ToppraTrajectoryGenerator,
     generate_collision_free_trajectory,
 )
-from .utils import all_joints, qpos_idx, random_valid_config, shortcut, site_pose
+from .utils import (
+    all_joints,
+    qpos_idx,
+    qvel_idx,
+    random_valid_config,
+    shortcut,
+    site_pose,
+)
 
 __all__ = (
     "CollisionRuleset",
@@ -21,6 +28,7 @@ __all__ = (
     "cartesian_plan",
     "generate_collision_free_trajectory",
     "qpos_idx",
+    "qvel_idx",
     "random_valid_config",
     "site_pose",
     "shortcut",
