@@ -40,6 +40,7 @@ classifiers = [
 
 [project.optional-dependencies]
 test = [
+  "dm_control",
   "robot_descriptions",
   "scipy",
 ]

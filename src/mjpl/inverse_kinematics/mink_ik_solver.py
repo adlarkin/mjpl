@@ -26,8 +26,9 @@ class MinkIKSolver(IKSolver):
 
         Args:
             model: MuJoCo model.
-            joints: The joints to use when generating initial states for new solve
-                attempts and validating configurations.
+            joints: The joints that can be manipulated to solve IK. The values of these
+                joints will be randomized when generating initial states for new solve
+                attempts.
             cr: The collision rules to enforce. If defined, IK solutions must
                 also obey this ruleset.
             pos_tolerance: Allowed position error.
@@ -55,6 +56,16 @@ class MinkIKSolver(IKSolver):
         self.iterations = iterations
         self.solver = solver
 
+        # If needed, create a damping task to make sure joints that are not in
+        # self.joints are held fixed while solving IK.
+        self.damping_task: mink.DampingTask | None = None
+        all_joints = utils.all_joints(model)
+        if set(joints) != set(all_joints):
+            fixed_joints = [j for j in all_joints if j not in joints]
+            cost = np.zeros((model.nv,))
+            cost[utils.qvel_idx(model, fixed_joints)] = 1e9
+            self.damping_task = mink.DampingTask(model, cost)
+
     def solve_ik(
         self, pose: mink.lie.SE3, site: str, q_init_guess: np.ndarray | None
     ) -> np.ndarray | None:
@@ -68,7 +79,10 @@ class MinkIKSolver(IKSolver):
             lm_damping=0.1,
         )
         end_effector_task.set_target(pose)
+
         tasks = [end_effector_task]
+        if self.damping_task is not None:
+            tasks.append(self.damping_task)
 
         limits = [mink.ConfigurationLimit(self.model)]
 

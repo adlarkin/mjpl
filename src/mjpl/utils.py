@@ -58,6 +58,25 @@ def qpos_idx(model: mujoco.MjModel, joints: list[str]) -> list[int]:
     return idx
 
 
+def qvel_idx(model: mujoco.MjModel, joints: list[str]) -> list[int]:
+    """Get the indices in mujoco.MjData.qvel that correspond to specific joints.
+
+    Args:
+        model: MuJoCo model.
+        joints: The names of the joints in `model`.
+
+    Returns:
+        A list of indices that correspond to `joints` in mujoco.MjData.qvel.
+    """
+    idx: list[int] = []
+    for j in joints:
+        jnt_id = model.joint(j).id
+        jnt_dim = mink.constants.dof_width(model.jnt_type[jnt_id])
+        vel_start = model.jnt_dofadr[jnt_id]
+        idx.extend(range(vel_start, vel_start + jnt_dim))
+    return idx
+
+
 def site_pose(data: mujoco.MjData, site_name: str) -> mink.SE3:
     """Get the pose of a site in the world frame.
 
