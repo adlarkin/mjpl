@@ -27,16 +27,16 @@ class CollisionRuleset:
             )
 
         self.model = model
-        self.allowed_collisions = None
+        self.allowed_collisions: np.ndarray | None = None
         if allowed_collision_bodies:
-            # Create a sorted body ID allowed collision matrix.
-            # Sort since collisions between bodies a and b can be represented as
-            # (a,b) or (b,a).
+            # Create a sorted body ID allowed collision matrix. Use array broadcasting
+            # for efficient checking between existing and allowed collision pairs. Sort
+            # since collisions between bodies a and b can be represented as (a,b) or (b,a).
             body_ids = [
                 (self.model.body(a).id, self.model.body(b).id)
                 for a, b in allowed_collision_bodies
             ]
-            self.allowed_collisions = np.sort(body_ids, axis=1)
+            self.allowed_collisions = np.sort(body_ids, axis=1)[None, :, :]
 
     def obeys_ruleset(self, collision_geometries: np.ndarray) -> bool:
         """Check if a collision matrix adheres to the allowed body collisions.
@@ -67,7 +67,5 @@ class CollisionRuleset:
         # Sort since collisions between bodies a and b can be represented as
         # (a,b) or (b,a).
         collision_bodies = np.sort(self.model.geom_bodyid[collision_geometries], axis=1)
-        matches = (
-            collision_bodies[:, None, :] == self.allowed_collisions[None, :, :]
-        ).all(axis=2)
+        matches = (collision_bodies[:, None, :] == self.allowed_collisions).all(axis=2)
         return np.all(matches.any(axis=1))
