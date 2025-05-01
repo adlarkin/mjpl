@@ -3,7 +3,8 @@ import mujoco
 import numpy as np
 
 from .. import utils
-from ..collision_ruleset import CollisionRuleset
+from ..constraint.constraint_interface import Constraint
+from ..constraint.utils import obeys_constraints
 from .ik_solver import IKSolver
 
 
@@ -14,7 +15,7 @@ class MinkIKSolver(IKSolver):
         self,
         model: mujoco.MjModel,
         joints: list[str],
-        cr: CollisionRuleset | None = CollisionRuleset(),
+        constraints: list[Constraint] = [],
         pos_tolerance: float = 1e-3,
         ori_tolerance: float = 1e-3,
         seed: int | None = None,
@@ -29,8 +30,7 @@ class MinkIKSolver(IKSolver):
             joints: The joints that can be manipulated to solve IK. The values of these
                 joints will be randomized when generating initial states for new solve
                 attempts.
-            cr: The collision rules to enforce. If defined, IK solutions must
-                also obey this ruleset.
+            constraints: The constraints to enforce on IK solutions.
             pos_tolerance: Allowed position error.
             ori_tolerance: Allowed orientation error.
             seed: Seed used for generating random samples in the case of retries
@@ -48,7 +48,7 @@ class MinkIKSolver(IKSolver):
             raise ValueError("`iterations` must be > 0.")
         self.model = model
         self.joints = joints
-        self.cr = cr
+        self.constraints = constraints
         self.pos_tolerance = pos_tolerance
         self.ori_tolerance = ori_tolerance
         self.seed = seed
@@ -69,8 +69,6 @@ class MinkIKSolver(IKSolver):
     def solve_ik(
         self, pose: mink.lie.SE3, site: str, q_init_guess: np.ndarray | None
     ) -> np.ndarray | None:
-        data = mujoco.MjData(self.model)
-
         end_effector_task = mink.FrameTask(
             frame_name=site,
             frame_type="site",
@@ -95,8 +93,7 @@ class MinkIKSolver(IKSolver):
                 pos_achieved = np.linalg.norm(err[:3]) <= self.pos_tolerance
                 ori_achieved = np.linalg.norm(err[3:]) <= self.ori_tolerance
                 if pos_achieved and ori_achieved:
-                    data.qpos = configuration.q
-                    if utils.is_valid_config(self.model, data, self.cr):
+                    if obeys_constraints(configuration.q, self.constraints):
                         return configuration.q
                     break
                 vel = mink.solve_ik(
@@ -111,8 +108,8 @@ class MinkIKSolver(IKSolver):
 
             # Make sure a different seed is used for each randomly generated config.
             _seed = self.seed + attempt if self.seed is not None else self.seed
-            next_guess = utils.random_valid_config(
-                self.model, configuration.q, self.joints, _seed, self.cr
+            next_guess = utils.random_config(
+                self.model, configuration.q, self.joints, _seed, self.constraints
             )
             configuration.update(next_guess)
         return None

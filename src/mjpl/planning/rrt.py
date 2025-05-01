@@ -5,7 +5,8 @@ import numpy as np
 from mink.lie.se3 import SE3
 
 from .. import utils
-from ..collision_ruleset import CollisionRuleset
+from ..constraint.constraint_interface import Constraint
+from ..constraint.utils import apply_constraints, obeys_constraints
 from ..inverse_kinematics.ik_solver import IKSolver
 from ..inverse_kinematics.mink_ik_solver import MinkIKSolver
 from ..types import Path
@@ -25,7 +26,7 @@ class RRT:
         self,
         model: mujoco.MjModel,
         planning_joints: list[str],
-        cr: CollisionRuleset,
+        constraints: list[Constraint],
         max_planning_time: float = 10.0,
         epsilon: float = 0.05,
         seed: int | None = None,
@@ -37,7 +38,7 @@ class RRT:
         Args:
             model: MuJoCo model.
             planning_joints: The joints used for planning.
-            cr: The CollisionRuleset the sampled configurations must obey.
+            constraints: The constraints the sampled configurations must obey.
             max_planning_time: Maximum planning time, in seconds.
             epsilon: The maximum distance allowed between nodes in the tree.
             seed: Seed used for the underlying sampler in the planner.
@@ -60,7 +61,7 @@ class RRT:
         self.model = model
         self.planning_joints = planning_joints
         self.q_idx = utils.qpos_idx(model, planning_joints)
-        self.cr = cr
+        self.constraints = constraints
         self.max_planning_time = max_planning_time
         self.epsilon = epsilon
         self.seed = seed
@@ -126,7 +127,7 @@ class RRT:
             solver = MinkIKSolver(
                 model=self.model,
                 joints=self.planning_joints,
-                cr=self.cr,
+                constraints=self.constraints,
                 seed=self.seed,
                 max_attempts=5,
             )
@@ -156,11 +157,11 @@ class RRT:
         data = mujoco.MjData(self.model)
 
         data.qpos = q_init
-        if not utils.is_valid_config(self.model, data, self.cr):
+        if not obeys_constraints(q_init, self.constraints):
             raise ValueError("q_init is not a valid configuration")
         for q in q_goals:
             data.qpos = q
-            if not utils.is_valid_config(self.model, data, self.cr):
+            if not obeys_constraints(q, self.constraints):
                 raise ValueError(
                     f"The following goal config is not a valid configuration: {q}"
                 )
@@ -195,8 +196,10 @@ class RRT:
         for n in goal_nodes:
             goal_tree.add_node(n)
 
+        q_full = q_init.copy()
         start_time = time.time()
         while time.time() - start_time < self.max_planning_time:
+            # Sample a configuration.
             if self.rng.random() <= self.goal_biasing_probability:
                 # randomly pick a goal
                 random_goal_idx = self.rng.integers(0, len(goal_nodes))
@@ -204,25 +207,30 @@ class RRT:
             else:
                 q_rand = self.rng.uniform(*self.model.jnt_range.T)[self.q_idx]
 
+            # Apply constraints to the sampled configuration.
+            q_full[self.q_idx] = q_rand
+            q_rand = apply_constraints(q_full, self.constraints)
+            if q_rand is None:
+                continue
+            q_rand = q_rand[self.q_idx]
+
             new_start_tree_node = _connect(
-                self.model,
                 data,
                 q_rand,
                 self.q_idx,
                 start_tree,
                 self.epsilon,
                 self.max_connection_distance,
-                self.cr,
+                self.constraints,
             )
             new_goal_tree_node = _connect(
-                self.model,
                 data,
                 new_start_tree_node.q,
                 self.q_idx,
                 goal_tree,
                 self.epsilon,
                 self.max_connection_distance,
-                self.cr,
+                self.constraints,
             )
             if (
                 np.linalg.norm(new_goal_tree_node.q - new_start_tree_node.q)
@@ -239,24 +247,22 @@ class RRT:
 
             if not np.array_equal(new_start_tree_node.q, q_rand):
                 new_goal_tree_node = _connect(
-                    self.model,
                     data,
                     q_rand,
                     self.q_idx,
                     goal_tree,
                     self.epsilon,
                     self.max_connection_distance,
-                    self.cr,
+                    self.constraints,
                 )
                 new_start_tree_node = _connect(
-                    self.model,
                     data,
                     new_goal_tree_node.q,
                     self.q_idx,
                     start_tree,
                     self.epsilon,
                     self.max_connection_distance,
-                    self.cr,
+                    self.constraints,
                 )
                 if (
                     np.linalg.norm(new_goal_tree_node.q - new_start_tree_node.q)

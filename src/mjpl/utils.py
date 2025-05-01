@@ -2,7 +2,8 @@ import mink
 import mujoco
 import numpy as np
 
-from .collision_ruleset import CollisionRuleset
+from .constraint.constraint_interface import Constraint
+from .constraint.utils import apply_constraints, obeys_constraints
 from .types import Path
 
 
@@ -95,51 +96,14 @@ def site_pose(data: mujoco.MjData, site_name: str) -> mink.SE3:
     )
 
 
-def is_valid_config(
-    model: mujoco.MjModel,
-    data: mujoco.MjData,
-    cr: CollisionRuleset | None,
-) -> bool:
-    """Check if the configuration stored in MjData.qpos is valid.
-
-    "Valid" in this case means joint limits and an (optional) CollisionRuleset
-    are not violated.
-
-    Args:
-        model: MuJoCo model.
-        data: MuJoCo data, which has the configuration to validate.
-        cr: CollisionRuleset the configuration must obey. Set this to None if no
-            CollisionRuleset should be enforced.
-
-    Returns:
-        True if the configuration in `data` does not violate joint limits and obeys
-        `cr` (if `cr` is defined). False otherwise.
-    """
-    # Check joint limits.
-    if not np.all(
-        (data.qpos >= model.jnt_range[:, 0]) & (data.qpos <= model.jnt_range[:, 1])
-    ):
-        return False
-
-    if cr:
-        # Check for collisions.
-        mujoco.mj_kinematics(model, data)
-        mujoco.mj_collision(model, data)
-        return cr.obeys_ruleset(data.contact.geom)
-
-    return True
-
-
-def random_valid_config(
+def random_config(
     model: mujoco.MjModel,
     q_init: np.ndarray,
     joints: list[str],
     seed: int | None = None,
-    cr: CollisionRuleset | None = CollisionRuleset(),
+    constraints: list[Constraint] = [],
 ) -> np.ndarray:
-    """Generate a random valid configuration.
-
-    See `is_valid_config` for notes about "validity" of a configration.
+    """Generate a random configuration that is within joint limits and obeys (optional) constraints.
 
     Args:
         model: MuJoCo model.
@@ -147,28 +111,29 @@ def random_valid_config(
             not in `joints`.
         joints: The joints to set random values for.
         seed: Seed used for random number generation.
-        cr: CollisionRuleset the randomly generated configuration must obey. Set this
-            to None if no CollisionRuleset should be enforced.
+        constraints: Constraints the randomly generated configuration must obey.
+            Set this to an empty list if no constraints should be enforced.
 
     Returns:
         A random valid configuration.
     """
-    data = mujoco.MjData(model)
-    data.qpos = q_init
-
-    rng = np.random.default_rng(seed=seed)
     q_idx = qpos_idx(model, joints)
-    data.qpos[q_idx] = rng.uniform(*model.jnt_range.T)[q_idx]
-    while not is_valid_config(model, data, cr):
-        data.qpos[q_idx] = rng.uniform(*model.jnt_range.T)[q_idx]
+    rng = np.random.default_rng(seed=seed)
 
-    return data.qpos
+    q = q_init.copy()
+    q[q_idx] = rng.uniform(*model.jnt_range.T)[q_idx]
+
+    q_constrained = apply_constraints(q, constraints)
+    while q_constrained is None:
+        q[q_idx] = rng.uniform(*model.jnt_range.T)[q_idx]
+        q_constrained = apply_constraints(q, constraints)
+    return q_constrained
 
 
 def shortcut(
     model: mujoco.MjModel,
     path: Path,
-    cr: CollisionRuleset | None,
+    constraints: list[Constraint],
     validation_dist: float = 0.05,
     max_attempts: int = 100,
     seed: int | None = None,
@@ -178,7 +143,7 @@ def shortcut(
     Args:
         model: MuJoCo model.
         path: The path to shortcut.
-        cr: The CollisionRuleset to enforce (if any) for validation checks.
+        constraints: The constraints to enforce (if any) for validation checks.
         validation_dist: The distance between each validation check, which occurs
             between a pair of waypoints that are trying to be directly connected
             if these waypoints are further than `validation_dist` apart.
@@ -191,22 +156,20 @@ def shortcut(
     Returns:
         A path with direct connections between each adjacent waypoint.
     """
-    data = mujoco.MjData(model)
-    data.qpos = path.q_init
+    q = path.q_init.copy()
     rng = np.random.default_rng(seed=seed)
 
     q_idx = qpos_idx(model, path.joints)
 
     # sanity check: can we shortcut directly between the start/end of the path?
     shortened_waypoints = _connect_waypoints(
-        model,
-        data,
+        q,
         path.waypoints,
         q_idx,
         start_idx=0,
         end_idx=len(path.waypoints) - 1,
         validation_dist=validation_dist,
-        cr=cr,
+        constraints=constraints,
     )
     for _ in range(max_attempts):
         if len(shortened_waypoints) == 2:
@@ -221,42 +184,39 @@ def shortcut(
         if start > end:
             start, end = end, start
         shortened_waypoints = _connect_waypoints(
-            model,
-            data,
+            q,
             shortened_waypoints,
             q_idx,
             start_idx=start,
             end_idx=end,
             validation_dist=validation_dist,
-            cr=cr,
+            constraints=constraints,
         )
 
     return Path(q_init=path.q_init, waypoints=shortened_waypoints, joints=path.joints)
 
 
 def _connect_waypoints(
-    model: mujoco.MjModel,
-    data: mujoco.MjData,
+    q_full: np.ndarray,
     waypoints: list[np.ndarray],
     q_idx: list[int],
     start_idx: int,
     end_idx: int,
     validation_dist: float,
-    cr: CollisionRuleset | None,
+    constraints: list[Constraint] = [],
 ) -> list[np.ndarray]:
     """If possible, directly connect two specific waypoints from a list of waypoints.
 
     Args:
-        model: MuJoCo model.
-        data: MuJoCo data. Used for validation checking. This should have values
-            initialized in MjData.qpos that do not correspond to `waypoints`/`q_idx`.
+        q_full: Configuration that has values initialized for joints that do not
+            correspond to `waypoints`/`q_idx`.
         waypoints: The list of waypoints.
         q_idx: The indices in MjData.qpos that correspond to the arrays in `waypoints`.
         start_idx: The index of the first waypoint.
         end_idx: The index of the second waypoint.
         validation_dist: The distance increment used for performing intermediate
             validation checks. This must be > 0.
-        cr: The CollisionRuleset to enforce (if any) for validation checks.
+        constraints: The constraints to enforce (if any) for validation checks.
 
     Returns:
         A waypoint list with a direct connection between the waypoints at indices
@@ -270,8 +230,8 @@ def _connect_waypoints(
 
     q_curr = step(q_start, q_target, validation_dist)
     while not np.array_equal(q_curr, q_target):
-        data.qpos[q_idx] = q_curr
-        if not is_valid_config(model, data, cr):
+        q_full[q_idx] = q_curr
+        if not obeys_constraints(q_full, constraints):
             return waypoints
         q_curr = step(q_curr, q_target, validation_dist)
     return waypoints[: start_idx + 1] + waypoints[end_idx:]
