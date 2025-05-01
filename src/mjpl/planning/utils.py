@@ -1,4 +1,3 @@
-import mujoco
 import numpy as np
 
 from .. import utils
@@ -7,13 +6,8 @@ from ..constraint.utils import obeys_constraints
 from .tree import Node, Tree
 
 
-# TODO: remove data? I don't think it's needed anymore since constraints are used.
-# This can be replaced with a numpy array (looks like the only thing needed from
-# data is qpos)
 def _extend(
-    data: mujoco.MjData,
     q_target: np.ndarray,
-    q_idx: list[int],
     tree: Tree,
     start_node: Node,
     eps: float,
@@ -22,10 +16,7 @@ def _extend(
     """Extend a node in a tree towards a target configuration.
 
     Args:
-        data: MuJoCo data. Used for validation checking. This should have values
-            initialized in MjData.qpos that do not correspond to `q_target`/`q_idx`.
         q_target: The target configuration.
-        q_idx: The indices in MjData.qpos that correspond to the values in `q_target`.
         tree: The tree with a node to extend towards `q_target`.
         start_node: The node in `tree` to extend towards `q_target`.
         eps: The maximum distance `start_node` will extend towards `q_target`.
@@ -38,8 +29,9 @@ def _extend(
     if np.array_equal(start_node.q, q_target):
         return start_node
     q_extend = utils.step(start_node.q, q_target, eps)
-    data.qpos[q_idx] = q_extend
-    if obeys_constraints(data.qpos, constraints):
+    # TODO: apply constraints to q_extend instead of just checking if it obeys constraints?
+    # Re-visit the paper
+    if obeys_constraints(q_extend, constraints):
         extended_node = Node(q_extend, start_node)
         tree.add_node(extended_node)
         return extended_node
@@ -47,9 +39,7 @@ def _extend(
 
 
 def _connect(
-    data: mujoco.MjData,
     q_target: np.ndarray,
-    q_idx: list[int],
     tree: Tree,
     eps: float,
     max_connection_distance: float,
@@ -58,10 +48,7 @@ def _connect(
     """Attempt to connect a node in a tree to a target configuration.
 
     Args:
-        data: MuJoCo data. Used for validation checking. This should have values
-            initialized in MjData.qpos that do not correspond to `q_target`/`q_idx`.
         q_target: The target configuration.
-        q_idx: The indices in MjData.qpos that correspond to the values in `q_target`.
         tree: The tree with a node that serves as the basis of the connection
             to `q_target`.
         eps: The maximum distance between nodes added to `tree`. If the
@@ -80,7 +67,7 @@ def _connect(
     while not np.array_equal(nearest_node.q, q_target):
         max_eps = min(eps, max_connection_distance - total_distance)
         next_node = _extend(
-            data, q_target, q_idx, tree, nearest_node, max_eps, constraints
+            q_target, tree, nearest_node, max_eps, constraints
         )
         if not next_node:
             break

@@ -109,7 +109,7 @@ def main():
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
     q_t = [q_init]
     for q_ref in trajectory.positions:
-        data.ctrl[actuator_ids] = q_ref
+        data.ctrl[actuator_ids] = q_ref[q_idx]
         mujoco.mj_step(model, data)
         q_t.append(data.qpos.copy())
 
@@ -143,7 +143,7 @@ def main():
             # Visualize the trajectory. The trajectory is of high resolution,
             # so plotting every other timestep should be sufficient.
             for q_ref in trajectory.positions[::2]:
-                data.qpos[q_idx] = q_ref
+                data.qpos = q_ref
                 mujoco.mj_kinematics(model, data)
                 pos = data.site(_PANDA_EE_SITE).xpos
                 viz.add_sphere(
