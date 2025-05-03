@@ -2,28 +2,29 @@ import mujoco
 import numpy as np
 
 from .. import utils
-from ..collision_ruleset import CollisionRuleset
+from ..constraint.constraint_interface import Constraint
+from ..constraint.utils import obeys_constraints
 from ..types import Path
 from .trajectory_interface import Trajectory, TrajectoryGenerator
 
 
-def generate_collision_free_trajectory(
+def generate_constrained_trajectory(
     model: mujoco.MjModel,
     path: Path,
     generator: TrajectoryGenerator,
-    cr: CollisionRuleset,
+    constraints: list[Constraint],
 ) -> Trajectory:
-    """Generate a trajectory that follows a path and obeys a collision ruleset.
+    """Generate a trajectory that follows a path and obeys constraints.
 
     This assumes that straight-line connections between adjacent waypoints in the path
-    obey the collision ruleset. The following steps are taken to ensure the trajectory
-    obeys the collision ruleset:
+    obey the constraints. The following steps are taken to ensure the trajectory obeys
+    the constraints:
         1. Generate a trajectory.
-        2. If part of the trajectory violates the collision ruleset, add an
-           intermediate waypoint to the path segment that corresponds to the part of
-           the trajectory that violates the collision ruleset.
+        2. If part of the trajectory violates the constraints, add an intermediate
+           waypoint to the path segment that corresponds to the part of the trajectory
+           that violates the constraints.
         3. Repeat steps 1-2 until the trajectory has no segments that violate the
-           collision ruleset.
+           constraints.
 
     This is taken from section 3.5 of https://groups.csail.mit.edu/rrg/papers/Richter_ISRR13.pdf
 
@@ -31,28 +32,24 @@ def generate_collision_free_trajectory(
         model: MuJoCo model.
         path: The path the trajectory must follow.
         generator: Trajectory generator.
-        cr: The collision ruleset the trajectory must adhere to.
+        constraints: The constraints the trajectory must obey.
 
     Returns:
-        A trajectory that follows `path` without violating `cr`.
+        A trajectory that follows `path` without violating `constraints`.
     """
-    data = mujoco.MjData(model)
     while True:
         traj = generator.generate_trajectory(path)
-        data.qpos = traj.q_init
+        q_full = traj.q_init.copy()
         q_idx = utils.qpos_idx(model, traj.joints)
         for i in range(len(traj.positions)):
-            q = traj.positions[i]
-            data.qpos[q_idx] = q
-            mujoco.mj_kinematics(model, data)
-            mujoco.mj_collision(model, data)
-            if not cr.obeys_ruleset(data.contact.geom):
-                # Add an intermediate waypoint to the section of the path
-                # that corresponds to the trajectory position that's in collision.
+            q_full[q_idx] = traj.positions[i]
+            if not obeys_constraints(q_full, constraints):
+                # Add an intermediate waypoint to the section of the path that
+                # corresponds to the trajectory position that violates the constraints.
                 path_timestamps = _waypoint_timing(path.waypoints, traj)
-                collision_timestamp = (i + 1) * traj.dt
+                trajectory_timestamp = (i + 1) * traj.dt
                 _add_intermediate_waypoint(
-                    path.waypoints, path_timestamps, collision_timestamp
+                    path.waypoints, path_timestamps, trajectory_timestamp
                 )
                 break
         else:

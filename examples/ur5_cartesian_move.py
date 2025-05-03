@@ -36,8 +36,6 @@ def main():
     arm_joints = mjpl.all_joints(model)
     q_idx = mjpl.qpos_idx(model, arm_joints)
 
-    cr = mjpl.CollisionRuleset()
-
     # Let the "home" keyframe in the MJCF be the initial state.
     home_keyframe = model.keyframe("home")
     q_init = home_keyframe.qpos.copy()
@@ -58,7 +56,7 @@ def main():
     solver = mjpl.MinkIKSolver(
         model=model,
         joints=arm_joints,
-        cr=cr,
+        constraints=[mjpl.CollisionConstraint(model)],
         seed=seed,
         max_attempts=5,
     )

@@ -5,7 +5,8 @@ import numpy as np
 from mink.lie.se3 import SE3
 
 from .. import utils
-from ..collision_ruleset import CollisionRuleset
+from ..constraint.constraint_interface import Constraint
+from ..constraint.utils import obeys_constraints
 from ..inverse_kinematics.ik_solver import IKSolver
 from ..inverse_kinematics.mink_ik_solver import MinkIKSolver
 from ..types import Path
@@ -14,18 +15,21 @@ from .utils import _combine_paths, _connect
 
 
 class RRT:
-    """Bi-directional RRT-Connect.
+    """Bi-directional RRT, with support for constraints.
 
     This implementation runs CONNECT on both trees. The original algorithm runs CONNECT
-    on one tree and EXTEND on the other, swapping trees every iteration:
-    https://www.cs.cmu.edu/afs/cs/academic/class/15494-s14/readings/kuffner_icra2000.pdf
+    on one tree and EXTEND on the other, swapping trees every iteration.
+
+    References:
+    - https://www.cs.cmu.edu/afs/cs/academic/class/15494-s14/readings/kuffner_icra2000.pdf
+    - https://personalrobotics.cs.washington.edu/publications/berenson2009cbirrt.pdf
     """
 
     def __init__(
         self,
         model: mujoco.MjModel,
         planning_joints: list[str],
-        cr: CollisionRuleset,
+        constraints: list[Constraint],
         max_planning_time: float = 10.0,
         epsilon: float = 0.05,
         seed: int | None = None,
@@ -36,8 +40,8 @@ class RRT:
 
         Args:
             model: MuJoCo model.
-            planning_joints: The joints used for planning.
-            cr: The CollisionRuleset the sampled configurations must obey.
+            planning_joints: The joints that are sampled during planning.
+            constraints: The constraints the sampled configurations must obey.
             max_planning_time: Maximum planning time, in seconds.
             epsilon: The maximum distance allowed between nodes in the tree.
             seed: Seed used for the underlying sampler in the planner.
@@ -59,15 +63,12 @@ class RRT:
 
         self.model = model
         self.planning_joints = planning_joints
-        self.q_idx = utils.qpos_idx(model, planning_joints)
-        self.cr = cr
+        self.constraints = constraints
         self.max_planning_time = max_planning_time
         self.epsilon = epsilon
         self.seed = seed
         self.goal_biasing_probability = goal_biasing_probability
         self.max_connection_distance = max_connection_distance
-
-        self.rng = np.random.default_rng(seed=seed)
 
     def plan_to_pose(
         self,
@@ -126,7 +127,7 @@ class RRT:
             solver = MinkIKSolver(
                 model=self.model,
                 joints=self.planning_joints,
-                cr=self.cr,
+                constraints=self.constraints,
                 seed=self.seed,
                 max_attempts=5,
             )
@@ -153,19 +154,16 @@ class RRT:
             planner will return the first path that is found. If a path cannot
             be found to any of the configurations, None is returned.
         """
-        data = mujoco.MjData(self.model)
-
-        data.qpos = q_init
-        if not utils.is_valid_config(self.model, data, self.cr):
+        if not obeys_constraints(q_init, self.constraints):
             raise ValueError("q_init is not a valid configuration")
         for q in q_goals:
-            data.qpos = q
-            if not utils.is_valid_config(self.model, data, self.cr):
+            if not obeys_constraints(q, self.constraints):
                 raise ValueError(
                     f"The following goal config is not a valid configuration: {q}"
                 )
 
-        fixed_jnt_idx = [i for i in range(self.model.nq) if i not in self.q_idx]
+        q_idx = utils.qpos_idx(self.model, self.planning_joints)
+        fixed_jnt_idx = [i for i in range(self.model.nq) if i not in q_idx]
         for q in q_goals:
             if not np.allclose(
                 q_init[fixed_jnt_idx], q[fixed_jnt_idx], rtol=0, atol=1e-12
@@ -181,94 +179,82 @@ class RRT:
             if np.linalg.norm(q - q_init) <= self.epsilon:
                 return Path(
                     q_init=q_init,
-                    waypoints=[q_init[self.q_idx], q[self.q_idx]],
-                    joints=self.planning_joints,
+                    waypoints=[q_init, q],
+                    joints=utils.all_joints(self.model),
                 )
 
-        start_tree = Tree(Node(q_init[self.q_idx]))
+        start_tree = Tree(Node(q_init))
         # To support multiple goals, the root of the goal tree is a sink node
         # (i.e., a node with an empty numpy array) and all goal configs are
         # children of this sink node.
         sink_node = Node(np.array([]))
-        goal_nodes = [Node(q[self.q_idx], sink_node) for q in q_goals]
+        goal_nodes = [Node(q, sink_node) for q in q_goals]
         goal_tree = Tree(sink_node, is_sink=True)
         for n in goal_nodes:
             goal_tree.add_node(n)
 
+        rng = np.random.default_rng(seed=self.seed)
         start_time = time.time()
         while time.time() - start_time < self.max_planning_time:
-            if self.rng.random() <= self.goal_biasing_probability:
-                # randomly pick a goal
-                random_goal_idx = self.rng.integers(0, len(goal_nodes))
+            if rng.random() <= self.goal_biasing_probability:
+                # Randomly pick a goal.
+                random_goal_idx = rng.integers(0, len(goal_nodes))
                 q_rand = goal_nodes[random_goal_idx].q
             else:
-                q_rand = self.rng.uniform(*self.model.jnt_range.T)[self.q_idx]
+                # Create a random configuration.
+                q_rand = q_init.copy()
+                q_rand[q_idx] = rng.uniform(*self.model.jnt_range.T)[q_idx]
 
             new_start_tree_node = _connect(
-                self.model,
-                data,
                 q_rand,
-                self.q_idx,
                 start_tree,
                 self.epsilon,
                 self.max_connection_distance,
-                self.cr,
+                self.constraints,
             )
             new_goal_tree_node = _connect(
-                self.model,
-                data,
                 new_start_tree_node.q,
-                self.q_idx,
                 goal_tree,
                 self.epsilon,
                 self.max_connection_distance,
-                self.cr,
+                self.constraints,
             )
-            if (
-                np.linalg.norm(new_goal_tree_node.q - new_start_tree_node.q)
-                <= self.epsilon
-            ):
+            if new_start_tree_node == new_goal_tree_node:
                 waypoints = _combine_paths(
                     start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
                 )
                 return Path(
                     q_init=q_init,
                     waypoints=waypoints,
-                    joints=self.planning_joints,
+                    joints=utils.all_joints(self.model),
                 )
 
+            # If the start tree was not able to reach q_rand, try the opposite process
+            # (grow the goal tree towards q_rand first). This can help reduce bias in
+            # each tree's growth.
             if not np.array_equal(new_start_tree_node.q, q_rand):
                 new_goal_tree_node = _connect(
-                    self.model,
-                    data,
                     q_rand,
-                    self.q_idx,
                     goal_tree,
                     self.epsilon,
                     self.max_connection_distance,
-                    self.cr,
+                    self.constraints,
                 )
                 new_start_tree_node = _connect(
-                    self.model,
-                    data,
                     new_goal_tree_node.q,
-                    self.q_idx,
                     start_tree,
                     self.epsilon,
                     self.max_connection_distance,
-                    self.cr,
+                    self.constraints,
                 )
-                if (
-                    np.linalg.norm(new_goal_tree_node.q - new_start_tree_node.q)
-                    <= self.epsilon
-                ):
+                if new_start_tree_node == new_goal_tree_node:
                     waypoints = _combine_paths(
                         start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
                     )
                     return Path(
                         q_init=q_init,
                         waypoints=waypoints,
-                        joints=self.planning_joints,
+                        joints=utils.all_joints(self.model),
                     )
 
         return None

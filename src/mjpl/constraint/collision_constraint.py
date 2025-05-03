@@ -1,6 +1,37 @@
 import mujoco
 import numpy as np
 
+from .constraint_interface import Constraint
+
+
+class CollisionConstraint(Constraint):
+    """Constraint that enforces collision rules on a configuration."""
+
+    def __init__(
+        self,
+        model: mujoco.MjModel,
+        allowed_collision_bodies: list[tuple[str, str]] = [],
+    ) -> None:
+        """Constructor.
+
+        Args:
+            model: MuJoCo model.
+            allowed_collision_bodies: List of body pairs that are allowed to be in
+                collision. An empty list means no bodies are allowed to be in collision.
+        """
+        self.model = model
+        self.data = mujoco.MjData(model)
+        self.cr = CollisionRuleset(model, allowed_collision_bodies)
+
+    def valid_config(self, q: np.ndarray) -> bool:
+        self.data.qpos = q
+        mujoco.mj_kinematics(self.model, self.data)
+        mujoco.mj_collision(self.model, self.data)
+        return self.cr.obeys_ruleset(self.data.contact.geom)
+
+    def apply(self, q: np.ndarray) -> np.ndarray | None:
+        return q if self.valid_config(q) else None
+
 
 class CollisionRuleset:
     """Class that defines which bodies are allowed to be in collision.

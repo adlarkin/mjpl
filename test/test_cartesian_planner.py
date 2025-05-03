@@ -110,7 +110,6 @@ class TestCartesianPlanner(unittest.TestCase):
         model = load_robot_description("ur5e_mj_description")
         data = mujoco.MjData(model)
         site = "attachment_site"
-        cr = mjpl.CollisionRuleset()
 
         # Use the "home" keyframe as the initial configuration.
         home_keyframe = model.keyframe("home")
@@ -138,7 +137,7 @@ class TestCartesianPlanner(unittest.TestCase):
         solver = mjpl.MinkIKSolver(
             model=model,
             joints=mjpl.all_joints(model),
-            cr=cr,
+            constraints=[mjpl.CollisionConstraint(model)],
             pos_tolerance=pos_tolerance,
             ori_tolerance=ori_tolerance,
             seed=12345,

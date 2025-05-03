@@ -1,33 +1,26 @@
-import mujoco
 import numpy as np
 
 from .. import utils
-from ..collision_ruleset import CollisionRuleset
+from ..constraint.constraint_interface import Constraint
+from ..constraint.utils import apply_constraints
 from .tree import Node, Tree
 
 
 def _extend(
-    model: mujoco.MjModel,
-    data: mujoco.MjData,
     q_target: np.ndarray,
-    q_idx: list[int],
     tree: Tree,
     start_node: Node,
     eps: float,
-    cr: CollisionRuleset,
+    constraints: list[Constraint],
 ) -> Node | None:
     """Extend a node in a tree towards a target configuration.
 
     Args:
-        model: MuJoCo model.
-        data: MuJoCo data. Used for validation checking. This should have values
-            initialized in MjData.qpos that do not correspond to `q_target`/`q_idx`.
         q_target: The target configuration.
-        q_idx: The indices in MjData.qpos that correspond to the values in `q_target`.
         tree: The tree with a node to extend towards `q_target`.
         start_node: The node in `tree` to extend towards `q_target`.
         eps: The maximum distance `start_node` will extend towards `q_target`.
-        cr: The CollisionRuleset configurations must obey.
+        constraints: The constraints the extended configuration must obey.
 
     Returns:
         The node that was the result of extending `start_node` towards `q_target`,
@@ -36,32 +29,25 @@ def _extend(
     if np.array_equal(start_node.q, q_target):
         return start_node
     q_extend = utils.step(start_node.q, q_target, eps)
-    data.qpos[q_idx] = q_extend
-    if utils.is_valid_config(model, data, cr):
-        extended_node = Node(q_extend, start_node)
+    q_constrained = apply_constraints(q_extend, constraints)
+    if q_constrained is not None:
+        extended_node = Node(q_constrained, start_node)
         tree.add_node(extended_node)
         return extended_node
     return None
 
 
 def _connect(
-    model: mujoco.MjModel,
-    data: mujoco.MjData,
     q_target: np.ndarray,
-    q_idx: list[int],
     tree: Tree,
     eps: float,
     max_connection_distance: float,
-    cr: CollisionRuleset,
+    constraints: list[Constraint],
 ) -> Node:
     """Attempt to connect a node in a tree to a target configuration.
 
     Args:
-        model: MuJoCo model.
-        data: MuJoCo data. Used for validation checking. This should have values
-            initialized in MjData.qpos that do not correspond to `q_target`/`q_idx`.
         q_target: The target configuration.
-        q_idx: The indices in MjData.qpos that correspond to the values in `q_target`.
         tree: The tree with a node that serves as the basis of the connection
             to `q_target`.
         eps: The maximum distance between nodes added to `tree`. If the
@@ -69,26 +55,44 @@ def _connect(
             than `eps`, multiple nodes will be added to `tree`.
         max_connection_distance: The maximum distance to cover before terminating
             the connect operation.
-        cr: The CollisionRuleset configurations must obey.
+        constraints: The constraints configurations must obey.
 
     Returns:
         The node that is the result of connecting a node from `tree` towards
         `q_target`. This node also belongs to `tree`.
     """
     nearest_node = tree.nearest_neighbor(q_target)
+    q_old = nearest_node.q
     total_distance = 0.0
     while not np.array_equal(nearest_node.q, q_target):
         max_eps = min(eps, max_connection_distance - total_distance)
-        next_node = _extend(
-            model, data, q_target, q_idx, tree, nearest_node, max_eps, cr
-        )
-        if not next_node:
+        next_node = _extend(q_target, tree, nearest_node, max_eps, constraints)
+        # Terminate if extension failed, or if extension is not making progress
+        # towards q_target because of the constraints.
+        if not next_node or _deviates_from_target(q_target, next_node.q, q_old):
             break
+        q_old = next_node.q
         nearest_node = next_node
         total_distance += max_eps
         if total_distance >= max_connection_distance:
             break
     return nearest_node
+
+
+def _deviates_from_target(
+    target: np.ndarray, curr: np.ndarray, prev: np.ndarray
+) -> bool:
+    """Check if a vector deviates from a target w.r.t. another vector.
+
+    Args:
+        target: The target vector.
+        curr: The vector to evaluate.
+        prev: The previous vector to compare against.
+
+    Returns:
+        True if `curr` is further from `target` than `prev`. False otherwise.
+    """
+    return np.linalg.norm(target - curr) > np.linalg.norm(target - prev)
 
 
 def _combine_paths(
