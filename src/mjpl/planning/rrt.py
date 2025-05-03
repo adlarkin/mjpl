@@ -9,7 +9,6 @@ from ..constraint.constraint_interface import Constraint
 from ..constraint.utils import obeys_constraints
 from ..inverse_kinematics.ik_solver import IKSolver
 from ..inverse_kinematics.mink_ik_solver import MinkIKSolver
-from ..types import Path
 from .tree import Node, Tree
 from .utils import _combine_paths, _connect
 
@@ -76,7 +75,7 @@ class RRT:
         pose: SE3,
         site: str,
         solver: IKSolver | None = None,
-    ) -> Path | None:
+    ) -> list[np.ndarray]:
         """Plan to a pose.
 
         Args:
@@ -86,21 +85,24 @@ class RRT:
             solver: Solver used to compute IK for `pose` and `site`.
 
         Returns:
-            A path from `q_init` to `pose`. If a path cannot be found,
-            None is returned.
+            A list of waypoints that form a path from `q_init` to a configuration
+            that satisfies the specified pose. If a path cannot be found, an empty
+            list is returned.
         """
         return self.plan_to_poses(q_init, [pose], site, solver)
 
-    def plan_to_config(self, q_init: np.ndarray, q_goal: np.ndarray) -> Path | None:
+    def plan_to_config(
+        self, q_init: np.ndarray, q_goal: np.ndarray
+    ) -> list[np.ndarray]:
         """Plan to a configuration.
 
         Args:
             q_init: Initial joint configuration.
-            q_goals: Goal joint configuration.
+            q_goal: Goal joint configuration.
 
         Returns:
-            A path from `q_init` to `pose`. If a path cannot be found,
-            None is returned.
+            A list of waypoints that form a path from `q_init` to `q_goal`.
+            If a path cannot be found, an empty list is returned.
         """
         return self.plan_to_configs(q_init, [q_goal])
 
@@ -110,7 +112,7 @@ class RRT:
         poses: list[SE3],
         site: str,
         solver: IKSolver | None = None,
-    ) -> Path | None:
+    ) -> list[np.ndarray]:
         """Plan to a list of poses.
 
         Args:
@@ -120,8 +122,9 @@ class RRT:
             solver: Solver used to compute IK for `poses` and `site`.
 
         Returns:
-            A path from `q_init` to `pose`. If a path cannot be found,
-            None is returned.
+            A list of waypoints that form a path from `q_init` to a configuration
+            that satisfies a pose in `poses`. If a path cannot be found, an empty
+            list is returned.
         """
         if solver is None:
             solver = MinkIKSolver(
@@ -137,12 +140,12 @@ class RRT:
         valid_solutions = [q for q in potential_solutions if q is not None]
         if not valid_solutions:
             print("Unable to find at least one configuration from the target poses.")
-            return None
+            return []
         return self.plan_to_configs(q_init, valid_solutions)
 
     def plan_to_configs(
         self, q_init: np.ndarray, q_goals: list[np.ndarray]
-    ) -> Path | None:
+    ) -> list[np.ndarray]:
         """Plan to a list of configurations.
 
         Args:
@@ -150,9 +153,8 @@ class RRT:
             q_goals: Goal joint configurations.
 
         Returns:
-            A path from `q_init` to a configuration in `q_goals`. The
-            planner will return the first path that is found. If a path cannot
-            be found to any of the configurations, None is returned.
+            A list of waypoints that form a path from `q_init` to a goal in `q_goals`.
+            If a path cannot be found, an empty list is returned.
         """
         if not obeys_constraints(q_init, self.constraints):
             raise ValueError("q_init is not a valid configuration")
@@ -177,11 +179,7 @@ class RRT:
         # Is there a direct connection to any of the goals from q_init?
         for q in q_goals:
             if np.linalg.norm(q - q_init) <= self.epsilon:
-                return Path(
-                    q_init=q_init,
-                    waypoints=[q_init, q],
-                    joints=utils.all_joints(self.model),
-                )
+                return [q_init, q]
 
         start_tree = Tree(Node(q_init))
         # To support multiple goals, the root of the goal tree is a sink node
@@ -220,13 +218,8 @@ class RRT:
                 self.constraints,
             )
             if new_start_tree_node == new_goal_tree_node:
-                waypoints = _combine_paths(
+                return _combine_paths(
                     start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
-                )
-                return Path(
-                    q_init=q_init,
-                    waypoints=waypoints,
-                    joints=utils.all_joints(self.model),
                 )
 
             # If the start tree was not able to reach q_rand, try the opposite process
@@ -248,13 +241,8 @@ class RRT:
                     self.constraints,
                 )
                 if new_start_tree_node == new_goal_tree_node:
-                    waypoints = _combine_paths(
+                    return _combine_paths(
                         start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
                     )
-                    return Path(
-                        q_init=q_init,
-                        waypoints=waypoints,
-                        joints=utils.all_joints(self.model),
-                    )
 
-        return None
+        return []

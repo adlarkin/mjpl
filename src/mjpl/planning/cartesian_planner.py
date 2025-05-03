@@ -1,10 +1,7 @@
-import mujoco
 import numpy as np
 from mink.lie import SE3
 
 from ..inverse_kinematics.ik_solver import IKSolver
-from ..types import Path
-from ..utils import all_joints
 
 
 def _interpolate_poses(
@@ -42,19 +39,18 @@ def _interpolate_poses(
 
 
 def cartesian_plan(
-    model: mujoco.MjModel,
-    q_init_world: np.ndarray,
+    q_init: np.ndarray,
     poses: list[SE3],
     site: str,
     solver: IKSolver,
     lin_threshold: float = 0.01,
     ori_threshold: float = 0.1,
-) -> Path | None:
+) -> list[np.ndarray]:
     """Plan joint configurations that satisfy a Cartesian path.
 
     Args:
         model: MuJoCo model.
-        q_init_world: Initial joint configuration of the world.
+        q_init: Initial joint configuration.
         poses: The Cartesian path. These poses should be in the world frame.
         site: The site (i.e., frame) that should follow the Cartesian path.
         solver: Solver used to compute IK for `poses` and `site`.
@@ -66,19 +62,19 @@ def cartesian_plan(
             is exceeded.
 
     Returns:
-        A path that adheres to a Cartesian path defined by `poses`, starting from
-        `q_init_world`. None is returned if a path cannot be formed.
+        A list of waypoints that adhere to a Cartesian path defined by `poses`,
+        starting from `q_init`. If a path cannot be found, an empty list is returned.
     """
     interpolated_poses = [poses[0]]
     for i in range(0, len(poses) - 1):
         batch = _interpolate_poses(poses[i], poses[i + 1], lin_threshold, ori_threshold)
         interpolated_poses.extend(batch[1:])
 
-    waypoints = [q_init_world]
+    waypoints = [q_init]
     for p in interpolated_poses:
         q = solver.solve_ik(p, site, waypoints[-1])
         if q is None:
             print(f"Unable to find a joint configuration for pose {p}")
-            return None
+            return []
         waypoints.append(q)
-    return Path(q_init=q_init_world, waypoints=waypoints, joints=all_joints(model))
+    return waypoints

@@ -3,15 +3,15 @@ import unittest
 import numpy as np
 
 import mjpl
-import mjpl.types
 
 
 class TestRuckigTrajectoryGenerator(unittest.TestCase):
     def test_generate_trajectory(self):
         dof = 7
+        dt = 0.002
 
         traj_generator = mjpl.RuckigTrajectoryGenerator(
-            dt=0.002,
+            dt=dt,
             max_velocity=np.ones(dof),
             max_acceleration=np.ones(dof),
             max_jerk=np.ones(dof),
@@ -28,13 +28,10 @@ class TestRuckigTrajectoryGenerator(unittest.TestCase):
             rng.random(dof),
             rng.random(dof),
         ]
-        path = mjpl.types.Path(
-            q_init=waypoints[0], waypoints=waypoints, joints=["dummy_joint"]
-        )
 
-        t = traj_generator.generate_trajectory(path)
-        np.testing.assert_equal(t.q_init, path.q_init)
-        self.assertListEqual(t.joints, path.joints)
+        t = traj_generator.generate_trajectory(waypoints)
+        self.assertEqual(t.dt, dt)
+        np.testing.assert_equal(t.q_init, waypoints[0])
 
         # Ensure limits are enforced, with some tolerance for floating point error.
         tolerance = 1e-8

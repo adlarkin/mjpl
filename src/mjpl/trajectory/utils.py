@@ -1,55 +1,47 @@
-import mujoco
 import numpy as np
 
-from .. import utils
 from ..constraint.constraint_interface import Constraint
 from ..constraint.utils import obeys_constraints
-from ..types import Path
 from .trajectory_interface import Trajectory, TrajectoryGenerator
 
 
 def generate_constrained_trajectory(
-    model: mujoco.MjModel,
-    path: Path,
+    waypoints: list[np.ndarray],
     generator: TrajectoryGenerator,
     constraints: list[Constraint],
 ) -> Trajectory:
-    """Generate a trajectory that follows a path and obeys constraints.
+    """Generate a trajectory that follows waypoints and obeys constraints.
 
-    This assumes that straight-line connections between adjacent waypoints in the path
-    obey the constraints. The following steps are taken to ensure the trajectory obeys
-    the constraints:
+    This assumes that straight-line connections between adjacent waypoints obey the
+    constraints. The following steps are taken to ensure the trajectory obeys the
+    constraints:
         1. Generate a trajectory.
         2. If part of the trajectory violates the constraints, add an intermediate
-           waypoint to the path segment that corresponds to the part of the trajectory
-           that violates the constraints.
+           waypoint to the segment of existing waypoints that corresponds to the part
+           of the trajectory that violates the constraints.
         3. Repeat steps 1-2 until the trajectory has no segments that violate the
            constraints.
 
     This is taken from section 3.5 of https://groups.csail.mit.edu/rrg/papers/Richter_ISRR13.pdf
 
     Args:
-        model: MuJoCo model.
-        path: The path the trajectory must follow.
+        waypoints: Waypoints the trajectory must follow.
         generator: Trajectory generator.
         constraints: The constraints the trajectory must obey.
 
     Returns:
-        A trajectory that follows `path` without violating `constraints`.
+        A trajectory that follows `waypoints` without violating `constraints`.
     """
     while True:
-        traj = generator.generate_trajectory(path)
-        q_full = traj.q_init.copy()
-        q_idx = utils.qpos_idx(model, traj.joints)
+        traj = generator.generate_trajectory(waypoints)
         for i in range(len(traj.positions)):
-            q_full[q_idx] = traj.positions[i]
-            if not obeys_constraints(q_full, constraints):
+            if not obeys_constraints(traj.positions[i], constraints):
                 # Add an intermediate waypoint to the section of the path that
                 # corresponds to the trajectory position that violates the constraints.
-                path_timestamps = _waypoint_timing(path.waypoints, traj)
+                path_timestamps = _waypoint_timing(waypoints, traj)
                 trajectory_timestamp = (i + 1) * traj.dt
                 _add_intermediate_waypoint(
-                    path.waypoints, path_timestamps, trajectory_timestamp
+                    waypoints, path_timestamps, trajectory_timestamp
                 )
                 break
         else:
