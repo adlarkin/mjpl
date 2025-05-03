@@ -42,7 +42,10 @@ if __name__ == "__main__":
     goal_biasing_probability = 0.1
     number_of_attempts = 15
 
-    cr = mjpl.CollisionRuleset(model, allowed_collisions)
+    constraints = [
+        mjpl.JointLimitConstraint(model.jnt_range[:, 0], model.jnt_range[:, 1]),
+        mjpl.CollisionConstraint(model),
+    ]
 
     # Plan number_of_attempts times and record benchmarks.
     successful_planning_times = []
@@ -53,14 +56,16 @@ if __name__ == "__main__":
 
         # From the initial state, generate a goal pose.
         data = mujoco.MjData(model)
-        data.qpos = mjpl.random_valid_config(model, q_init, planning_joints, seed, cr)
+        data.qpos = mjpl.random_config(
+            model, q_init, planning_joints, seed, constraints
+        )
         mujoco.mj_kinematics(model, data)
         goal_pose = mjpl.site_pose(data, _PANDA_EE_SITE)
 
         planner = mjpl.RRT(
             model,
             planning_joints,
-            cr,
+            constraints,
             max_planning_time=max_planning_time,
             epsilon=epsilon,
             seed=seed,

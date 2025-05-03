@@ -103,7 +103,7 @@ def random_config(
     seed: int | None = None,
     constraints: list[Constraint] = [],
 ) -> np.ndarray:
-    """Generate a random configuration that is within joint limits and obeys (optional) constraints.
+    """Generate a random configuration that obeys constraints.
 
     Args:
         model: MuJoCo model.

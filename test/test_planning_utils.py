@@ -16,9 +16,10 @@ _BALL_XML = _MODEL_DIR / "one_dof_ball.xml"
 class TestPlanningUtils(unittest.TestCase):
     def test_extend(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
-        data = mujoco.MjData(model)
-        q_idx = mjpl.qpos_idx(model, ["ball_slide_x"])
-        cr = mjpl.CollisionRuleset()
+        constraints = [
+            mjpl.CollisionConstraint(model),
+            mjpl.JointLimitConstraint(model.jnt_range[:, 0], model.jnt_range[:, 1]),
+        ]
         epsilon = 0.1
 
         q_init = np.array([-0.1])
@@ -28,10 +29,9 @@ class TestPlanningUtils(unittest.TestCase):
         # Test a valid EXTEND.
         q_goal = np.array([0.5])
         expected_q_extended = np.array([0.0])
-        extended_node = _extend(
-            model, data, q_goal, q_idx, tree, root_node, epsilon, cr
-        )
+        extended_node = _extend(q_goal, tree, root_node, epsilon, constraints)
         self.assertIsNotNone(extended_node)
+        self.assertTrue(mjpl.obeys_constraints(extended_node.q, constraints))
         self.assertSetEqual(tree.nodes, {root_node, extended_node})
         np.testing.assert_allclose(
             extended_node.q, expected_q_extended, rtol=0, atol=1e-9
@@ -41,28 +41,27 @@ class TestPlanningUtils(unittest.TestCase):
         # Running EXTEND when q_target == start_node.q should do nothing.
         existing_nodes = tree.nodes.copy()
         same_extended_node = _extend(
-            model, data, extended_node.q, q_idx, tree, extended_node, epsilon, cr
+            extended_node.q, tree, extended_node, epsilon, constraints
         )
         self.assertIsNotNone(same_extended_node)
         self.assertIn(same_extended_node, existing_nodes)
         self.assertSetEqual(tree.nodes, existing_nodes)
 
-        # EXTEND should fail if the result of the extension is an invalid node
+        # EXTEND should fail if the result of the extension violates constraints
         # (in this case, a node that is in collision).
         q_init = np.array([0.75])
         root_node = Node(q_init)
         tree = Tree(root_node)
-        extended_node = _extend(
-            model, data, np.array([0.9]), q_idx, tree, root_node, epsilon, cr
-        )
+        extended_node = _extend(np.array([0.9]), tree, root_node, epsilon, constraints)
         self.assertIsNone(extended_node)
         self.assertSetEqual(tree.nodes, {root_node})
 
     def test_connect(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
-        data = mujoco.MjData(model)
-        q_idx = mjpl.qpos_idx(model, ["ball_slide_x"])
-        cr = mjpl.CollisionRuleset()
+        constraints = [
+            mjpl.CollisionConstraint(model),
+            mjpl.JointLimitConstraint(model.jnt_range[:, 0], model.jnt_range[:, 1]),
+        ]
         epsilon = 0.1
 
         q_init = np.array([-0.1])
@@ -71,7 +70,7 @@ class TestPlanningUtils(unittest.TestCase):
 
         # Test a valid CONNECT.
         q_goal = np.array([0.15])
-        connected_node = _connect(model, data, q_goal, q_idx, tree, epsilon, np.inf, cr)
+        connected_node = _connect(q_goal, tree, epsilon, np.inf, constraints)
         np.testing.assert_allclose(connected_node.q, q_goal, rtol=0, atol=1e-9)
         # Check the path from the last connected node.
         # This implicitly checks each connected node's parent.
@@ -90,7 +89,7 @@ class TestPlanningUtils(unittest.TestCase):
         # in the tree should do nothing.
         existing_nodes = tree.nodes.copy()
         same_connected_node = _connect(
-            model, data, connected_node.q, q_idx, tree, epsilon, np.inf, cr
+            connected_node.q, tree, epsilon, np.inf, constraints
         )
         self.assertIn(same_connected_node, existing_nodes)
         self.assertSetEqual(tree.nodes, existing_nodes)
@@ -103,7 +102,7 @@ class TestPlanningUtils(unittest.TestCase):
         max_connection_dist = 0.45
         max_connected_q = q_init + max_connection_dist
         connected_node = _connect(
-            model, data, q_goal, q_idx, tree, epsilon, max_connection_dist, cr
+            q_goal, tree, epsilon, max_connection_dist, constraints
         )
         np.testing.assert_allclose(connected_node.q, max_connected_q, rtol=0, atol=1e-9)
         # Check the path from the last connected node.
@@ -121,15 +120,16 @@ class TestPlanningUtils(unittest.TestCase):
         for i in range(len(path)):
             np.testing.assert_allclose(path[i], expected_path[i], rtol=0, atol=1e-9)
 
-        # Test CONNECT with an invalid goal (in this case, one that is in collision).
-        # CONNECT should stop just before the obstacle.
+        # Test CONNECT with an invalid goal (in this case, one that violates the
+        # collision constraint). CONNECT should stop just before the obstacle.
         q_init = np.array([0.0])
         root_node = Node(q_init)
         tree = Tree(root_node)
         obstacle = model.geom("wall_obstacle")
         obstacle_min_x = obstacle.pos[0] - obstacle.size[0]
         q_goal = np.array([1.0])
-        connected_node = _connect(model, data, q_goal, q_idx, tree, epsilon, np.inf, cr)
+        connected_node = _connect(q_goal, tree, epsilon, np.inf, constraints)
+        self.assertTrue(mjpl.obeys_constraints(connected_node.q, constraints))
         self.assertNotEqual(connected_node, root_node)
         self.assertGreater(len(tree.nodes), 1)
         np.testing.assert_array_less(connected_node.q, obstacle_min_x)

@@ -1,9 +1,36 @@
 import unittest
+from pathlib import Path
 
+import mujoco
 import numpy as np
 from robot_descriptions.loaders.mujoco import load_robot_description
 
 import mjpl
+from mjpl.constraint.collision_constraint import CollisionRuleset
+
+_HERE = Path(__file__).parent
+_MODEL_DIR = _HERE / "models"
+_TWO_DOF_BALL_XML = _MODEL_DIR / "two_dof_ball.xml"
+
+
+class TestCollisionConstraint(unittest.TestCase):
+    def test_constraint(self):
+        model = mujoco.MjModel.from_xml_path(_TWO_DOF_BALL_XML.as_posix())
+
+        # Collision constraint that allows no collisions.
+        constraint = mjpl.CollisionConstraint(model)
+
+        # Test a configuration that does not violate the constraint.
+        q = np.array([0.0, 0.0])
+        self.assertTrue(constraint.valid_config(q))
+        q_constrained = constraint.apply(q)
+        self.assertIsNotNone(q_constrained)
+        np.testing.assert_equal(q_constrained, q)
+
+        # Test a configuration that violates the constraint.
+        q = np.array([0.6, 0.0])
+        self.assertFalse(constraint.valid_config(q))
+        self.assertIsNone(constraint.apply(q))
 
 
 class TestCollisionRuleset(unittest.TestCase):
@@ -31,7 +58,7 @@ class TestCollisionRuleset(unittest.TestCase):
 
     def test_single_valid_collision(self):
         valid_collision_bodies = [("link1", "link2")]
-        cr = mjpl.CollisionRuleset(self.model, valid_collision_bodies)
+        cr = CollisionRuleset(self.model, valid_collision_bodies)
 
         geom_collision_matrix = np.empty((0, 2))
         self.assertTrue(cr.obeys_ruleset(geom_collision_matrix))
@@ -86,7 +113,7 @@ class TestCollisionRuleset(unittest.TestCase):
             ("link6", "link7"),
             ("left_finger", "right_finger"),
         ]
-        cr = mjpl.CollisionRuleset(self.model, valid_collision_bodies)
+        cr = CollisionRuleset(self.model, valid_collision_bodies)
 
         geom_collision_matrix = np.empty((0, 2))
         self.assertTrue(cr.obeys_ruleset(geom_collision_matrix))
@@ -146,7 +173,7 @@ class TestCollisionRuleset(unittest.TestCase):
         self.assertFalse(cr.obeys_ruleset(geom_collision_matrix))
 
     def test_no_valid_collisions(self):
-        cr = mjpl.CollisionRuleset()
+        cr = CollisionRuleset()
 
         no_collisions = np.empty((0, 2))
         self.assertTrue(cr.obeys_ruleset(no_collisions))
@@ -160,11 +187,9 @@ class TestCollisionRuleset(unittest.TestCase):
 
     def test_invalid_args(self):
         with self.assertRaisesRegex(ValueError, "must be defined"):
-            mjpl.CollisionRuleset(
-                model=None, allowed_collision_bodies=[("body1", "body2")]
-            )
+            CollisionRuleset(model=None, allowed_collision_bodies=[("body1", "body2")])
 
-        cr = mjpl.CollisionRuleset()
+        cr = CollisionRuleset()
         with self.assertRaisesRegex(ValueError, "nx2"):
             cr.obeys_ruleset(np.zeros((1, 3)))
             cr.obeys_ruleset(np.zeros((1, 2, 1)))

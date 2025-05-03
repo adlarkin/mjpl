@@ -2,7 +2,7 @@ import numpy as np
 
 from .. import utils
 from ..constraint.constraint_interface import Constraint
-from ..constraint.utils import obeys_constraints
+from ..constraint.utils import apply_constraints
 from .tree import Node, Tree
 
 
@@ -29,10 +29,9 @@ def _extend(
     if np.array_equal(start_node.q, q_target):
         return start_node
     q_extend = utils.step(start_node.q, q_target, eps)
-    # TODO: apply constraints to q_extend instead of just checking if it obeys constraints?
-    # Re-visit the paper
-    if obeys_constraints(q_extend, constraints):
-        extended_node = Node(q_extend, start_node)
+    q_constrained = apply_constraints(q_extend, constraints)
+    if q_constrained is not None:
+        extended_node = Node(q_constrained, start_node)
         tree.add_node(extended_node)
         return extended_node
     return None
@@ -63,14 +62,18 @@ def _connect(
         `q_target`. This node also belongs to `tree`.
     """
     nearest_node = tree.nearest_neighbor(q_target)
+    q_old = nearest_node.q
     total_distance = 0.0
     while not np.array_equal(nearest_node.q, q_target):
         max_eps = min(eps, max_connection_distance - total_distance)
-        next_node = _extend(
-            q_target, tree, nearest_node, max_eps, constraints
-        )
-        if not next_node:
+        next_node = _extend(q_target, tree, nearest_node, max_eps, constraints)
+        # Terminate if extension failed, or if extension is not making progress
+        # towards q_target because of the constraints.
+        if not next_node or np.linalg.norm(q_target - next_node.q) > np.linalg.norm(
+            q_target - q_old
+        ):
             break
+        q_old = next_node.q
         nearest_node = next_node
         total_distance += max_eps
         if total_distance >= max_connection_distance:

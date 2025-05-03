@@ -1,6 +1,5 @@
 """mjpl: MuJoCo motion planning library."""
 
-from .collision_ruleset import CollisionRuleset
 from .constraint import (
     CollisionConstraint,
     JointLimitConstraint,
@@ -26,7 +25,6 @@ from .utils import (
 
 __all__ = (
     "CollisionConstraint",
-    "CollisionRuleset",
     "JointLimitConstraint",
     "MinkIKSolver",
     "RRT",

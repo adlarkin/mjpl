@@ -6,7 +6,7 @@ from mink.lie.se3 import SE3
 
 from .. import utils
 from ..constraint.constraint_interface import Constraint
-from ..constraint.utils import apply_constraints, obeys_constraints
+from ..constraint.utils import obeys_constraints
 from ..inverse_kinematics.ik_solver import IKSolver
 from ..inverse_kinematics.mink_ik_solver import MinkIKSolver
 from ..types import Path
@@ -63,15 +63,12 @@ class RRT:
 
         self.model = model
         self.planning_joints = planning_joints
-        self.q_idx = utils.qpos_idx(model, planning_joints)
         self.constraints = constraints
         self.max_planning_time = max_planning_time
         self.epsilon = epsilon
         self.seed = seed
         self.goal_biasing_probability = goal_biasing_probability
         self.max_connection_distance = max_connection_distance
-
-        self.rng = np.random.default_rng(seed=seed)
 
     def plan_to_pose(
         self,
@@ -165,7 +162,8 @@ class RRT:
                     f"The following goal config is not a valid configuration: {q}"
                 )
 
-        fixed_jnt_idx = [i for i in range(self.model.nq) if i not in self.q_idx]
+        q_idx = utils.qpos_idx(self.model, self.planning_joints)
+        fixed_jnt_idx = [i for i in range(self.model.nq) if i not in q_idx]
         for q in q_goals:
             if not np.allclose(
                 q_init[fixed_jnt_idx], q[fixed_jnt_idx], rtol=0, atol=1e-12
@@ -195,21 +193,18 @@ class RRT:
         for n in goal_nodes:
             goal_tree.add_node(n)
 
+        rng = np.random.default_rng(seed=self.seed)
         start_time = time.time()
         while time.time() - start_time < self.max_planning_time:
             # Sample a configuration.
-            if self.rng.random() <= self.goal_biasing_probability:
-                # Randomly pick a goal. Constraints don't need to be applied since goal
-                # configurations already obey constraints.
-                random_goal_idx = self.rng.integers(0, len(goal_nodes))
+            if rng.random() <= self.goal_biasing_probability:
+                # Randomly pick a goal.
+                random_goal_idx = rng.integers(0, len(goal_nodes))
                 q_rand = goal_nodes[random_goal_idx].q
             else:
-                # Create a random configuration and apply constraints to it.
+                # Create a random configuration.
                 q_rand = q_init.copy()
-                q_rand[self.q_idx] = self.rng.uniform(*self.model.jnt_range.T)[self.q_idx]
-                q_rand = apply_constraints(q_rand, self.constraints)
-                if q_rand is None:
-                    continue
+                q_rand[q_idx] = rng.uniform(*self.model.jnt_range.T)[q_idx]
 
             new_start_tree_node = _connect(
                 q_rand,
@@ -225,10 +220,7 @@ class RRT:
                 self.max_connection_distance,
                 self.constraints,
             )
-            if (
-                np.linalg.norm(new_goal_tree_node.q - new_start_tree_node.q)
-                <= self.epsilon
-            ):
+            if new_start_tree_node == new_goal_tree_node:
                 waypoints = _combine_paths(
                     start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
                 )
@@ -238,6 +230,9 @@ class RRT:
                     joints=utils.all_joints(self.model),
                 )
 
+            # If the start tree was not able to reach q_rand, try the opposite process
+            # (grow the goal tree towards q_rand first). This can help reduce bias in
+            # each tree's growth.
             if not np.array_equal(new_start_tree_node.q, q_rand):
                 new_goal_tree_node = _connect(
                     q_rand,
@@ -253,10 +248,7 @@ class RRT:
                     self.max_connection_distance,
                     self.constraints,
                 )
-                if (
-                    np.linalg.norm(new_goal_tree_node.q - new_start_tree_node.q)
-                    <= self.epsilon
-                ):
+                if new_start_tree_node == new_goal_tree_node:
                     waypoints = _combine_paths(
                         start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
                     )

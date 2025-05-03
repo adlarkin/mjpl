@@ -39,7 +39,10 @@ def main():
     q_init = home_keyframe.qpos.copy()
 
     allowed_collisions = [("left_finger", "right_finger")]
-    cr = mjpl.CollisionRuleset(model, allowed_collisions)
+    constraints = [
+        mjpl.JointLimitConstraint(model.jnt_range[:, 0], model.jnt_range[:, 1]),
+        mjpl.CollisionConstraint(model, allowed_collisions),
+    ]
 
     # From the initial state, generate valid goal poses that are derived from
     # valid joint configurations.
@@ -49,12 +52,14 @@ def main():
     for i in range(_NUM_GOALS):
         # Make sure a different seed is used for each randomly generated config
         _seed = seed + i if seed is not None else seed
-        data.qpos = mjpl.random_valid_config(model, q_init, arm_joints, _seed, cr)
+        data.qpos = mjpl.random_config(model, q_init, arm_joints, _seed, constraints)
         mujoco.mj_kinematics(model, data)
         goal_poses.append(mjpl.site_pose(data, _PANDA_EE_SITE))
 
     # Set up the planner.
-    planner = mjpl.RRT(model, arm_joints, cr, seed=seed, goal_biasing_probability=0.1)
+    planner = mjpl.RRT(
+        model, arm_joints, constraints, seed=seed, goal_biasing_probability=0.1
+    )
 
     print("Planning...")
     start = time.time()
@@ -69,7 +74,7 @@ def main():
     shortcut_path = mjpl.shortcut(
         model,
         path,
-        cr,
+        constraints,
         validation_dist=planner.epsilon,
         max_attempts=len(path.waypoints),
         seed=seed,
@@ -88,8 +93,8 @@ def main():
 
     print("Generating trajectory...")
     start = time.time()
-    trajectory = mjpl.generate_collision_free_trajectory(
-        model, shortcut_path, traj_generator, cr
+    trajectory = mjpl.generate_constrained_trajectory(
+        model, shortcut_path, traj_generator, constraints
     )
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
@@ -109,7 +114,7 @@ def main():
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
     q_t = [q_init]
     for q_ref in trajectory.positions:
-        data.ctrl[actuator_ids] = q_ref
+        data.ctrl[actuator_ids] = q_ref[q_idx]
         mujoco.mj_step(model, data)
         q_t.append(data.qpos.copy())
 
@@ -144,7 +149,7 @@ def main():
             # Visualize the trajectory. The trajectory is of high resolution,
             # so plotting every other timestep should be sufficient.
             for q_ref in trajectory.positions[::2]:
-                data.qpos[q_idx] = q_ref
+                data.qpos = q_ref
                 mujoco.mj_kinematics(model, data)
                 pos = data.site(_PANDA_EE_SITE).xpos
                 viz.add_sphere(
