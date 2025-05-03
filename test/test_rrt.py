@@ -16,8 +16,8 @@ class TestRRT(unittest.TestCase):
     def test_run_rrt(self):
         model = mujoco.MjModel.from_xml_path(_ONE_DOF_BALL_XML.as_posix())
         constraints = [
+            mjpl.JointLimitConstraint(model),
             mjpl.CollisionConstraint(model),
-            mjpl.JointLimitConstraint(model.jnt_range[:, 0], model.jnt_range[:, 1]),
         ]
         epsilon = 0.1
 
@@ -57,8 +57,8 @@ class TestRRT(unittest.TestCase):
     def test_run_rrt_subset_joints(self):
         model = mujoco.MjModel.from_xml_path(_TWO_DOF_BALL_XML.as_posix())
         constraints = [
+            mjpl.JointLimitConstraint(model),
             mjpl.CollisionConstraint(model),
-            mjpl.JointLimitConstraint(model.jnt_range[:, 0], model.jnt_range[:, 1]),
         ]
         epsilon = 0.1
 
@@ -99,8 +99,8 @@ class TestRRT(unittest.TestCase):
     def test_trivial_rrt(self):
         model = mujoco.MjModel.from_xml_path(_ONE_DOF_BALL_XML.as_posix())
         constraints = [
+            mjpl.JointLimitConstraint(model),
             mjpl.CollisionConstraint(model),
-            mjpl.JointLimitConstraint(model.jnt_range[:, 0], model.jnt_range[:, 1]),
         ]
         epsilon = 0.1
 
@@ -131,8 +131,8 @@ class TestRRT(unittest.TestCase):
     def test_trivial_rrt_subset_joints(self):
         model = mujoco.MjModel.from_xml_path(_TWO_DOF_BALL_XML.as_posix())
         constraints = [
+            mjpl.JointLimitConstraint(model),
             mjpl.CollisionConstraint(model),
-            mjpl.JointLimitConstraint(model.jnt_range[:, 0], model.jnt_range[:, 1]),
         ]
         epsilon = 0.1
 

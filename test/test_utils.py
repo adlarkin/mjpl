@@ -114,8 +114,8 @@ class TestUtils(unittest.TestCase):
         model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
         q_idx = mjpl.qpos_idx(model, mjpl.all_joints(model))
         constraints = [
+            mjpl.JointLimitConstraint(model),
             mjpl.CollisionConstraint(model),
-            mjpl.JointLimitConstraint(model.jnt_range[:, 0], model.jnt_range[:, 1]),
         ]
 
         # Waypoint connection should fail if it violates the collision constraint.
@@ -189,8 +189,8 @@ class TestUtils(unittest.TestCase):
         model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
         planning_joints = ["ball_slide_x", "ball_slide_y"]
         constraints = [
+            mjpl.JointLimitConstraint(model),
             mjpl.CollisionConstraint(model),
-            mjpl.JointLimitConstraint(model.jnt_range[:, 0], model.jnt_range[:, 1]),
         ]
 
         waypoints = directly_connectable_waypoints()
@@ -250,8 +250,8 @@ class TestUtils(unittest.TestCase):
     def test_shortcut_6dof(self):
         model = load_robot_description("ur5e_mj_description")
         constraints = [
+            mjpl.JointLimitConstraint(model),
             mjpl.CollisionConstraint(model),
-            mjpl.JointLimitConstraint(model.jnt_range[:, 0], model.jnt_range[:, 1]),
         ]
         seed = 42
 
@@ -341,8 +341,8 @@ class TestUtils(unittest.TestCase):
     def test_random_config(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
         constraints = [
+            mjpl.JointLimitConstraint(model),
             mjpl.CollisionConstraint(model),
-            mjpl.JointLimitConstraint(model.jnt_range[:, 0], model.jnt_range[:, 1]),
         ]
 
         seed = 42

@@ -24,7 +24,7 @@ def main():
     arm_joints = mjpl.all_joints(model)
 
     constraints = [
-        mjpl.JointLimitConstraint(model.jnt_range[:, 0], model.jnt_range[:, 1]),
+        mjpl.JointLimitConstraint(model),
         mjpl.CollisionConstraint(model),
     ]
 

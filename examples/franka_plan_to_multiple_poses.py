@@ -40,7 +40,7 @@ def main():
 
     allowed_collisions = [("left_finger", "right_finger")]
     constraints = [
-        mjpl.JointLimitConstraint(model.jnt_range[:, 0], model.jnt_range[:, 1]),
+        mjpl.JointLimitConstraint(model),
         mjpl.CollisionConstraint(model, allowed_collisions),
     ]
 

@@ -43,7 +43,7 @@ if __name__ == "__main__":
     number_of_attempts = 15
 
     constraints = [
-        mjpl.JointLimitConstraint(model.jnt_range[:, 0], model.jnt_range[:, 1]),
+        mjpl.JointLimitConstraint(model),
         mjpl.CollisionConstraint(model),
     ]
 

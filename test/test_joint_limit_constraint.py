@@ -16,9 +16,7 @@ class TestJointLimitConstraint(unittest.TestCase):
         model = mujoco.MjModel.from_xml_path(_TWO_DOF_BALL_XML.as_posix())
 
         # Constraint that uses joint limits from the MuJoCo model.
-        constraint = mjpl.JointLimitConstraint(
-            model.jnt_range[:, 0], model.jnt_range[:, 1]
-        )
+        constraint = mjpl.JointLimitConstraint(model)
 
         # Test a configuration that does not violate the constraint.
         q = np.array([0.0, 0.0])

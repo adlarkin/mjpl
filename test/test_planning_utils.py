@@ -17,8 +17,8 @@ class TestPlanningUtils(unittest.TestCase):
     def test_extend(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
         constraints = [
+            mjpl.JointLimitConstraint(model),
             mjpl.CollisionConstraint(model),
-            mjpl.JointLimitConstraint(model.jnt_range[:, 0], model.jnt_range[:, 1]),
         ]
         epsilon = 0.1
 
@@ -59,8 +59,8 @@ class TestPlanningUtils(unittest.TestCase):
     def test_connect(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
         constraints = [
+            mjpl.JointLimitConstraint(model),
             mjpl.CollisionConstraint(model),
-            mjpl.JointLimitConstraint(model.jnt_range[:, 0], model.jnt_range[:, 1]),
         ]
         epsilon = 0.1
 
