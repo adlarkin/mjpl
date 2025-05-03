@@ -6,7 +6,7 @@ import numpy as np
 
 import mjpl
 from mjpl.planning.tree import Node, Tree
-from mjpl.planning.utils import _combine_paths, _connect, _extend
+from mjpl.planning.utils import _combine_paths, _connect, _deviates_from_target, _extend
 
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
@@ -133,6 +133,14 @@ class TestPlanningUtils(unittest.TestCase):
         self.assertNotEqual(connected_node, root_node)
         self.assertGreater(len(tree.nodes), 1)
         np.testing.assert_array_less(connected_node.q, obstacle_min_x)
+
+    def test_deviates_from_target(self):
+        target = np.array([1, 0])
+        zero_vec = np.zeros_like(target)
+
+        self.assertFalse(_deviates_from_target(target, np.array([0.5, 0]), zero_vec))
+        self.assertFalse(_deviates_from_target(target, zero_vec, zero_vec))
+        self.assertTrue(_deviates_from_target(target, np.array([-1, 0]), zero_vec))
 
     def test_combine_paths(self):
         root_start = Node(np.array([0.0]))

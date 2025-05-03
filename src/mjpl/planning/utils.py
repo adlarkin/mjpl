@@ -69,9 +69,7 @@ def _connect(
         next_node = _extend(q_target, tree, nearest_node, max_eps, constraints)
         # Terminate if extension failed, or if extension is not making progress
         # towards q_target because of the constraints.
-        if not next_node or np.linalg.norm(q_target - next_node.q) > np.linalg.norm(
-            q_target - q_old
-        ):
+        if not next_node or _deviates_from_target(q_target, next_node.q, q_old):
             break
         q_old = next_node.q
         nearest_node = next_node
@@ -79,6 +77,22 @@ def _connect(
         if total_distance >= max_connection_distance:
             break
     return nearest_node
+
+
+def _deviates_from_target(
+    target: np.ndarray, curr: np.ndarray, prev: np.ndarray
+) -> bool:
+    """Check if a vector deviates from a target w.r.t. another vector.
+
+    Args:
+        target: The target vector.
+        curr: The vector to evaluate.
+        prev: The previous vector to compare against.
+
+    Returns:
+        True if `curr` is further from `target` than `prev`. False otherwise.
+    """
+    return np.linalg.norm(target - curr) > np.linalg.norm(target - prev)
 
 
 def _combine_paths(
