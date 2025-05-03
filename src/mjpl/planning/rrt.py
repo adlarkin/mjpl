@@ -40,7 +40,7 @@ class RRT:
 
         Args:
             model: MuJoCo model.
-            planning_joints: The joints used for planning.
+            planning_joints: The joints that are sampled during planning.
             constraints: The constraints the sampled configurations must obey.
             max_planning_time: Maximum planning time, in seconds.
             epsilon: The maximum distance allowed between nodes in the tree.
@@ -196,7 +196,6 @@ class RRT:
         rng = np.random.default_rng(seed=self.seed)
         start_time = time.time()
         while time.time() - start_time < self.max_planning_time:
-            # Sample a configuration.
             if rng.random() <= self.goal_biasing_probability:
                 # Randomly pick a goal.
                 random_goal_idx = rng.integers(0, len(goal_nodes))

@@ -45,7 +45,7 @@ def generate_constrained_trajectory(
             q_full[q_idx] = traj.positions[i]
             if not obeys_constraints(q_full, constraints):
                 # Add an intermediate waypoint to the section of the path that
-                # corresponds to the trajectory position that violates the constraint.
+                # corresponds to the trajectory position that violates the constraints.
                 path_timestamps = _waypoint_timing(path.waypoints, traj)
                 trajectory_timestamp = (i + 1) * traj.dt
                 _add_intermediate_waypoint(

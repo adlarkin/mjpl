@@ -115,7 +115,7 @@ def random_config(
             Set this to an empty list if no constraints should be enforced.
 
     Returns:
-        A random valid configuration.
+        A random configuration that obeys `constraints`.
     """
     q_idx = qpos_idx(model, joints)
     rng = np.random.default_rng(seed=seed)
@@ -154,7 +154,8 @@ def shortcut(
             to shortcut.
 
     Returns:
-        A path with direct connections between each adjacent waypoint.
+        A path with direct connections between each adjacent waypoint that obeys
+        `constraints`.
     """
     q = path.q_init.copy()
     rng = np.random.default_rng(seed=seed)
@@ -220,7 +221,8 @@ def _connect_waypoints(
 
     Returns:
         A waypoint list with a direct connection between the waypoints at indices
-        (`start_idx`, `end_idx`) if the waypoints at these indices can be connected.
+        (`start_idx`, `end_idx`) if the waypoints at these indices can be connected
+        without violating `constraints`.
     """
     if validation_dist <= 0.0:
         raise ValueError("`validation_dist` must be > 0")

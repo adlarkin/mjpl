@@ -20,7 +20,7 @@ def _extend(
         tree: The tree with a node to extend towards `q_target`.
         start_node: The node in `tree` to extend towards `q_target`.
         eps: The maximum distance `start_node` will extend towards `q_target`.
-        constraints: The constraints configurations must obey.
+        constraints: The constraints the extended configuration must obey.
 
     Returns:
         The node that was the result of extending `start_node` towards `q_target`,

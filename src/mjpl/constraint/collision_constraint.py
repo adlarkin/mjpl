@@ -5,7 +5,7 @@ from .constraint_interface import Constraint
 
 
 class CollisionConstraint(Constraint):
-    """Constraint that enforces collision constraints on a configuration."""
+    """Constraint that enforces collision rules on a configuration."""
 
     def __init__(
         self,

@@ -11,7 +11,10 @@ class TestMinkIKSolver(unittest.TestCase):
     def test_ik(self):
         model = load_robot_description("ur5e_mj_description")
         site_name = "attachment_site"
-        constraints = [mjpl.CollisionConstraint(model)]
+        constraints = [
+            mjpl.JointLimitConstraint(model),
+            mjpl.CollisionConstraint(model),
+        ]
 
         q_init = model.keyframe("home").qpos.copy()
 
@@ -67,7 +70,10 @@ class TestMinkIKSolver(unittest.TestCase):
     def test_ik_subset_joints(self):
         model = load_robot_description("ur5e_mj_description")
         site_name = "attachment_site"
-        constraints = [mjpl.CollisionConstraint(model)]
+        constraints = [
+            mjpl.JointLimitConstraint(model),
+            mjpl.CollisionConstraint(model),
+        ]
 
         q_init = model.keyframe("home").qpos.copy()
 
