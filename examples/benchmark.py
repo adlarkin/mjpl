@@ -74,9 +74,9 @@ if __name__ == "__main__":
 
         print(f"Attempt {i}...")
         start_time = time.time()
-        path = planner.plan_to_pose(q_init, goal_pose, _PANDA_EE_SITE)
+        waypoints = planner.plan_to_pose(q_init, goal_pose, _PANDA_EE_SITE)
         elapsed_time = time.time() - start_time
-        if path is not None:
+        if waypoints:
             successful_planning_times.append(elapsed_time)
     print()
 

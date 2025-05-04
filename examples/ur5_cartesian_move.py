@@ -63,15 +63,15 @@ def main():
 
     print("Planning...")
     start = time.time()
-    path = mjpl.cartesian_plan(model, q_init, poses, _UR5_EE_SITE, solver)
-    if path is None:
+    waypoints = mjpl.cartesian_plan(q_init, poses, _UR5_EE_SITE, solver)
+    if not waypoints:
         print("Planning failed")
         return
     print(f"Planning took {(time.time() - start):.4f}s")
 
     # The trajectory limits used here are for demonstration purposes only.
     # In practice, consult your hardware spec sheet for this information.
-    dof = len(path.waypoints[0])
+    dof = len(waypoints[0])
     traj_generator = mjpl.ToppraTrajectoryGenerator(
         dt=model.opt.timestep,
         max_velocity=np.ones(dof) * 0.5 * np.pi,
@@ -80,7 +80,7 @@ def main():
 
     print("Generating trajectory...")
     start = time.time()
-    trajectory = traj_generator.generate_trajectory(path)
+    trajectory = traj_generator.generate_trajectory(waypoints)
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
     # Actuator indices in data.ctrl that correspond to the joints in the trajectory.
