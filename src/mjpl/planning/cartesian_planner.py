@@ -49,7 +49,6 @@ def cartesian_plan(
     """Plan joint configurations that satisfy a Cartesian path.
 
     Args:
-        model: MuJoCo model.
         q_init: Initial joint configuration.
         poses: The Cartesian path. These poses should be in the world frame.
         site: The site (i.e., frame) that should follow the Cartesian path.

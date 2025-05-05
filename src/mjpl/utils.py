@@ -144,15 +144,15 @@ def shortcut(
         validation_dist: The distance between each validation check, which occurs
             between a pair of waypoints that are trying to be directly connected
             if these waypoints are further than `validation_dist` apart.
-        max_attempts: The maximum number of shortcut attempts. Each attempt
-            will randomly select two waypoints in the path. If the path has
-            exactly two waypoints, no more attempts will be executed.
+        max_attempts: The maximum number of shortcut attempts. Each attempt will
+            randomly select two waypoints to connect. If exactly two waypoints
+            remain, no more attempts will be executed.
         seed: The seed which is used for randomly picking pairs of waypoints
             to shortcut.
 
     Returns:
-        A path with direct connections between each adjacent waypoint that obeys
-        `constraints`.
+        A waypoint list with direct connections between each adjacent waypoint that
+        obeys `constraints`.
     """
     rng = np.random.default_rng(seed=seed)
 
