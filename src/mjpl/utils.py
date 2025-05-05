@@ -122,10 +122,13 @@ def random_config(
     q = q_init.copy()
     q[q_idx] = rng.uniform(*model.jnt_range.T)[q_idx]
 
-    q_constrained = apply_constraints(q, constraints)
+    # TODO: revisit this. Here (and a few lines below) I am using q_init for q_old
+    # to obey API changes (I think that's actually ok) - if I stick with this,
+    # maybe make a note of it in docs above for the `q_init` arg?
+    q_constrained = apply_constraints(q_init, q, constraints)
     while q_constrained is None:
         q[q_idx] = rng.uniform(*model.jnt_range.T)[q_idx]
-        q_constrained = apply_constraints(q, constraints)
+        q_constrained = apply_constraints(q_init, q, constraints)
     return q_constrained
 
 

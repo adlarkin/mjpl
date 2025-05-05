@@ -29,7 +29,7 @@ def _extend(
     if np.array_equal(start_node.q, q_target):
         return start_node
     q_extend = utils.step(start_node.q, q_target, eps)
-    q_constrained = apply_constraints(q_extend, constraints)
+    q_constrained = apply_constraints(start_node.q, q_extend, constraints)
     if q_constrained is not None:
         extended_node = Node(q_constrained, start_node)
         tree.add_node(extended_node)

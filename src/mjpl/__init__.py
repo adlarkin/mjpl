@@ -3,6 +3,7 @@
 from .constraint import (
     CollisionConstraint,
     JointLimitConstraint,
+    PoseConstraint,
     apply_constraints,
     obeys_constraints,
 )
@@ -27,6 +28,7 @@ __all__ = (
     "CollisionConstraint",
     "JointLimitConstraint",
     "MinkIKSolver",
+    "PoseConstraint",
     "RRT",
     "RuckigTrajectoryGenerator",
     "ToppraTrajectoryGenerator",

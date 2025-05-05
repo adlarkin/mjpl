@@ -21,14 +21,14 @@ class TestJointLimitConstraint(unittest.TestCase):
         # Test a configuration that does not violate the constraint.
         q = np.array([0.0, 0.0])
         self.assertTrue(constraint.valid_config(q))
-        q_constrained = constraint.apply(q)
+        q_constrained = constraint.apply(np.zeros_like(q), q)
         self.assertIsNotNone(q_constrained)
         np.testing.assert_equal(q_constrained, q)
 
         # Test a configuration that violates the constraint.
         q = np.array([2.5, 0.0])
         self.assertFalse(constraint.valid_config(q))
-        self.assertIsNone(constraint.apply(q))
+        self.assertIsNone(constraint.apply(np.zeros_like(q), q))
 
 
 if __name__ == "__main__":

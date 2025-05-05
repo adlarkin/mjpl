@@ -20,12 +20,13 @@ def obeys_constraints(q: np.ndarray, constraints: list[Constraint]) -> bool:
 
 
 def apply_constraints(
-    q: np.ndarray, constraints: list[Constraint]
+    q_old: np.ndarray, q: np.ndarray, constraints: list[Constraint]
 ) -> np.ndarray | None:
     """Apply constraints to a configuration.
 
     Args:
-        q: The configuration.
+        q_old: An older configuration w.r.t `q`.
+        q: The configuration to apply `constraints` to.
         constraints: The constraints to apply. The order of this list is the order in
             which the constraints are applied.
 
@@ -35,7 +36,7 @@ def apply_constraints(
     """
     q_constrained = q
     for c in constraints:
-        q_constrained = c.apply(q_constrained)
+        q_constrained = c.apply(q_old, q_constrained)
         if q_constrained is None:
             return None
     # Make sure that applying a constraint does not invalidate previously applied constraints.
