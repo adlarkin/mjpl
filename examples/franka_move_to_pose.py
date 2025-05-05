@@ -57,27 +57,26 @@ def main():
 
     print("Planning...")
     start = time.time()
-    path = planner.plan_to_pose(q_init, goal_pose, _PANDA_EE_SITE)
-    if path is None:
+    waypoints = planner.plan_to_pose(q_init, goal_pose, _PANDA_EE_SITE)
+    if not waypoints:
         print("Planning failed")
         return
     print(f"Planning took {(time.time() - start):.4f}s")
 
     print("Shortcutting...")
     start = time.time()
-    shortcut_path = mjpl.shortcut(
-        model,
-        path,
+    shortcut_waypoints = mjpl.shortcut(
+        waypoints,
         constraints,
         validation_dist=planner.epsilon,
-        max_attempts=len(path.waypoints),
+        max_attempts=len(waypoints),
         seed=seed,
     )
     print(f"Shortcutting took {(time.time() - start):.4f}s")
 
     # The trajectory limits used here are for demonstration purposes only.
     # In practice, consult your hardware spec sheet for this information.
-    dof = len(path.waypoints[0])
+    dof = len(waypoints[0])
     traj_generator = mjpl.RuckigTrajectoryGenerator(
         dt=model.opt.timestep,
         max_velocity=np.ones(dof) * np.pi,
@@ -88,7 +87,7 @@ def main():
     print("Generating trajectory...")
     start = time.time()
     trajectory = mjpl.generate_constrained_trajectory(
-        model, shortcut_path, traj_generator, constraints
+        shortcut_waypoints, traj_generator, constraints
     )
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 

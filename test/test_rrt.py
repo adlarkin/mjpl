@@ -32,26 +32,22 @@ class TestRRT(unittest.TestCase):
             epsilon=epsilon,
             seed=42,
         )
-        path = planner.plan_to_config(q_init, q_goal)
-        self.assertIsNotNone(path)
-        np.testing.assert_equal(path.q_init, q_init)
-        self.assertGreater(len(path.waypoints), 2)
-        self.assertListEqual(path.joints, mjpl.all_joints(model))
+        waypoints = planner.plan_to_config(q_init, q_goal)
+        self.assertGreater(len(waypoints), 2)
 
-        # The path should start at q_init and end at q_goal.
-        np.testing.assert_equal(path.waypoints[0], q_init)
-        np.testing.assert_equal(path.waypoints[-1], q_goal)
+        # The waypoints should start at q_init and end at q_goal.
+        np.testing.assert_equal(waypoints[0], q_init)
+        np.testing.assert_equal(waypoints[-1], q_goal)
 
         # Subsequent waypoints should be no further than epsilon apart.
-        for i in range(1, len(path.waypoints)):
+        for i in range(1, len(waypoints)):
             self.assertLessEqual(
-                np.linalg.norm(path.waypoints[i] - path.waypoints[i - 1]),
+                np.linalg.norm(waypoints[i] - waypoints[i - 1]),
                 epsilon,
             )
 
-        # The path's initial state and all waypoints should obey constraints.
-        self.assertTrue(mjpl.obeys_constraints(path.q_init, constraints))
-        for wp in path.waypoints:
+        # The waypoints should obey constraints.
+        for wp in waypoints:
             self.assertTrue(mjpl.obeys_constraints(wp, constraints))
 
     def test_run_rrt_subset_joints(self):
@@ -74,26 +70,22 @@ class TestRRT(unittest.TestCase):
             epsilon=epsilon,
             seed=42,
         )
-        path = planner.plan_to_config(q_init, q_goal)
-        self.assertIsNotNone(path)
-        np.testing.assert_equal(path.q_init, q_init)
-        self.assertGreater(len(path.waypoints), 2)
-        self.assertListEqual(path.joints, mjpl.all_joints(model))
+        waypoints = planner.plan_to_config(q_init, q_goal)
+        self.assertGreater(len(waypoints), 2)
 
-        # The path should start at q_init and end at q_goal.
-        np.testing.assert_equal(path.waypoints[0], q_init)
-        np.testing.assert_equal(path.waypoints[-1], q_goal)
+        # The waypoints should start at q_init and end at q_goal.
+        np.testing.assert_equal(waypoints[0], q_init)
+        np.testing.assert_equal(waypoints[-1], q_goal)
 
         # Subsequent waypoints should be no further than epsilon apart.
-        for i in range(1, len(path.waypoints)):
+        for i in range(1, len(waypoints)):
             self.assertLessEqual(
-                np.linalg.norm(path.waypoints[i] - path.waypoints[i - 1]),
+                np.linalg.norm(waypoints[i] - waypoints[i - 1]),
                 epsilon,
             )
 
-        # The path's initial state and all waypoints should obey constraints.
-        self.assertTrue(mjpl.obeys_constraints(path.q_init, constraints))
-        for wp in path.waypoints:
+        # The waypoints should obey constraints.
+        for wp in waypoints:
             self.assertTrue(mjpl.obeys_constraints(wp, constraints))
 
     def test_trivial_rrt(self):
@@ -116,17 +108,14 @@ class TestRRT(unittest.TestCase):
             epsilon=epsilon,
             seed=42,
         )
-        path = planner.plan_to_config(q_init, q_goal)
-        self.assertIsNotNone(path)
-        self.assertEqual(len(path.waypoints), 2)
-        np.testing.assert_equal(path.waypoints[0], q_init)
-        np.testing.assert_equal(path.waypoints[1], q_goal)
-        self.assertListEqual(path.joints, mjpl.all_joints(model))
+        waypoints = planner.plan_to_config(q_init, q_goal)
+        self.assertEqual(len(waypoints), 2)
+        np.testing.assert_equal(waypoints[0], q_init)
+        np.testing.assert_equal(waypoints[1], q_goal)
 
-        # The path's initial state and all waypoints should obey constraints.
-        self.assertTrue(mjpl.obeys_constraints(path.q_init, constraints))
-        self.assertTrue(mjpl.obeys_constraints(path.waypoints[0], constraints))
-        self.assertTrue(mjpl.obeys_constraints(path.waypoints[1], constraints))
+        # The waypoints should obey constraints.
+        self.assertTrue(mjpl.obeys_constraints(waypoints[0], constraints))
+        self.assertTrue(mjpl.obeys_constraints(waypoints[1], constraints))
 
     def test_trivial_rrt_subset_joints(self):
         model = mujoco.MjModel.from_xml_path(_TWO_DOF_BALL_XML.as_posix())
@@ -149,17 +138,14 @@ class TestRRT(unittest.TestCase):
             epsilon=epsilon,
             seed=42,
         )
-        path = planner.plan_to_config(q_init, q_goal)
-        self.assertIsNotNone(path)
-        self.assertEqual(len(path.waypoints), 2)
-        np.testing.assert_equal(path.waypoints[0], q_init)
-        np.testing.assert_equal(path.waypoints[1], q_goal)
-        self.assertListEqual(path.joints, mjpl.all_joints(model))
+        waypoints = planner.plan_to_config(q_init, q_goal)
+        self.assertEqual(len(waypoints), 2)
+        np.testing.assert_equal(waypoints[0], q_init)
+        np.testing.assert_equal(waypoints[1], q_goal)
 
-        # The path's initial state and all waypoints should obey constraints.
-        self.assertTrue(mjpl.obeys_constraints(path.q_init, constraints))
-        self.assertTrue(mjpl.obeys_constraints(path.waypoints[0], constraints))
-        self.assertTrue(mjpl.obeys_constraints(path.waypoints[1], constraints))
+        # The waypoints should obey constraints.
+        self.assertTrue(mjpl.obeys_constraints(waypoints[0], constraints))
+        self.assertTrue(mjpl.obeys_constraints(waypoints[1], constraints))
 
     def test_invalid_args(self):
         model = mujoco.MjModel.from_xml_path(_ONE_DOF_BALL_XML.as_posix())

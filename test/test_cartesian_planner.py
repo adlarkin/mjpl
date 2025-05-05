@@ -113,7 +113,7 @@ class TestCartesianPlanner(unittest.TestCase):
 
         # Use the "home" keyframe as the initial configuration.
         home_keyframe = model.keyframe("home")
-        q_init_world = home_keyframe.qpos.copy()
+        q_init = home_keyframe.qpos.copy()
 
         # From the initial configuration, define a few EE poses that define the
         # desired Cartesian path.
@@ -145,27 +145,22 @@ class TestCartesianPlanner(unittest.TestCase):
         )
 
         # Plan a Cartesian path.
-        path = mjpl.cartesian_plan(
-            model,
-            q_init_world,
+        waypoints = mjpl.cartesian_plan(
+            q_init,
             poses,
             site,
             solver,
             lin_threshold=0.01,
             ori_threshold=0.1,
         )
-        self.assertIsNotNone(path)
-        self.assertEqual(len(path.waypoints), 4)
-        # (cartesian path gives waypoints that are a full configuration)
-        self.assertListEqual(path.joints, mjpl.all_joints(model))
+        self.assertEqual(len(waypoints), 4)
 
         # The first element in the path should match the initial configuration.
-        np.testing.assert_equal(path.q_init, q_init_world)
-        np.testing.assert_equal(path.waypoints[0], q_init_world)
+        np.testing.assert_equal(waypoints[0], q_init)
 
         # The other joint configurations in the path should satisfy the poses
         # within the IK solver's tolerance.
-        data.qpos = path.waypoints[1]
+        data.qpos = waypoints[1]
         mujoco.mj_kinematics(model, data)
         actual_site_pose = mjpl.site_pose(data, site)
         err = poses[0].minus(actual_site_pose)
@@ -173,13 +168,13 @@ class TestCartesianPlanner(unittest.TestCase):
         self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
 
         # An interpolated pose should have been added to the Cartesian path
-        data.qpos = path.waypoints[2]
+        data.qpos = waypoints[2]
         mujoco.mj_kinematics(model, data)
         actual_site_pose = mjpl.site_pose(data, site)
         err = interpolated_pose.minus(actual_site_pose)
         self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
         self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
-        data.qpos = path.waypoints[3]
+        data.qpos = waypoints[3]
         mujoco.mj_kinematics(model, data)
         actual_site_pose = mjpl.site_pose(data, site)
         err = poses[1].minus(actual_site_pose)

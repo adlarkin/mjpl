@@ -6,7 +6,6 @@ import numpy as np
 from robot_descriptions.loaders.mujoco import load_robot_description
 
 import mjpl
-import mjpl.types
 
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
@@ -112,7 +111,6 @@ class TestUtils(unittest.TestCase):
 
     def test_connect_waypoints(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
-        q_idx = mjpl.qpos_idx(model, mjpl.all_joints(model))
         constraints = [
             mjpl.JointLimitConstraint(model),
             mjpl.CollisionConstraint(model),
@@ -121,9 +119,7 @@ class TestUtils(unittest.TestCase):
         # Waypoint connection should fail if it violates the collision constraint.
         waypoints = shortcuttable_waypoints()
         connected_waypoints = mjpl.utils._connect_waypoints(
-            waypoints[0],
             waypoints,
-            q_idx,
             start_idx=1,
             end_idx=5,
             validation_dist=0.1,
@@ -141,9 +137,7 @@ class TestUtils(unittest.TestCase):
 
         # Test a valid waypoint connection.
         connected_waypoints = mjpl.utils._connect_waypoints(
-            waypoints[0],
             waypoints,
-            q_idx,
             start_idx=0,
             end_idx=2,
             validation_dist=0.25,
@@ -155,9 +149,7 @@ class TestUtils(unittest.TestCase):
 
         # Waypoint connection should fail if it violates the joint limit constraint.
         connected_waypoints = mjpl.utils._connect_waypoints(
-            waypoints[0],
             waypoints,
-            q_idx,
             start_idx=1,
             end_idx=3,
             validation_dist=0.25,
@@ -167,18 +159,14 @@ class TestUtils(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "`validation_dist` must be > 0"):
             mjpl.utils._connect_waypoints(
-                waypoints[0],
                 waypoints,
-                q_idx,
                 start_idx=0,
                 end_idx=2,
                 validation_dist=0.0,
                 constraints=constraints,
             )
             mjpl.utils._connect_waypoints(
-                waypoints[0],
                 waypoints,
-                q_idx,
                 start_idx=0,
                 end_idx=2,
                 validation_dist=-1.0,
@@ -187,65 +175,42 @@ class TestUtils(unittest.TestCase):
 
     def test_shortcut(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
-        planning_joints = ["ball_slide_x", "ball_slide_y"]
         constraints = [
             mjpl.JointLimitConstraint(model),
             mjpl.CollisionConstraint(model),
         ]
 
         waypoints = directly_connectable_waypoints()
-        path = mjpl.types.Path(
-            q_init=waypoints[0], waypoints=waypoints, joints=planning_joints
-        )
 
-        # The first and last waypoints in the path can be connected directly without
-        # violating constraints.
-        shortened_path = mjpl.shortcut(model, path, constraints, seed=5)
-        np.testing.assert_equal(shortened_path.q_init, path.q_init)
-        self.assertListEqual(
-            shortened_path.waypoints, [path.waypoints[0], path.waypoints[-1]]
-        )
-        self.assertListEqual(shortened_path.joints, path.joints)
+        # The first and last waypoints can be connected directly without violating constraints.
+        shortened_waypoints = mjpl.shortcut(waypoints, constraints, seed=5)
+        self.assertListEqual(shortened_waypoints, [waypoints[0], waypoints[-1]])
 
-        # Add a final waypoint to the path that violates the joint limit constraint.
-        # This means that after enough tries, the first and penultimate
-        # (i.e., last valid) waypoints can be directly connected
+        # Add a final waypoint that violates the joint limit constraint. This means that
+        # after enough tries, the first and penultimate (i.e., last valid) waypoints can
+        # be directly connected.
         invalid_waypoints = waypoints + [np.array([3.0, -5.0])]
-        invalid_path = mjpl.types.Path(
-            q_init=waypoints[0], waypoints=invalid_waypoints, joints=planning_joints
+        shortened_waypoints = mjpl.shortcut(
+            invalid_waypoints, constraints, max_attempts=20, seed=42
         )
-        shortened_path = mjpl.shortcut(
-            model, invalid_path, constraints, max_attempts=20, seed=42
-        )
-        np.testing.assert_equal(shortened_path.q_init, path.q_init)
         self.assertListEqual(
-            shortened_path.waypoints,
-            [
-                invalid_path.waypoints[0],
-                invalid_path.waypoints[-2],
-                invalid_path.waypoints[-1],
-            ],
+            shortened_waypoints,
+            [invalid_waypoints[0], invalid_waypoints[-2], invalid_waypoints[-1]],
         )
-        self.assertListEqual(shortened_path.joints, invalid_path.joints)
 
-        # Test shortcutting on a path that can be shortened, but is not
+        # Test shortcutting on waypoints that can be shortened, but are not
         # directly connectable from the start to end.
         waypoints = shortcuttable_waypoints()
-        path = mjpl.types.Path(
-            q_init=waypoints[0], waypoints=waypoints, joints=planning_joints
-        )
-        shortened_path = mjpl.shortcut(model, path, constraints, seed=5)
-        np.testing.assert_equal(shortened_path.q_init, path.q_init)
+        shortened_waypoints = mjpl.shortcut(waypoints, constraints, seed=5)
         self.assertListEqual(
-            shortened_path.waypoints,
+            shortened_waypoints,
             [
-                path.waypoints[0],
-                path.waypoints[2],
-                path.waypoints[4],
-                path.waypoints[6],
+                waypoints[0],
+                waypoints[2],
+                waypoints[4],
+                waypoints[6],
             ],
         )
-        self.assertListEqual(shortened_path.joints, path.joints)
 
     def test_shortcut_6dof(self):
         model = load_robot_description("ur5e_mj_description")
@@ -266,26 +231,21 @@ class TestUtils(unittest.TestCase):
             hashable_q_rand = tuple(q_rand)
             self.assertNotIn(hashable_q_rand, unique_waypoints)
             unique_waypoints.add(tuple(q_rand))
-        path = mjpl.types.Path(
-            q_init=waypoints[0], waypoints=waypoints, joints=mjpl.all_joints(model)
-        )
 
-        # Perform shortcutting. The path should now be shorter, but still start
-        # and end at the same waypoints.
-        shortcut_path = mjpl.shortcut(model, path, constraints, seed=seed)
-        np.testing.assert_equal(shortcut_path.q_init, path.q_init)
-        self.assertLess(len(shortcut_path.waypoints), len(path.waypoints))
-        self.assertGreaterEqual(len(shortcut_path.waypoints), 2)
-        np.testing.assert_equal(shortcut_path.waypoints[0], path.waypoints[0])
-        np.testing.assert_equal(shortcut_path.waypoints[-1], path.waypoints[-1])
+        # Perform shortcutting. There should be fewer waypoints in the list, but the
+        # start and end waypoints should be the same.
+        shortcut_waypoints = mjpl.shortcut(waypoints, constraints, seed=seed)
+        self.assertLess(len(shortcut_waypoints), len(waypoints))
+        self.assertGreaterEqual(len(shortcut_waypoints), 2)
+        np.testing.assert_equal(shortcut_waypoints[0], waypoints[0])
+        np.testing.assert_equal(shortcut_waypoints[-1], waypoints[-1])
         # (must convert numpy arrays to tuples to make them hashable)
-        original_intermediate_qs = {tuple(q) for q in path.waypoints[1:-1]}
-        for intermediate_q in shortcut_path.waypoints[1:-1]:
+        original_intermediate_qs = {tuple(q) for q in waypoints[1:-1]}
+        for intermediate_q in shortcut_waypoints[1:-1]:
             self.assertIn(tuple(intermediate_q), original_intermediate_qs)
-        self.assertListEqual(shortcut_path.joints, path.joints)
 
-        # The shortcut path should still obey all constraints.
-        for wp in shortcut_path.waypoints:
+        # The shortcutted waypoints should still obey all constraints.
+        for wp in shortcut_waypoints:
             self.assertTrue(mjpl.obeys_constraints(wp, constraints))
 
     def test_qpos_idx(self):

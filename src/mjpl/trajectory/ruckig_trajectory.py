@@ -1,7 +1,6 @@
 import numpy as np
 from ruckig import InputParameter, OutputParameter, Result, Ruckig
 
-from ..types import Path
 from .trajectory_interface import Trajectory, TrajectoryGenerator
 
 
@@ -36,13 +35,13 @@ class RuckigTrajectoryGenerator(TrajectoryGenerator):
         self.min_acceleration = min_acceleration or -max_acceleration
         self.max_jerk = max_jerk
 
-    def generate_trajectory(self, path: Path) -> Trajectory:
-        dof = path.waypoints[0].size
-        otg = Ruckig(dof, self.dt, len(path.waypoints))
+    def generate_trajectory(self, waypoints: list[np.ndarray]) -> Trajectory:
+        dof = waypoints[0].size
+        otg = Ruckig(dof, self.dt, len(waypoints))
         inp = InputParameter(dof)
-        out = OutputParameter(dof, len(path.waypoints))
+        out = OutputParameter(dof, len(waypoints))
 
-        inp.current_position = path.waypoints[0]
+        inp.current_position = waypoints[0]
         inp.current_velocity = np.zeros(dof)
         inp.current_acceleration = np.zeros(dof)
 
@@ -51,9 +50,9 @@ class RuckigTrajectoryGenerator(TrajectoryGenerator):
         # generation time. Pre-processing the path by filtering out some of
         # the waypoints will make trajectory generation faster. For more info:
         # https://docs.ruckig.com/md_pages_2__intermediate__waypoints.html
-        inp.intermediate_positions = path.waypoints[1:-1]
+        inp.intermediate_positions = waypoints[1:-1]
 
-        inp.target_position = path.waypoints[-1]
+        inp.target_position = waypoints[-1]
         inp.target_velocity = np.zeros(dof)
         inp.target_acceleration = np.zeros(dof)
 
@@ -77,6 +76,4 @@ class RuckigTrajectoryGenerator(TrajectoryGenerator):
         if res != Result.Finished:
             raise ValueError("Trajectory generation failed.")
 
-        return Trajectory(
-            path.q_init, path.joints, self.dt, positions, velocities, accelerations
-        )
+        return Trajectory(self.dt, waypoints[0], positions, velocities, accelerations)

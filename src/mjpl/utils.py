@@ -4,7 +4,6 @@ import numpy as np
 
 from .constraint.constraint_interface import Constraint
 from .constraint.utils import apply_constraints, obeys_constraints
-from .types import Path
 
 
 def step(start: np.ndarray, target: np.ndarray, max_step_dist: float) -> np.ndarray:
@@ -131,53 +130,44 @@ def random_config(
 
 
 def shortcut(
-    model: mujoco.MjModel,
-    path: Path,
+    waypoints: list[np.ndarray],
     constraints: list[Constraint],
     validation_dist: float = 0.05,
     max_attempts: int = 100,
     seed: int | None = None,
-) -> Path:
-    """Perform shortcutting on a path.
+) -> list[np.ndarray]:
+    """Perform shortcutting on a list of waypoints.
 
     Args:
-        model: MuJoCo model.
-        path: The path to shortcut.
+        waypoints: The waypoints to shortcut.
         constraints: The constraints to enforce (if any) for validation checks.
         validation_dist: The distance between each validation check, which occurs
             between a pair of waypoints that are trying to be directly connected
             if these waypoints are further than `validation_dist` apart.
-        max_attempts: The maximum number of shortcut attempts. Each attempt
-            will randomly select two waypoints in the path. If the path has
-            exactly two waypoints, no more attempts will be executed.
+        max_attempts: The maximum number of shortcut attempts. Each attempt will
+            randomly select two waypoints to connect. If exactly two waypoints
+            remain, no more attempts will be executed.
         seed: The seed which is used for randomly picking pairs of waypoints
             to shortcut.
 
     Returns:
-        A path with direct connections between each adjacent waypoint that obeys
-        `constraints`.
+        A waypoint list with direct connections between each adjacent waypoint that
+        obeys `constraints`.
     """
-    q = path.q_init.copy()
     rng = np.random.default_rng(seed=seed)
-
-    q_idx = qpos_idx(model, path.joints)
 
     # sanity check: can we shortcut directly between the start/end of the path?
     shortened_waypoints = _connect_waypoints(
-        q,
-        path.waypoints,
-        q_idx,
+        waypoints,
         start_idx=0,
-        end_idx=len(path.waypoints) - 1,
+        end_idx=len(waypoints) - 1,
         validation_dist=validation_dist,
         constraints=constraints,
     )
     for _ in range(max_attempts):
         if len(shortened_waypoints) == 2:
             # we can go directly from start to goal, so no more shortcutting can be done
-            return Path(
-                q_init=path.q_init, waypoints=shortened_waypoints, joints=path.joints
-            )
+            return shortened_waypoints
         # randomly pick 2 waypoints
         start, end = 0, 0
         while start == end:
@@ -185,22 +175,18 @@ def shortcut(
         if start > end:
             start, end = end, start
         shortened_waypoints = _connect_waypoints(
-            q,
             shortened_waypoints,
-            q_idx,
             start_idx=start,
             end_idx=end,
             validation_dist=validation_dist,
             constraints=constraints,
         )
 
-    return Path(q_init=path.q_init, waypoints=shortened_waypoints, joints=path.joints)
+    return shortened_waypoints
 
 
 def _connect_waypoints(
-    q_full: np.ndarray,
     waypoints: list[np.ndarray],
-    q_idx: list[int],
     start_idx: int,
     end_idx: int,
     validation_dist: float,
@@ -209,10 +195,7 @@ def _connect_waypoints(
     """If possible, directly connect two specific waypoints from a list of waypoints.
 
     Args:
-        q_full: Configuration that has values initialized for joints that do not
-            correspond to `waypoints`/`q_idx`.
         waypoints: The list of waypoints.
-        q_idx: The indices in MjData.qpos that correspond to the arrays in `waypoints`.
         start_idx: The index of the first waypoint.
         end_idx: The index of the second waypoint.
         validation_dist: The distance increment used for performing intermediate
@@ -232,8 +215,7 @@ def _connect_waypoints(
 
     q_curr = step(q_start, q_target, validation_dist)
     while not np.array_equal(q_curr, q_target):
-        q_full[q_idx] = q_curr
-        if not obeys_constraints(q_full, constraints):
+        if not obeys_constraints(q_curr, constraints):
             return waypoints
         q_curr = step(q_curr, q_target, validation_dist)
     return waypoints[: start_idx + 1] + waypoints[end_idx:]
