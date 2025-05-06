@@ -32,8 +32,12 @@ def _extend(
     q_constrained = apply_constraints(start_node.q, q_extend, constraints)
     if q_constrained is not None:
         extended_node = Node(q_constrained, start_node)
-        tree.add_node(extended_node)
-        return extended_node
+        # Applying constraints can result in configurations that are already in the tree.
+        # TODO: figure out if I need this, or if it's a bug
+        # If the node exists, should I return the existing node? (need to get the parent right)
+        if extended_node not in tree:
+            tree.add_node(extended_node)
+            return extended_node
     return None
 
 

@@ -8,6 +8,12 @@ from .joint_limit_constraint import JointLimitConstraint
 
 
 class PoseConstraint(Constraint):
+    """Constraint that enforces pose constraints on an end-effector.
+
+    This is done through a projection technique that's described in section 4a/4b here:
+    https://personalrobotics.cs.washington.edu/publications/berenson2009cbirrt.pdf
+    """
+
     def __init__(
         self,
         model: mujoco.MjModel,
@@ -23,10 +29,22 @@ class PoseConstraint(Constraint):
         q_step: float,
     ) -> None:
         """
-        C: 6x2 matrix with min values in column 0 and max vals in column 1
-        transform: transform for `C`, in the world frame (i.e., what limits are
-            defined w.r.t. - maybe rename this to `relative_to`?)
-        site: frame to apply `limits` to
+        Constructor.
+
+        Args:
+            x_translation: (min, max) allowed translation along the x-axis, in meters.
+            y_translation: (min, max) allowed translation along the y-axis, in meters.
+            z_translation: (min, max) allowed translation along the z-axis, in meters.
+            roll: (min, max) allowed roll, in radians.
+            pitch: (min, max) allowed pitch, in radians.
+            yaw: (min, max) allowed yaw, in radians.
+            transform: The frame the pose constraints are defined relative to. This
+                transform should be defined w.r.t. the world frame.
+            site: The site (i.e., frame) that must obey the pose constraints.
+            tolerance: The maximum allowed deviation `site` may have from the
+                pose constraints.
+            q_step: The maximum distance (in joint space) the constrained configuration
+                can be from another configuration.
         """
         if tolerance < 0.0:
             raise ValueError("`tolerance` must be >= 0.")
@@ -48,8 +66,11 @@ class PoseConstraint(Constraint):
 
     def valid_config(self, q: np.ndarray) -> bool:
         # TODO: check for joint limits and 2*q_step here as well?
-        return np.linalg.norm(self._displacement_from_constraint(q)) < self.tolerance
+        dx = self._displacement_from_constraint(q)
+        return np.linalg.norm(dx) < self.tolerance
 
+    # TODO: make q_old np.ndarray | None?
+    # This means constraint interface would have to be updated
     def apply(self, q_old: np.ndarray, q: np.ndarray) -> np.ndarray | None:
         q_projected = q
         while True:
@@ -68,6 +89,14 @@ class PoseConstraint(Constraint):
         self,
         q: np.ndarray,
     ) -> np.ndarray:
+        """Compute the displacement between a configuration and the pose constraints.
+
+        Args:
+            q: The configuration.
+
+        Returns:
+            A 6D displacement vector: {x, y, z, r, p, y}.
+        """
         self.data.qpos = q
         mujoco.mj_kinematics(self.model, self.data)
 
@@ -93,6 +122,14 @@ class PoseConstraint(Constraint):
         return delta_X
 
     def _get_jacobian(self, q: np.ndarray) -> np.ndarray:
+        """Get the RPY Jacobian of the end-effector site.
+
+        Args:
+            q: The configuration.
+
+        Returns:
+            The RPY Jacobian.
+        """
         # Get the Jacobian with respect to the site.
         # mj_kinematics updates frame transforms, and mj_comPos updates jacobians:
         # - https://mujoco.readthedocs.io/en/stable/APIreference/APIfunctions.html#mj-jac
@@ -104,10 +141,6 @@ class PoseConstraint(Constraint):
         mujoco.mj_jacSite(self.model, self.data, jac[:3], jac[3:], self.site_id)
 
         world_T_site = utils.site_pose(self.data, self.site)
-        """
-        C_T_site = self.C_T_world.multiply(world_T_site)
-        rpy = C_T_site.rotation().as_rpy_radians()
-        """
         rpy = world_T_site.rotation().as_rpy_radians()
 
         c_p = np.cos(rpy.pitch)
@@ -115,9 +148,12 @@ class PoseConstraint(Constraint):
         s_p = np.sin(rpy.pitch)
         s_y = np.sin(rpy.yaw)
 
+        # Define a linear transformation that converts angular velocities to RPY:
+        # - https://ieeexplore.ieee.org/document/4399305 (appendix)
+        # - https://personalrobotics.cs.washington.edu/publications/berenson2009cbirrt.pdf (section 4b)
         E_rpy = np.zeros((6, 6))
         E_rpy[:3, :3] = np.eye(3)
-        E_rpy[3:, 3:-1] = np.array(
+        E_rpy[3:6, 3:5] = np.array(
             [
                 [c_y / c_p, s_y / c_p],
                 [-s_y, c_p],
