@@ -78,7 +78,8 @@ class PoseConstraint(Constraint):
             if np.linalg.norm(dx) < self.tolerance:
                 return q_projected
             J = self._get_jacobian(q_projected)
-            q_err = J.T @ np.linalg.inv(J @ J.T) @ dx
+            # Use pseudo-inverse in case we have a singular matrix.
+            q_err = J.T @ np.linalg.pinv(J @ J.T) @ dx
             q_projected = q_projected - q_err
             violates_limits = not self.joint_limit_constraint.valid_config(q_projected)
             extends_too_far = np.linalg.norm(q_projected - q_old) > (2 * self.q_step)
