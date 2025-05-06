@@ -17,30 +17,31 @@ class PoseConstraint(Constraint):
     def __init__(
         self,
         model: mujoco.MjModel,
-        x_translation: tuple[float, float],
-        y_translation: tuple[float, float],
-        z_translation: tuple[float, float],
-        roll: tuple[float, float],
-        pitch: tuple[float, float],
-        yaw: tuple[float, float],
-        transform: mink.SE3,
         site: str,
-        tolerance: float,
-        q_step: float,
+        reference_frame: mink.SE3,
+        x_translation: tuple[float, float] = (-np.inf, np.inf),
+        y_translation: tuple[float, float] = (-np.inf, np.inf),
+        z_translation: tuple[float, float] = (-np.inf, np.inf),
+        roll: tuple[float, float] = (-np.inf, np.inf),
+        pitch: tuple[float, float] = (-np.inf, np.inf),
+        yaw: tuple[float, float] = (-np.inf, np.inf),
+        tolerance: float = 0.001,
+        q_step: float = 0.05,
     ) -> None:
         """
         Constructor.
 
         Args:
+            model: MuJoCo model.
+            site: The site (i.e., frame) that must obey the pose constraints.
+            reference_frame: The frame the pose constraints are defined relative to.
+                This should be defined w.r.t. the world frame.
             x_translation: (min, max) allowed translation along the x-axis, in meters.
             y_translation: (min, max) allowed translation along the y-axis, in meters.
             z_translation: (min, max) allowed translation along the z-axis, in meters.
             roll: (min, max) allowed roll, in radians.
             pitch: (min, max) allowed pitch, in radians.
             yaw: (min, max) allowed yaw, in radians.
-            transform: The frame the pose constraints are defined relative to. This
-                transform should be defined w.r.t. the world frame.
-            site: The site (i.e., frame) that must obey the pose constraints.
             tolerance: The maximum allowed deviation `site` may have from the
                 pose constraints.
             q_step: The maximum distance (in joint space) the constrained configuration
@@ -55,7 +56,8 @@ class PoseConstraint(Constraint):
         self.C = np.array(
             [x_translation, y_translation, z_translation, roll, pitch, yaw]
         )
-        self.C_T_world = transform.inverse()
+        # reference_frame is world_T_C (C = constraint frame)
+        self.C_T_world = reference_frame.inverse()
         self.site = site
         self.tolerance = tolerance
         self.q_step = q_step

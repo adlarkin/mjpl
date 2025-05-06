@@ -29,16 +29,10 @@ def main():
     ee_init_pose = mjpl.site_pose(data, _UR5_EE_SITE)
     ee_pose_constraint = mjpl.PoseConstraint(
         model,
-        (-np.inf, np.inf),
-        (-np.inf, np.inf),
-        (-np.inf, np.inf),
-        (-0.1, 0.1),
-        (-0.1, 0.1),
-        (-np.inf, np.inf),
-        ee_init_pose,
         _UR5_EE_SITE,
-        tolerance=0.001,
-        q_step=0.05,
+        ee_init_pose,
+        roll=(-0.1, 0.1),
+        pitch=(-0.1, 0.1),
     )
     constraints = [
         ee_pose_constraint,

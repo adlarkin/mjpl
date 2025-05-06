@@ -32,8 +32,6 @@ def main():
     ]
     q_idx = mjpl.qpos_idx(model, arm_joints)
 
-    epsilon = 0.05
-
     # Let the "home" keyframe in the MJCF be the initial state.
     home_keyframe = model.keyframe("home")
     q_init = home_keyframe.qpos.copy()
@@ -47,16 +45,10 @@ def main():
     ee_init_pose = mjpl.site_pose(data, _PANDA_EE_SITE)
     ee_pose_constraint = mjpl.PoseConstraint(
         model,
-        (-np.inf, np.inf),
-        (-np.inf, np.inf),
-        (-np.inf, np.inf),
-        (-0.1, 0.1),
-        (-0.1, 0.1),
-        (-np.inf, np.inf),
-        ee_init_pose,
         _PANDA_EE_SITE,
-        tolerance=0.001,
-        q_step=epsilon,
+        ee_init_pose,
+        roll=(-0.1, 0.1),
+        pitch=(-0.1, 0.1),
     )
 
     allowed_collisions = [("left_finger", "right_finger")]

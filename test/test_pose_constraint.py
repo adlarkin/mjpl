@@ -26,15 +26,9 @@ class TestPoseConstraint(unittest.TestCase):
         # Define a pose constraint that limits ball translation along the x-axis.
         pose_constraint = mjpl.PoseConstraint(
             model,
-            (-0.1, 0.1),
-            (-np.inf, np.inf),
-            (-np.inf, np.inf),
-            (-np.inf, np.inf),
-            (-np.inf, np.inf),
-            (-np.inf, np.inf),
-            ball_home_pose,
             site_name,
-            tolerance=0.001,
+            ball_home_pose,
+            x_translation=(-0.1, 0.1),
             q_step=np.inf,
         )
 
@@ -84,15 +78,10 @@ class TestPoseConstraint(unittest.TestCase):
         rotation_limit = (-0.1, 0.1)
         pose_constraint = mjpl.PoseConstraint(
             model,
-            (-np.inf, np.inf),
-            (-np.inf, np.inf),
-            (-np.inf, np.inf),
-            rotation_limit,
-            rotation_limit,
-            (-np.inf, np.inf),
-            ee_init_pose,
             site_name,
-            tolerance=0.001,
+            ee_init_pose,
+            roll=rotation_limit,
+            pitch=rotation_limit,
             q_step=np.inf,
         )
 
