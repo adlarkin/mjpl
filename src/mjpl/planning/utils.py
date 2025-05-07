@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 
 from .. import utils
@@ -6,24 +8,77 @@ from ..constraint.utils import apply_constraints
 from .tree import Node, Tree
 
 
+def smooth_path(
+    waypoints: list[np.ndarray],
+    constraints: list[Constraint],
+    eps: float = 0.05,
+    num_tries: int = 100,
+    seed: int | None = None,
+) -> list[np.ndarray]:
+    smoothed_path = waypoints
+    rng = np.random.default_rng(seed=seed)
+    for _ in range(num_tries):
+        # Randomly select two waypoints to shortcut.
+        start = rng.integers(0, len(smoothed_path) - 1)
+        end = rng.integers(start + 1, len(smoothed_path))
+        assert start < end
+        assert start >= 0 and start < len(smoothed_path) - 1
+        assert end < len(smoothed_path)
+
+        # See if the randomly selected waypoints can be connected without violating
+        # constraints.
+        node = Node(smoothed_path[start])
+        tree = Tree(node)
+        q_reached = _constrained_extend(
+            smoothed_path[end], node, tree, eps, constraints, np.inf
+        )
+        if np.array_equal(q_reached, smoothed_path[end]):
+            # Form a direct connection between the two waypoints if it shortens path
+            # length. This check must be performed since constraints project
+            # configurations in an arbitrary way.
+            end_node = tree.nearest_neighbor(q_reached)
+            shortcut_path_segment = [n.q for n in tree.get_path(end_node)]
+            shortcut_length = utils.path_length(shortcut_path_segment)
+            original_length = utils.path_length(smoothed_path[start : end + 1])
+            if shortcut_length < original_length:
+                shortcut_path_segment.reverse()
+                smoothed_path = (
+                    smoothed_path[:start]
+                    + shortcut_path_segment[:-1]
+                    + smoothed_path[end:]
+                )
+                # TODO: use the code below instead? This would create a "sparse" path.
+                # The issue though is that generate_constrained_trajectory takes a long
+                # time (or soemtimes even times out) when the path is too sparse
+                #
+                # smoothed_path = smoothed_path[: start + 1] + smoothed_path[end:]
+
+        # TODO: remove this if I don't make a "sparse" path (see TODO above)
+        if len(smoothed_path) == 2:
+            # The first and last waypoints can be directly connected.
+            break
+    return smoothed_path
+
+
 def _constrained_extend(
     q_target: np.ndarray,
     nearest_node: Node,
     tree: Tree,
     eps: float,
     constraints: list[Constraint],
+    max_time: float,
 ) -> np.ndarray:
-    """
-    q = q_near
-    q_old = q_near
-    """
     q = nearest_node.q
     q_old = nearest_node.q
     closest_node = nearest_node
-    while True:
+
+    start_time = time.time()
+    while time.time() - start_time < max_time:
         if np.array_equal(q_target, q):
             return q
-        if np.linalg.norm(q_target - q) > np.linalg.norm(q_target - q_old):
+        # TODO: re-visit if this is needed? It seems like q and q_old are always
+        # the same at this point based on how the algorithm is written in the paper
+        if np.linalg.norm(q_target - q) > np.linalg.norm(q_old - q_target):
             return q_old
         q = utils.step(q, q_target, eps)
         q = apply_constraints(q_old, q, constraints)
@@ -31,105 +86,12 @@ def _constrained_extend(
             closest_node = Node(q, closest_node)
             # Applying constraints can result in redundant configurations.
             if closest_node in tree:
-                closest_node = tree.nearest_neighbor(q)
-            else:
-                tree.add_node(closest_node)
+                return q
+            tree.add_node(closest_node)
             q_old = q
         else:
             return q_old
-
-
-def _extend(
-    q_target: np.ndarray,
-    tree: Tree,
-    start_node: Node,
-    eps: float,
-    constraints: list[Constraint],
-) -> Node | None:
-    """Extend a node in a tree towards a target configuration.
-
-    Args:
-        q_target: The target configuration.
-        tree: The tree with a node to extend towards `q_target`.
-        start_node: The node in `tree` to extend towards `q_target`.
-        eps: The maximum distance `start_node` will extend towards `q_target`.
-        constraints: The constraints the extended configuration must obey.
-
-    Returns:
-        The node that was the result of extending `start_node` towards `q_target`,
-        or None if extension wasn't possible. This node also belongs to `tree`.
-    """
-    if np.array_equal(start_node.q, q_target):
-        return start_node
-    q_extend = utils.step(start_node.q, q_target, eps)
-    q_constrained = apply_constraints(start_node.q, q_extend, constraints)
-    if q_constrained is not None:
-        extended_node = Node(q_constrained, start_node)
-        # Applying constraints can result in configurations that are already in the tree.
-        # TODO: figure out if I need this, or if it's a bug
-        # If the node exists, should I return the existing node? (need to get the parent right)
-        if extended_node not in tree:
-            tree.add_node(extended_node)
-            return extended_node
-    return None
-
-
-def _connect(
-    q_target: np.ndarray,
-    tree: Tree,
-    eps: float,
-    max_connection_distance: float,
-    constraints: list[Constraint],
-) -> Node:
-    """Attempt to connect a node in a tree to a target configuration.
-
-    Args:
-        q_target: The target configuration.
-        tree: The tree with a node that serves as the basis of the connection
-            to `q_target`.
-        eps: The maximum distance between nodes added to `tree`. If the
-            distance between the start node in `tree` and `q_target` is greater
-            than `eps`, multiple nodes will be added to `tree`.
-        max_connection_distance: The maximum distance to cover before terminating
-            the connect operation.
-        constraints: The constraints configurations must obey.
-
-    Returns:
-        The node that is the result of connecting a node from `tree` towards
-        `q_target`. This node also belongs to `tree`.
-    """
-    nearest_node = tree.nearest_neighbor(q_target)
-    q_old = nearest_node.q
-    total_distance = 0.0
-    while not np.array_equal(nearest_node.q, q_target):
-        max_eps = min(eps, max_connection_distance - total_distance)
-        next_node = _extend(q_target, tree, nearest_node, max_eps, constraints)
-        # Terminate if extension failed, or if extension is not making progress
-        # towards q_target because of the constraints.
-        if not next_node or _deviates_from_target(q_target, next_node.q, q_old):
-            break
-        q_old = next_node.q
-        nearest_node = next_node
-        total_distance += max_eps
-        if total_distance >= max_connection_distance:
-            break
-    return nearest_node
-
-
-def _deviates_from_target(
-    target: np.ndarray, curr: np.ndarray, prev: np.ndarray
-) -> bool:
-    """Check if a vector deviates from a target w.r.t. another vector.
-
-    Args:
-        target: The target vector.
-        curr: The vector to evaluate.
-        prev: The previous vector to compare against.
-
-    Returns:
-        True if `curr` is further from `target` than `prev`. False otherwise.
-    """
-    return np.linalg.norm(target - curr) > np.linalg.norm(target - prev)
+    return q
 
 
 def _combine_paths(

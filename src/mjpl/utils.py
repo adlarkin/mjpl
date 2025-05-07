@@ -3,7 +3,7 @@ import mujoco
 import numpy as np
 
 from .constraint.constraint_interface import Constraint
-from .constraint.utils import apply_constraints, obeys_constraints
+from .constraint.utils import apply_constraints
 
 
 def step(start: np.ndarray, target: np.ndarray, max_step_dist: float) -> np.ndarray:
@@ -132,93 +132,16 @@ def random_config(
     return q_constrained
 
 
-def shortcut(
-    waypoints: list[np.ndarray],
-    constraints: list[Constraint],
-    validation_dist: float = 0.05,
-    max_attempts: int = 100,
-    seed: int | None = None,
-) -> list[np.ndarray]:
-    """Perform shortcutting on a list of waypoints.
+def path_length(waypoints: list[np.ndarray]) -> float:
+    """Compute the path length in configuration space.
 
     Args:
-        waypoints: The waypoints to shortcut.
-        constraints: The constraints to enforce (if any) for validation checks.
-        validation_dist: The distance between each validation check, which occurs
-            between a pair of waypoints that are trying to be directly connected
-            if these waypoints are further than `validation_dist` apart.
-        max_attempts: The maximum number of shortcut attempts. Each attempt will
-            randomly select two waypoints to connect. If exactly two waypoints
-            remain, no more attempts will be executed.
-        seed: The seed which is used for randomly picking pairs of waypoints
-            to shortcut.
+        waypoints: A list of waypoints that form the path.
 
     Returns:
-        A waypoint list with direct connections between each adjacent waypoint that
-        obeys `constraints`.
+        The length of the waypoint list in configuration space.
     """
-    rng = np.random.default_rng(seed=seed)
-
-    # sanity check: can we shortcut directly between the start/end of the path?
-    shortened_waypoints = _connect_waypoints(
-        waypoints,
-        start_idx=0,
-        end_idx=len(waypoints) - 1,
-        validation_dist=validation_dist,
-        constraints=constraints,
-    )
-    for _ in range(max_attempts):
-        if len(shortened_waypoints) == 2:
-            # we can go directly from start to goal, so no more shortcutting can be done
-            return shortened_waypoints
-        # randomly pick 2 waypoints
-        start, end = 0, 0
-        while start == end:
-            start, end = rng.integers(len(shortened_waypoints), size=2)
-        if start > end:
-            start, end = end, start
-        shortened_waypoints = _connect_waypoints(
-            shortened_waypoints,
-            start_idx=start,
-            end_idx=end,
-            validation_dist=validation_dist,
-            constraints=constraints,
-        )
-
-    return shortened_waypoints
-
-
-def _connect_waypoints(
-    waypoints: list[np.ndarray],
-    start_idx: int,
-    end_idx: int,
-    validation_dist: float,
-    constraints: list[Constraint] = [],
-) -> list[np.ndarray]:
-    """If possible, directly connect two specific waypoints from a list of waypoints.
-
-    Args:
-        waypoints: The list of waypoints.
-        start_idx: The index of the first waypoint.
-        end_idx: The index of the second waypoint.
-        validation_dist: The distance increment used for performing intermediate
-            validation checks. This must be > 0.
-        constraints: The constraints to enforce (if any) for validation checks.
-
-    Returns:
-        A waypoint list with a direct connection between the waypoints at indices
-        (`start_idx`, `end_idx`) if the waypoints at these indices can be connected
-        without violating `constraints`.
-    """
-    if validation_dist <= 0.0:
-        raise ValueError("`validation_dist` must be > 0")
-
-    q_start = waypoints[start_idx]
-    q_target = waypoints[end_idx]
-
-    q_curr = step(q_start, q_target, validation_dist)
-    while not np.array_equal(q_curr, q_target):
-        if not obeys_constraints(q_curr, constraints):
-            return waypoints
-        q_curr = step(q_curr, q_target, validation_dist)
-    return waypoints[: start_idx + 1] + waypoints[end_idx:]
+    path = np.array(waypoints)
+    diffs = np.diff(path, axis=0)
+    segment_lengths = np.linalg.norm(diffs, axis=1)
+    return np.sum(segment_lengths)

@@ -325,6 +325,15 @@ class TestUtils(unittest.TestCase):
         np.testing.assert_equal(q_rand[unchanged_idx], q_init[unchanged_idx])
         self.assertTrue(mjpl.obeys_constraints(q_rand, constraints))
 
+    def test_path_length(self):
+        waypoints = [
+            np.array([0.0, 0.0, 0.0]),
+            np.array([1.0, 0.0, 0.0]),
+            np.array([1.0, 1.0, 0.0]),
+            np.array([1.0, 1.0, 1.0]),
+        ]
+        self.assertAlmostEqual(mjpl.path_length(waypoints), 3.0)
+
 
 if __name__ == "__main__":
     unittest.main()

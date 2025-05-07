@@ -33,7 +33,6 @@ class RRT:
         epsilon: float = 0.05,
         seed: int | None = None,
         goal_biasing_probability: float = 0.05,
-        max_connection_distance: float = np.inf,
     ) -> None:
         """Constructor.
 
@@ -47,7 +46,6 @@ class RRT:
                 `None` means the algorithm is nondeterministc.
             goal_biasing_probability: Probability of sampling a goal state during planning.
                 This must be a value between [0.0, 1.0].
-            max_connection_distance: The maximum distance for extending a tree using CONNECT.
         """
         if not planning_joints:
             raise ValueError("`planning_joints` cannot be empty.")
@@ -55,8 +53,6 @@ class RRT:
             raise ValueError("`max_planning_time` must be > 0.0")
         if epsilon <= 0.0:
             raise ValueError("`epsilon` must be > 0.0")
-        if max_connection_distance <= 0.0:
-            raise ValueError("`max_connection_distance` must be > 0.0")
         if goal_biasing_probability < 0.0 or goal_biasing_probability > 1.0:
             raise ValueError("`goal_biasing_probability` must be within [0.0, 1.0].")
 
@@ -67,7 +63,6 @@ class RRT:
         self.epsilon = epsilon
         self.seed = seed
         self.goal_biasing_probability = goal_biasing_probability
-        self.max_connection_distance = max_connection_distance
 
     def plan_to_pose(
         self,
@@ -212,11 +207,21 @@ class RRT:
             # Run constrained extend on both trees.
             nn_a = t_a.nearest_neighbor(q_rand)
             q_reached_a = _constrained_extend(
-                q_rand, nn_a, t_a, self.epsilon, self.constraints
+                q_rand,
+                nn_a,
+                t_a,
+                self.epsilon,
+                self.constraints,
+                self.max_planning_time - (time.time() - start_time),
             )
             nn_b = t_b.nearest_neighbor(q_reached_a)
             q_reached_b = _constrained_extend(
-                q_reached_a, nn_b, t_b, self.epsilon, self.constraints
+                q_reached_a,
+                nn_b,
+                t_b,
+                self.epsilon,
+                self.constraints,
+                self.max_planning_time - (time.time() - start_time),
             )
             if np.array_equal(q_reached_a, q_reached_b):
                 if swapped:
