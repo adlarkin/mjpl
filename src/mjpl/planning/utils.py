@@ -6,6 +6,39 @@ from ..constraint.utils import apply_constraints
 from .tree import Node, Tree
 
 
+def _constrained_extend(
+    q_target: np.ndarray,
+    nearest_node: Node,
+    tree: Tree,
+    eps: float,
+    constraints: list[Constraint],
+) -> np.ndarray:
+    """
+    q = q_near
+    q_old = q_near
+    """
+    q = nearest_node.q
+    q_old = nearest_node.q
+    closest_node = nearest_node
+    while True:
+        if np.array_equal(q_target, q):
+            return q
+        if np.linalg.norm(q_target - q) > np.linalg.norm(q_target - q_old):
+            return q_old
+        q = utils.step(q, q_target, eps)
+        q = apply_constraints(q_old, q, constraints)
+        if q is not None:
+            closest_node = Node(q, closest_node)
+            # Applying constraints can result in redundant configurations.
+            if closest_node in tree:
+                closest_node = tree.nearest_neighbor(q)
+            else:
+                tree.add_node(closest_node)
+            q_old = q
+        else:
+            return q_old
+
+
 def _extend(
     q_target: np.ndarray,
     tree: Tree,

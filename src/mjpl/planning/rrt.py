@@ -10,7 +10,7 @@ from ..constraint.utils import obeys_constraints
 from ..inverse_kinematics.ik_solver import IKSolver
 from ..inverse_kinematics.mink_ik_solver import MinkIKSolver
 from .tree import Node, Tree
-from .utils import _combine_paths, _connect
+from .utils import _combine_paths, _constrained_extend
 
 
 class RRT:
@@ -192,57 +192,41 @@ class RRT:
             goal_tree.add_node(n)
 
         rng = np.random.default_rng(seed=self.seed)
+        t_a, t_b = start_tree, goal_tree
+        swapped = False
+
         start_time = time.time()
         while time.time() - start_time < self.max_planning_time:
             if rng.random() <= self.goal_biasing_probability:
-                # Randomly pick a goal.
-                random_goal_idx = rng.integers(0, len(goal_nodes))
-                q_rand = goal_nodes[random_goal_idx].q
+                if swapped:
+                    q_rand = q_init
+                else:
+                    # Randomly pick a goal.
+                    random_goal_idx = rng.integers(0, len(goal_nodes))
+                    q_rand = goal_nodes[random_goal_idx].q
             else:
                 # Create a random configuration.
                 q_rand = q_init.copy()
                 q_rand[q_idx] = rng.uniform(*self.model.jnt_range.T)[q_idx]
 
-            new_start_tree_node = _connect(
-                q_rand,
-                start_tree,
-                self.epsilon,
-                self.max_connection_distance,
-                self.constraints,
+            # Run constrained extend on both trees.
+            nn_a = t_a.nearest_neighbor(q_rand)
+            q_reached_a = _constrained_extend(
+                q_rand, nn_a, t_a, self.epsilon, self.constraints
             )
-            new_goal_tree_node = _connect(
-                new_start_tree_node.q,
-                goal_tree,
-                self.epsilon,
-                self.max_connection_distance,
-                self.constraints,
+            nn_b = t_b.nearest_neighbor(q_reached_a)
+            q_reached_b = _constrained_extend(
+                q_reached_a, nn_b, t_b, self.epsilon, self.constraints
             )
-            if new_start_tree_node == new_goal_tree_node:
-                return _combine_paths(
-                    start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
-                )
+            if np.array_equal(q_reached_a, q_reached_b):
+                if swapped:
+                    t_a, t_b = t_b, t_a
+                node_a = start_tree.nearest_neighbor(q_reached_a)
+                node_b = goal_tree.nearest_neighbor(q_reached_b)
+                return _combine_paths(t_a, node_a, t_b, node_b)
 
-            # If the start tree was not able to reach q_rand, try the opposite process
-            # (grow the goal tree towards q_rand first). This can help reduce bias in
-            # each tree's growth.
-            if not np.array_equal(new_start_tree_node.q, q_rand):
-                new_goal_tree_node = _connect(
-                    q_rand,
-                    goal_tree,
-                    self.epsilon,
-                    self.max_connection_distance,
-                    self.constraints,
-                )
-                new_start_tree_node = _connect(
-                    new_goal_tree_node.q,
-                    start_tree,
-                    self.epsilon,
-                    self.max_connection_distance,
-                    self.constraints,
-                )
-                if new_start_tree_node == new_goal_tree_node:
-                    return _combine_paths(
-                        start_tree, new_start_tree_node, goal_tree, new_goal_tree_node
-                    )
+            # Swap trees.
+            t_a, t_b = t_b, t_a
+            swapped = not swapped
 
         return []

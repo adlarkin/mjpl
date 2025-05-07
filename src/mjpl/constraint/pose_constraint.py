@@ -67,7 +67,8 @@ class PoseConstraint(Constraint):
         self.site_id = model.site(site).id
 
     def valid_config(self, q: np.ndarray) -> bool:
-        # TODO: check for joint limits and 2*q_step here as well?
+        if not self.joint_limit_constraint.valid_config(q):
+            return False
         dx = self._displacement_from_constraint(q)
         return np.linalg.norm(dx) < self.tolerance
 
@@ -154,8 +155,7 @@ class PoseConstraint(Constraint):
         # Define a linear transformation that converts angular velocities to RPY:
         # - https://ieeexplore.ieee.org/document/4399305 (appendix)
         # - https://personalrobotics.cs.washington.edu/publications/berenson2009cbirrt.pdf (section 4b)
-        E_rpy = np.zeros((6, 6))
-        E_rpy[:3, :3] = np.eye(3)
+        E_rpy = np.eye(6)
         E_rpy[3:6, 3:5] = np.array(
             [
                 [c_y / c_p, s_y / c_p],
@@ -163,6 +163,5 @@ class PoseConstraint(Constraint):
                 [c_y * (s_p / c_p), s_y * (s_p / c_p)],
             ]
         )
-        E_rpy[5, 5] = 1
 
         return E_rpy @ jac
