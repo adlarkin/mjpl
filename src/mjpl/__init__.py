@@ -10,7 +10,7 @@ from .constraint import (
 from .inverse_kinematics import MinkIKSolver
 from .planning.cartesian_planner import cartesian_plan
 from .planning.rrt import RRT
-from .planning.utils import smooth_path
+from .planning.utils import path_length, smooth_path
 from .trajectory import (
     RuckigTrajectoryGenerator,
     ToppraTrajectoryGenerator,
@@ -18,7 +18,6 @@ from .trajectory import (
 )
 from .utils import (
     all_joints,
-    path_length,
     qpos_idx,
     qvel_idx,
     random_config,

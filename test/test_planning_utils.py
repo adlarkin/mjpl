@@ -176,6 +176,15 @@ class TestPlanningUtils(unittest.TestCase):
         for wp in smoothed_waypoints:
             self.assertTrue(mjpl.obeys_constraints(wp, constraints))
 
+    def test_path_length(self):
+        waypoints = [
+            np.array([0.0, 0.0, 0.0]),
+            np.array([1.0, 0.0, 0.0]),
+            np.array([1.0, 1.0, 0.0]),
+            np.array([1.0, 1.0, 1.0]),
+        ]
+        self.assertAlmostEqual(mjpl.path_length(waypoints), 3.0)
+
     def test_constrained_extend_that_reaches_target(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
         constraints = [

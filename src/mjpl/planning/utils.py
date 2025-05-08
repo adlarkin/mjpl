@@ -13,9 +13,35 @@ def smooth_path(
     seed: int | None = None,
     sparse: bool = False,
 ) -> list[np.ndarray]:
+    """Smooth a path subject to constraints.
+
+    This is based on algorithm 3, described here:
+    https://personalrobotics.cs.washington.edu/publications/berenson2009cbirrt.pdf
+
+    Args:
+        waypoints: The waypoints that form the path to be smoothed.
+        constraints: The constraints the smoothed path must obey.
+        eps: The step size that is used for checking constraints when attempting to
+            smooth `waypoints`. If `sparse` is False, this is the maximum distance
+            between waypoints that are added to the smoothed path.
+        num_tries: The maximum number of times to randomly select two waypoints and
+            attempt smoothing between them.
+        seed: The seed for the underlying random number generator.
+        sparse: If True, a "sparse" path is formed. A sparse path only keeps waypoints
+            from the original waypoints list. If False, intermediate waypoints are added
+            in between smoothed waypoints to ensure that the smoothed path has consecutive
+            waypoints that are no further than `eps` apart.
+
+    Returns:
+        A smoothed path based on `waypoints` that obeys `constraints`.
+    """
     smoothed_path = waypoints
     rng = np.random.default_rng(seed=seed)
     for _ in range(num_tries):
+        if len(smoothed_path) == 2:
+            # The first and last waypoints can be directly connected.
+            return smoothed_path
+
         # Randomly select two waypoints to shortcut.
         start = rng.integers(0, len(smoothed_path) - 1)
         end = rng.integers(start + 1, len(smoothed_path))
@@ -45,9 +71,6 @@ def smooth_path(
                         + smoothed_path[end:]
                     )
 
-        if len(smoothed_path) == 2:
-            # The first and last waypoints can be directly connected.
-            break
     return smoothed_path
 
 
@@ -72,6 +95,20 @@ def _constrained_extend(
     eps: float,
     constraints: list[Constraint],
 ) -> np.ndarray:
+    """Extend a tree towards a target configuration, subject to constraints.
+
+    This is based on algorithm 2, described here:
+    https://personalrobotics.cs.washington.edu/publications/berenson2009cbirrt.pdf
+
+    Args:
+        q_target: The target configuration.
+        tree: The tree to extend towards `q_target`.
+        eps: The maximum distance allowed between nodes in `tree`.
+        constraints: The constraints nodes in `tree` must obey.
+
+    Returns:
+        The configuration that `tree` was able to reach.
+    """
     closest_node = tree.nearest_neighbor(q_target)
     q = closest_node.q
     q_old = closest_node.q

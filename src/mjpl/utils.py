@@ -109,18 +109,3 @@ def random_config(
         q[q_idx] = rng.uniform(*model.jnt_range.T)[q_idx]
         q_constrained = apply_constraints(q_init, q, constraints)
     return q_constrained
-
-
-def path_length(waypoints: list[np.ndarray]) -> float:
-    """Compute the path length in configuration space.
-
-    Args:
-        waypoints: A list of waypoints that form the path.
-
-    Returns:
-        The length of the waypoint list in configuration space.
-    """
-    path = np.array(waypoints)
-    diffs = np.diff(path, axis=0)
-    segment_lengths = np.linalg.norm(diffs, axis=1)
-    return np.sum(segment_lengths)

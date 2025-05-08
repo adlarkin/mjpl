@@ -23,14 +23,14 @@ class TestCollisionConstraint(unittest.TestCase):
         # Test a configuration that does not violate the constraint.
         q = np.array([0.0, 0.0])
         self.assertTrue(constraint.valid_config(q))
-        q_constrained = constraint.apply(np.zeros_like(q), q)
+        q_constrained = constraint.apply(np.array([]), q)
         self.assertIsNotNone(q_constrained)
         np.testing.assert_equal(q_constrained, q)
 
         # Test a configuration that violates the constraint.
         q = np.array([0.6, 0.0])
         self.assertFalse(constraint.valid_config(q))
-        self.assertIsNone(constraint.apply(np.zeros_like(q), q))
+        self.assertIsNone(constraint.apply(np.array([]), q))
 
 
 class TestCollisionRuleset(unittest.TestCase):
