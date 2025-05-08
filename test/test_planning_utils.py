@@ -3,18 +3,180 @@ from pathlib import Path
 
 import mujoco
 import numpy as np
+from robot_descriptions.loaders.mujoco import load_robot_description
 
 import mjpl
 from mjpl.planning.tree import Node, Tree
-from mjpl.planning.utils import _combine_paths
+from mjpl.planning.utils import _combine_paths, _constrained_extend, _step
 
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
 _BALL_XML = _MODEL_DIR / "one_dof_ball.xml"
+_BALL_XY_PLANE_XML = _MODEL_DIR / "two_dof_ball.xml"
+
+
+def directly_connectable_waypoints() -> list[np.ndarray]:
+    """
+    Waypoints that can be directly connected between the start and end.
+    "X" represents an obstacle.
+
+    NOTE: This is meant to be used with the two_dof_ball.xml test file.
+
+                  p2 -> p3 --> p4
+                  ^            |
+                  |     X      |
+            p0 -> p1    X      |
+                        X      |
+                               v
+                        p6 <-- p5
+    """
+    p0 = np.array([0.0, 0.0])
+    p1 = np.array([0.25, 0.0])
+    p2 = np.array([0.25, 0.75])
+    p3 = np.array([0.5, 0.75])
+    p4 = np.array([1.0, 0.75])
+    p5 = np.array([1.0, -0.75])
+    p6 = np.array([0.5, -0.75])
+    return [p0, p1, p2, p3, p4, p5, p6]
+
+
+def shortcuttable_waypoints() -> list[np.ndarray]:
+    """
+    Waypoints that can benefit from shortcutting.
+    "X" represents an obstacle.
+
+    NOTE: This is meant to be used with the two_dof_ball.xml test file.
+
+                  p2 -> p3 --> p4
+                  ^            |
+                  |     X      v
+            p0 -> p1    X      p5 -> p6
+                        X
+    """
+    p0 = np.array([0.0, 0.0])
+    p1 = np.array([0.25, 0.0])
+    p2 = np.array([0.25, 1.5])
+    p3 = np.array([0.5, 1.5])
+    p4 = np.array([1.0, 1.5])
+    p5 = np.array([1.0, 0.0])
+    p6 = np.array([1.0, 0.0])
+    return [p0, p1, p2, p3, p4, p5, p6]
 
 
 class TestPlanningUtils(unittest.TestCase):
-    def test_extend(self):
+    def test_smooth_path_on_directly_connectable_path(self):
+        model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
+        constraints = [
+            mjpl.JointLimitConstraint(model),
+            mjpl.CollisionConstraint(model),
+        ]
+        seed = 5
+        eps = 0.1
+
+        waypoints = directly_connectable_waypoints()
+
+        # The first and last waypoints can be connected without violating constraints.
+        shortened_waypoints = mjpl.smooth_path(
+            waypoints, constraints, eps=eps, seed=seed, sparse=False
+        )
+        self.assertLess(
+            mjpl.path_length(shortened_waypoints), mjpl.path_length(waypoints)
+        )
+        self.assertGreater(len(shortened_waypoints), 2)
+        np.testing.assert_equal(shortened_waypoints[0], waypoints[0])
+        np.testing.assert_equal(shortened_waypoints[-1], waypoints[-1])
+        for i in range(1, len(shortened_waypoints)):
+            # Add tolerance to the epsilon check to account for floating point error.
+            self.assertLessEqual(
+                np.linalg.norm(shortened_waypoints[i] - shortened_waypoints[i - 1]),
+                eps + 1e-8,
+            )
+        for wp in shortened_waypoints:
+            self.assertTrue(mjpl.obeys_constraints(wp, constraints))
+
+        # Run smooting on the same path with sparse=True.
+        shortened_waypoints = mjpl.smooth_path(
+            waypoints, constraints, eps=eps, seed=seed, sparse=True
+        )
+        self.assertLess(
+            mjpl.path_length(shortened_waypoints), mjpl.path_length(waypoints)
+        )
+        self.assertListEqual(shortened_waypoints, [waypoints[0], waypoints[-1]])
+
+    def test_smooth_path_around_obstacle(self):
+        model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
+        constraints = [
+            mjpl.JointLimitConstraint(model),
+            mjpl.CollisionConstraint(model),
+        ]
+        seed = 5
+        eps = 0.1
+
+        waypoints = shortcuttable_waypoints()
+
+        smoothed_waypoints = mjpl.smooth_path(
+            waypoints, constraints, eps=eps, seed=seed
+        )
+        self.assertLess(
+            mjpl.path_length(smoothed_waypoints), mjpl.path_length(waypoints)
+        )
+        self.assertGreater(len(smoothed_waypoints), 2)
+        np.testing.assert_equal(smoothed_waypoints[0], waypoints[0])
+        np.testing.assert_equal(smoothed_waypoints[-1], waypoints[-1])
+        for i in range(1, len(smoothed_waypoints)):
+            # Add tolerance to the epsilon check to account for floating point error.
+            self.assertLessEqual(
+                np.linalg.norm(smoothed_waypoints[i] - smoothed_waypoints[i - 1]),
+                eps + 1e-8,
+            )
+        for wp in smoothed_waypoints:
+            self.assertTrue(mjpl.obeys_constraints(wp, constraints))
+
+        # Run smooting on the same path with sparse=True. Since there's an obstacle in
+        # the way, the smoothed path should have more than just the start/end waypoint.
+        smoothed_waypoints = mjpl.smooth_path(
+            waypoints, constraints, eps=eps, seed=seed, sparse=True
+        )
+        self.assertLess(
+            mjpl.path_length(smoothed_waypoints), mjpl.path_length(waypoints)
+        )
+        self.assertGreater(len(smoothed_waypoints), 2)
+        np.testing.assert_equal(smoothed_waypoints[0], waypoints[0])
+        np.testing.assert_equal(smoothed_waypoints[-1], waypoints[-1])
+        for wp in smoothed_waypoints:
+            self.assertTrue(mjpl.obeys_constraints(wp, constraints))
+
+    def test_smooth_path_6dof(self):
+        model = load_robot_description("ur5e_mj_description")
+        constraints = [
+            mjpl.JointLimitConstraint(model),
+            mjpl.CollisionConstraint(model),
+        ]
+        seed = 42
+
+        # Make a path starting from the home config that connects to various random valid configs.
+        waypoints = [model.keyframe("home").qpos.copy()]
+        unique_waypoints = {tuple(waypoints[0])}
+        for i in range(5):
+            q_rand = mjpl.random_config(
+                model, np.zeros(model.nq), mjpl.all_joints(model), seed + i, constraints
+            )
+            waypoints.append(q_rand)
+            hashable_q_rand = tuple(q_rand)
+            self.assertNotIn(hashable_q_rand, unique_waypoints)
+            unique_waypoints.add(tuple(q_rand))
+
+        # Smooth the path.
+        smoothed_waypoints = mjpl.smooth_path(waypoints, constraints, seed=seed)
+        self.assertLess(
+            mjpl.path_length(smoothed_waypoints), mjpl.path_length(waypoints)
+        )
+        np.testing.assert_equal(smoothed_waypoints[0], waypoints[0])
+        np.testing.assert_equal(smoothed_waypoints[-1], waypoints[-1])
+        for wp in smoothed_waypoints:
+            self.assertTrue(mjpl.obeys_constraints(wp, constraints))
+
+    def test_constrained_extend_that_reaches_target(self):
         model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
         constraints = [
             mjpl.JointLimitConstraint(model),
@@ -23,116 +185,82 @@ class TestPlanningUtils(unittest.TestCase):
         epsilon = 0.1
 
         q_init = np.array([-0.1])
-        root_node = Node(q_init)
-        tree = Tree(root_node)
+        tree = Tree(Node(q_init))
 
-        # Test a valid EXTEND.
-        q_goal = np.array([0.5])
-        expected_q_extended = np.array([0.0])
-        extended_node = _extend(q_goal, tree, root_node, epsilon, constraints)
-        self.assertIsNotNone(extended_node)
-        self.assertTrue(mjpl.obeys_constraints(extended_node.q, constraints))
-        self.assertSetEqual(tree.nodes, {root_node, extended_node})
-        np.testing.assert_allclose(
-            extended_node.q, expected_q_extended, rtol=0, atol=1e-9
-        )
-        self.assertTrue(extended_node.parent, root_node)
-
-        # Running EXTEND when q_target == start_node.q should do nothing.
-        existing_nodes = tree.nodes.copy()
-        same_extended_node = _extend(
-            extended_node.q, tree, extended_node, epsilon, constraints
-        )
-        self.assertIsNotNone(same_extended_node)
-        self.assertIn(same_extended_node, existing_nodes)
-        self.assertSetEqual(tree.nodes, existing_nodes)
-
-        # EXTEND should fail if the result of the extension violates constraints
-        # (in this case, a node that is in collision).
-        q_init = np.array([0.75])
-        root_node = Node(q_init)
-        tree = Tree(root_node)
-        extended_node = _extend(np.array([0.9]), tree, root_node, epsilon, constraints)
-        self.assertIsNone(extended_node)
-        self.assertSetEqual(tree.nodes, {root_node})
-
-    def test_connect(self):
-        model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
-        constraints = [
-            mjpl.JointLimitConstraint(model),
-            mjpl.CollisionConstraint(model),
-        ]
-        epsilon = 0.1
-
-        q_init = np.array([-0.1])
-        root_node = Node(q_init)
-        tree = Tree(root_node)
-
-        # Test a valid CONNECT.
+        # Test a constrained extend that should reach the target.
         q_goal = np.array([0.15])
-        connected_node = _connect(q_goal, tree, epsilon, np.inf, constraints)
-        np.testing.assert_allclose(connected_node.q, q_goal, rtol=0, atol=1e-9)
+        q_reached = _constrained_extend(q_goal, tree, epsilon, constraints)
+        np.testing.assert_equal(q_reached, q_goal)
+
         # Check the path from the last connected node.
-        # This implicitly checks each connected node's parent.
+        # This implicitly checks each node's parent.
         expected_path = [
             q_goal,
             np.array([0.1]),
             np.array([0.0]),
             q_init,
         ]
-        path = [n.q for n in tree.get_path(connected_node)]
+        path = [n.q for n in tree.get_path(tree.nearest_neighbor(q_goal))]
         self.assertEqual(len(path), len(expected_path))
         for i in range(len(path)):
             np.testing.assert_allclose(path[i], expected_path[i], rtol=0, atol=1e-9)
 
-        # Running CONNECT when q_target corresponds to a node that's already
-        # in the tree should do nothing.
-        existing_nodes = tree.nodes.copy()
-        same_connected_node = _connect(
-            connected_node.q, tree, epsilon, np.inf, constraints
-        )
-        self.assertIn(same_connected_node, existing_nodes)
-        self.assertSetEqual(tree.nodes, existing_nodes)
-
-        # Test CONNECT with a max connection distance that is < distance from q_init to q_goal.
-        q_init = np.array([0.0])
-        root_node = Node(q_init)
-        tree = Tree(root_node)
-        q_goal = np.array([0.5])
-        max_connection_dist = 0.45
-        max_connected_q = q_init + max_connection_dist
-        connected_node = _connect(
-            q_goal, tree, epsilon, max_connection_dist, constraints
-        )
-        np.testing.assert_allclose(connected_node.q, max_connected_q, rtol=0, atol=1e-9)
-        # Check the path from the last connected node.
-        # This implicitly checks each connected node's parent.
-        expected_path = [
-            max_connected_q,
-            np.array([0.4]),
-            np.array([0.3]),
-            np.array([0.2]),
-            np.array([0.1]),
-            q_init,
+    def test_constrained_extend_that_violates_constraint(self):
+        model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
+        constraints = [
+            mjpl.JointLimitConstraint(model),
+            mjpl.CollisionConstraint(model),
         ]
-        path = [n.q for n in tree.get_path(connected_node)]
-        self.assertEqual(len(path), len(expected_path))
-        for i in range(len(path)):
-            np.testing.assert_allclose(path[i], expected_path[i], rtol=0, atol=1e-9)
+        epsilon = 0.1
 
-        # Test CONNECT with an invalid goal (in this case, one that violates the
-        # collision constraint). CONNECT should stop just before the obstacle.
         q_init = np.array([0.0])
-        root_node = Node(q_init)
-        tree = Tree(root_node)
+        tree = Tree(Node(q_init))
+
         obstacle = model.geom("wall_obstacle")
         obstacle_min_x = obstacle.pos[0] - obstacle.size[0]
+
+        # Test a constrained extend that cannot reach the target due to constraint
+        # violation (in this case, collision). In this case, the q_reach should be
+        # just before the obstacle.
         q_goal = np.array([1.0])
-        connected_node = _connect(q_goal, tree, epsilon, np.inf, constraints)
-        self.assertTrue(mjpl.obeys_constraints(connected_node.q, constraints))
-        self.assertNotEqual(connected_node, root_node)
-        self.assertGreater(len(tree.nodes), 1)
-        np.testing.assert_array_less(connected_node.q, obstacle_min_x)
+        q_reached = _constrained_extend(q_goal, tree, epsilon, constraints)
+        np.testing.assert_array_less(q_init, q_reached)
+        np.testing.assert_array_less(q_reached, obstacle_min_x)
+        np.testing.assert_array_less(q_reached, q_goal)
+
+    def test_constrained_extend_towards_existing_config(self):
+        model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
+        constraints = [
+            mjpl.JointLimitConstraint(model),
+            mjpl.CollisionConstraint(model),
+        ]
+        epsilon = 0.1
+
+        root_node = Node(np.array([0.0]))
+        tree = Tree(root_node)
+
+        # Running constrained extend on a configuration that's already in the tree
+        # should do nothing.
+        q_reached = _constrained_extend(root_node.q, tree, epsilon, constraints)
+        np.testing.assert_equal(q_reached, root_node.q)
+        self.assertSetEqual(tree.nodes, {root_node})
+
+    def test_step(self):
+        start = np.array([0.0, 0.0])
+        target = np.array([0.5, 0.0])
+
+        q_next = _step(start, target, max_step_dist=5.0)
+        np.testing.assert_equal(q_next, target)
+
+        q_next = _step(start, target, max_step_dist=0.1)
+        np.testing.assert_allclose(q_next, np.array([0.1, 0.0]), rtol=0, atol=1e-8)
+
+        q_next = _step(target, target, max_step_dist=np.inf)
+        np.testing.assert_equal(q_next, target)
+
+        with self.assertRaisesRegex(ValueError, "`max_step_dist` must be > 0.0"):
+            _step(start, target, max_step_dist=0.0)
+            _step(start, target, max_step_dist=-1.0)
 
     def test_combine_paths(self):
         root_start = Node(np.array([0.0]))
@@ -152,9 +280,7 @@ class TestPlanningUtils(unittest.TestCase):
             root_goal.q,
         ]
         path = _combine_paths(start_tree, child_start, goal_tree, child_goal)
-        self.assertTrue(len(path), len(expected_path))
-        for i in range(len(path)):
-            np.testing.assert_equal(path[i], expected_path[i])
+        self.assertListEqual(path, expected_path)
 
         # Add a duplicate "merge node".
         q_new = np.array([0.15])
@@ -172,9 +298,7 @@ class TestPlanningUtils(unittest.TestCase):
             root_goal.q,
         ]
         path = _combine_paths(start_tree, grandchild_start, goal_tree, grandchild_goal)
-        self.assertTrue(len(path), len(expected_path))
-        for i in range(len(path)):
-            np.testing.assert_equal(path[i], expected_path[i])
+        self.assertListEqual(path, expected_path)
 
 
 if __name__ == "__main__":

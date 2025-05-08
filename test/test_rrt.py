@@ -157,9 +157,6 @@ class TestRRT(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "epsilon"):
             mjpl.RRT(model, joints, [], epsilon=0.0)
             mjpl.RRT(model, joints, [], epsilon=-1.0)
-        with self.assertRaisesRegex(ValueError, "max_connection_distance"):
-            mjpl.RRT(model, joints, [], max_connection_distance=0.0)
-            mjpl.RRT(model, joints, [], max_connection_distance=-1.0)
         with self.assertRaisesRegex(ValueError, "goal_biasing_probability"):
             mjpl.RRT(model, joints, [], goal_biasing_probability=-1.0)
             mjpl.RRT(model, joints, [], goal_biasing_probability=2.0)

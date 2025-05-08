@@ -187,7 +187,7 @@ class RRT:
             goal_tree.add_node(n)
 
         rng = np.random.default_rng(seed=self.seed)
-        t_a, t_b = start_tree, goal_tree
+        tree_a, tree_b = start_tree, goal_tree
         swapped = False
 
         start_time = time.time()
@@ -205,31 +205,28 @@ class RRT:
                 q_rand[q_idx] = rng.uniform(*self.model.jnt_range.T)[q_idx]
 
             # Run constrained extend on both trees.
-            nn_a = t_a.nearest_neighbor(q_rand)
             q_reached_a = _constrained_extend(
                 q_rand,
-                nn_a,
-                t_a,
+                tree_a,
                 self.epsilon,
                 self.constraints,
             )
-            nn_b = t_b.nearest_neighbor(q_reached_a)
             q_reached_b = _constrained_extend(
                 q_reached_a,
-                nn_b,
-                t_b,
+                tree_b,
                 self.epsilon,
                 self.constraints,
             )
             if np.array_equal(q_reached_a, q_reached_b):
-                if swapped:
-                    t_a, t_b = t_b, t_a
-                node_a = start_tree.nearest_neighbor(q_reached_a)
-                node_b = goal_tree.nearest_neighbor(q_reached_b)
-                return _combine_paths(t_a, node_a, t_b, node_b)
+                return _combine_paths(
+                    start_tree,
+                    start_tree.nearest_neighbor(q_reached_a),
+                    goal_tree,
+                    goal_tree.nearest_neighbor(q_reached_a),
+                )
 
             # Swap trees.
-            t_a, t_b = t_b, t_a
+            tree_a, tree_b = tree_b, tree_a
             swapped = not swapped
 
         return []

@@ -6,27 +6,6 @@ from .constraint.constraint_interface import Constraint
 from .constraint.utils import apply_constraints
 
 
-def step(start: np.ndarray, target: np.ndarray, max_step_dist: float) -> np.ndarray:
-    """Step a vector towards a target.
-
-    Args:
-        start: The start vector.
-        target: The target.
-        max_step_dist: Maximum amount to step towards `target`.
-
-    Return:
-        A vector that has taken a step towards `target` from `start`.
-    """
-    if max_step_dist <= 0.0:
-        raise ValueError("`max_step_dist` must be > 0.0")
-    if np.array_equal(start, target):
-        return target.copy()
-    direction = target - start
-    magnitude = np.linalg.norm(direction)
-    unit_vec = direction / magnitude
-    return start + (unit_vec * min(max_step_dist, magnitude))
-
-
 def all_joints(model: mujoco.MjModel) -> list[str]:
     """Get all joint names in a MuJoCo model.
 

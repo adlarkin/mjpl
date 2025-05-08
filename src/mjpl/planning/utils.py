@@ -1,6 +1,5 @@
 import numpy as np
 
-from .. import utils
 from ..constraint.constraint_interface import Constraint
 from ..constraint.utils import apply_constraints
 from .tree import Node, Tree
@@ -20,25 +19,19 @@ def smooth_path(
         # Randomly select two waypoints to shortcut.
         start = rng.integers(0, len(smoothed_path) - 1)
         end = rng.integers(start + 1, len(smoothed_path))
-        assert start < end
-        assert start >= 0 and start < len(smoothed_path) - 1
-        assert end < len(smoothed_path)
 
         # See if the randomly selected waypoints can be connected without violating
         # constraints.
-        node = Node(smoothed_path[start])
-        tree = Tree(node)
-        q_reached = _constrained_extend(
-            smoothed_path[end], node, tree, eps, constraints
-        )
+        tree = Tree(Node(smoothed_path[start]))
+        q_reached = _constrained_extend(smoothed_path[end], tree, eps, constraints)
         if np.array_equal(q_reached, smoothed_path[end]):
             # Form a direct connection between the two waypoints if it shortens path
             # length. This check must be performed since constraints project
             # configurations in an arbitrary way.
             end_node = tree.nearest_neighbor(q_reached)
             shortcut_path_segment = [n.q for n in tree.get_path(end_node)]
-            shortcut_length = utils.path_length(shortcut_path_segment)
-            original_length = utils.path_length(smoothed_path[start : end + 1])
+            shortcut_length = path_length(shortcut_path_segment)
+            original_length = path_length(smoothed_path[start : end + 1])
             if shortcut_length < original_length:
                 # tree.get_path gives order from the specified node to the tree's root,
                 # so we must reverse it to get ordering starting from the root.
@@ -58,22 +51,36 @@ def smooth_path(
     return smoothed_path
 
 
+def path_length(waypoints: list[np.ndarray]) -> float:
+    """Compute the path length in configuration space.
+
+    Args:
+        waypoints: A list of waypoints that form the path.
+
+    Returns:
+        The length of the waypoint list in configuration space.
+    """
+    path = np.array(waypoints)
+    diffs = np.diff(path, axis=0)
+    segment_lengths = np.linalg.norm(diffs, axis=1)
+    return np.sum(segment_lengths)
+
+
 def _constrained_extend(
     q_target: np.ndarray,
-    nearest_node: Node,
     tree: Tree,
     eps: float,
     constraints: list[Constraint],
 ) -> np.ndarray:
-    q = nearest_node.q
-    q_old = nearest_node.q
-    closest_node = nearest_node
+    closest_node = tree.nearest_neighbor(q_target)
+    q = closest_node.q
+    q_old = closest_node.q
 
     while True:
         if np.array_equal(q_target, q):
             return q
 
-        q = utils.step(q, q_target, eps)
+        q = _step(q, q_target, eps)
         q = apply_constraints(q_old, q, constraints)
 
         # Terminate if:
@@ -90,6 +97,27 @@ def _constrained_extend(
         closest_node = Node(q, closest_node)
         tree.add_node(closest_node)
         q_old = q
+
+
+def _step(start: np.ndarray, target: np.ndarray, max_step_dist: float) -> np.ndarray:
+    """Step a vector towards a target.
+
+    Args:
+        start: The start vector.
+        target: The target.
+        max_step_dist: Maximum amount to step towards `target`.
+
+    Return:
+        A vector that has taken a step towards `target` from `start`.
+    """
+    if max_step_dist <= 0.0:
+        raise ValueError("`max_step_dist` must be > 0.0")
+    if np.array_equal(start, target):
+        return target.copy()
+    direction = target - start
+    magnitude = np.linalg.norm(direction)
+    unit_vec = direction / magnitude
+    return start + (unit_vec * min(max_step_dist, magnitude))
 
 
 def _combine_paths(
