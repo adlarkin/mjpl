@@ -24,24 +24,25 @@ def smooth_path(
         eps: The step size that is used for checking constraints when attempting to
             smooth `waypoints`. If `sparse` is False, this is the maximum distance
             between waypoints that are added to the smoothed path.
-        num_tries: The maximum number of times to randomly select two waypoints and
-            attempt smoothing between them.
+        num_tries: The number of times to randomly select two waypoints and attempt
+            smoothing between them.
         seed: The seed for the underlying random number generator.
         sparse: If True, a "sparse" path is formed. A sparse path only keeps waypoints
-            from the original waypoints list. If False, intermediate waypoints are added
+            from the original waypoints list. If False, constrained waypoints are added
             in between smoothed waypoints to ensure that the smoothed path has consecutive
             waypoints that are no further than `eps` apart.
 
     Returns:
         A smoothed path based on `waypoints` that obeys `constraints`.
     """
+    if eps <= 0.0:
+        raise ValueError("`eps` must be > 0.")
+    if num_tries <= 0:
+        raise ValueError("`num_tries` must be > 0.")
+
     smoothed_path = waypoints
     rng = np.random.default_rng(seed=seed)
     for _ in range(num_tries):
-        if len(smoothed_path) == 2:
-            # The first and last waypoints can be directly connected.
-            return smoothed_path
-
         # Randomly select two waypoints to shortcut.
         start = rng.integers(0, len(smoothed_path) - 1)
         end = rng.integers(start + 1, len(smoothed_path))
@@ -50,26 +51,28 @@ def smooth_path(
         # constraints.
         tree = Tree(Node(smoothed_path[start]))
         q_reached = _constrained_extend(smoothed_path[end], tree, eps, constraints)
-        if np.array_equal(q_reached, smoothed_path[end]):
-            # Form a direct connection between the two waypoints if it shortens path
-            # length. This check must be performed since constraints project
-            # configurations in an arbitrary way.
-            end_node = tree.nearest_neighbor(q_reached)
-            shortcut_path_segment = [n.q for n in tree.get_path(end_node)]
-            shortcut_length = path_length(shortcut_path_segment)
-            original_length = path_length(smoothed_path[start : end + 1])
-            if shortcut_length < original_length:
-                # tree.get_path gives order from the specified node to the tree's root,
-                # so we must reverse it to get ordering starting from the root.
-                shortcut_path_segment.reverse()
-                if sparse:
-                    smoothed_path = smoothed_path[: start + 1] + smoothed_path[end:]
-                else:
-                    smoothed_path = (
-                        smoothed_path[:start]
-                        + shortcut_path_segment[:-1]
-                        + smoothed_path[end:]
-                    )
+        if not np.array_equal(q_reached, smoothed_path[end]):
+            continue
+
+        # Form a direct connection between the two waypoints if it shortens path
+        # length. This check must be performed since constraints project
+        # configurations in an arbitrary way.
+        end_node = tree.nearest_neighbor(q_reached)
+        shortcut_path_segment = [n.q for n in tree.get_path(end_node)]
+        shortcut_length = path_length(shortcut_path_segment)
+        original_length = path_length(smoothed_path[start : end + 1])
+        if shortcut_length < original_length:
+            # tree.get_path gives order from the specified node to the tree's root,
+            # so we must reverse it to get ordering starting from the root.
+            shortcut_path_segment.reverse()
+            if sparse:
+                smoothed_path = smoothed_path[: start + 1] + smoothed_path[end:]
+            else:
+                smoothed_path = (
+                    smoothed_path[:start]
+                    + shortcut_path_segment[:-1]
+                    + smoothed_path[end:]
+                )
 
     return smoothed_path
 
@@ -150,7 +153,7 @@ def _step(start: np.ndarray, target: np.ndarray, max_step_dist: float) -> np.nda
     if max_step_dist <= 0.0:
         raise ValueError("`max_step_dist` must be > 0.0")
     if np.array_equal(start, target):
-        return target.copy()
+        return start
     direction = target - start
     magnitude = np.linalg.norm(direction)
     unit_vec = direction / magnitude

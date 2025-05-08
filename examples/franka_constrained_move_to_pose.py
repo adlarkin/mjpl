@@ -16,7 +16,8 @@ _PANDA_EE_SITE = "ee_site"
 
 def main():
     visualize, seed = ex_utils.parse_args(
-        description="Compute and follow a trajectory to a goal pose."
+        description="Compute and follow a trajectory to a goal pose that enforces a "
+        "pose constraint on the arm's end-effector."
     )
 
     model = mujoco.MjModel.from_xml_path(_PANDA_XML.as_posix())
@@ -58,7 +59,7 @@ def main():
         mjpl.CollisionConstraint(model, allowed_collisions),
     ]
 
-    # Generate a valid goal pose that's derived from a valid joint configuration.
+    # Generate a goal pose that's derived from a valid joint configuration.
     # The pose constraint only allows configurations w.r.t. some distance (q_step)
     # from a previous configuration (in this case, q_init). Since we want to set a
     # random configuration at any distance from q_init, temporarily set the pose

@@ -8,7 +8,7 @@ from .joint_limit_constraint import JointLimitConstraint
 
 
 class PoseConstraint(Constraint):
-    """Constraint that enforces pose constraints on an end-effector.
+    """Constraint that enforces pose constraints on a site.
 
     This is done through a projection technique that's described in section 4a/4b here:
     https://personalrobotics.cs.washington.edu/publications/berenson2009cbirrt.pdf
@@ -44,8 +44,8 @@ class PoseConstraint(Constraint):
             yaw: (min, max) allowed yaw, in radians.
             tolerance: The maximum allowed deviation `site` may have from the
                 pose constraints.
-            q_step: The maximum distance (in joint space) the constrained configuration
-                can be from another configuration.
+            q_step: The maximum distance (in configuration space) the constrained
+                configuration can be from another configuration.
         """
         if tolerance < 0.0:
             raise ValueError("`tolerance` must be >= 0.")
@@ -57,6 +57,8 @@ class PoseConstraint(Constraint):
             [x_translation, y_translation, z_translation, roll, pitch, yaw]
         )
         # reference_frame is world_T_C (C = constraint frame)
+        # For more information about the notation being used here, see:
+        # https://manipulation.csail.mit.edu/pick.html#monogram
         self.C_T_world = reference_frame.inverse()
         self.site = site
         self.tolerance = tolerance
@@ -70,16 +72,16 @@ class PoseConstraint(Constraint):
         if not self.joint_limit_constraint.valid_config(q):
             return False
         dx = self._displacement_from_constraint(q)
-        return np.linalg.norm(dx) < self.tolerance
+        return np.linalg.norm(dx) <= self.tolerance
 
     def apply(self, q_old: np.ndarray, q: np.ndarray) -> np.ndarray | None:
         q_projected = q
         while True:
             dx = self._displacement_from_constraint(q_projected)
-            if np.linalg.norm(dx) < self.tolerance:
+            if np.linalg.norm(dx) <= self.tolerance:
                 return q_projected
             J = self._get_jacobian(q_projected)
-            # Use pseudo-inverse in case we have a singular matrix.
+            # Use pseudo-inverse in case J is singular.
             q_err = J.T @ np.linalg.pinv(J @ J.T) @ dx
             q_projected = q_projected - q_err
             violates_limits = not self.joint_limit_constraint.valid_config(q_projected)
@@ -124,7 +126,7 @@ class PoseConstraint(Constraint):
         return delta_X
 
     def _get_jacobian(self, q: np.ndarray) -> np.ndarray:
-        """Get the RPY Jacobian of the end-effector site.
+        """Get the RPY Jacobian of the site.
 
         Args:
             q: The configuration.

@@ -11,8 +11,8 @@ from mjpl.planning.utils import _combine_paths, _constrained_extend, _step
 
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
-_BALL_XML = _MODEL_DIR / "one_dof_ball.xml"
-_BALL_XY_PLANE_XML = _MODEL_DIR / "two_dof_ball.xml"
+_ONE_DOF_BALL_XML = _MODEL_DIR / "one_dof_ball.xml"
+_TWO_DOF_BALL_XML = _MODEL_DIR / "two_dof_ball.xml"
 
 
 def directly_connectable_waypoints() -> list[np.ndarray]:
@@ -65,7 +65,7 @@ def shortcuttable_waypoints() -> list[np.ndarray]:
 
 class TestPlanningUtils(unittest.TestCase):
     def test_smooth_path_on_directly_connectable_path(self):
-        model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
+        model = mujoco.MjModel.from_xml_path(_TWO_DOF_BALL_XML.as_posix())
         constraints = [
             mjpl.JointLimitConstraint(model),
             mjpl.CollisionConstraint(model),
@@ -77,7 +77,7 @@ class TestPlanningUtils(unittest.TestCase):
 
         # The first and last waypoints can be connected without violating constraints.
         shortened_waypoints = mjpl.smooth_path(
-            waypoints, constraints, eps=eps, seed=seed, sparse=False
+            waypoints, constraints, eps=eps, seed=seed
         )
         self.assertLess(
             mjpl.path_length(shortened_waypoints), mjpl.path_length(waypoints)
@@ -104,7 +104,7 @@ class TestPlanningUtils(unittest.TestCase):
         self.assertListEqual(shortened_waypoints, [waypoints[0], waypoints[-1]])
 
     def test_smooth_path_around_obstacle(self):
-        model = mujoco.MjModel.from_xml_path(_BALL_XY_PLANE_XML.as_posix())
+        model = mujoco.MjModel.from_xml_path(_TWO_DOF_BALL_XML.as_posix())
         constraints = [
             mjpl.JointLimitConstraint(model),
             mjpl.CollisionConstraint(model),
@@ -186,7 +186,7 @@ class TestPlanningUtils(unittest.TestCase):
         self.assertAlmostEqual(mjpl.path_length(waypoints), 3.0)
 
     def test_constrained_extend_that_reaches_target(self):
-        model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
+        model = mujoco.MjModel.from_xml_path(_ONE_DOF_BALL_XML.as_posix())
         constraints = [
             mjpl.JointLimitConstraint(model),
             mjpl.CollisionConstraint(model),
@@ -215,7 +215,7 @@ class TestPlanningUtils(unittest.TestCase):
             np.testing.assert_allclose(path[i], expected_path[i], rtol=0, atol=1e-9)
 
     def test_constrained_extend_that_violates_constraint(self):
-        model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
+        model = mujoco.MjModel.from_xml_path(_ONE_DOF_BALL_XML.as_posix())
         constraints = [
             mjpl.JointLimitConstraint(model),
             mjpl.CollisionConstraint(model),
@@ -229,8 +229,7 @@ class TestPlanningUtils(unittest.TestCase):
         obstacle_min_x = obstacle.pos[0] - obstacle.size[0]
 
         # Test a constrained extend that cannot reach the target due to constraint
-        # violation (in this case, collision). In this case, the q_reach should be
-        # just before the obstacle.
+        # violation (in this case, collision). q_reached should be just before the obstacle.
         q_goal = np.array([1.0])
         q_reached = _constrained_extend(q_goal, tree, epsilon, constraints)
         np.testing.assert_array_less(q_init, q_reached)
@@ -238,7 +237,7 @@ class TestPlanningUtils(unittest.TestCase):
         np.testing.assert_array_less(q_reached, q_goal)
 
     def test_constrained_extend_towards_existing_config(self):
-        model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
+        model = mujoco.MjModel.from_xml_path(_ONE_DOF_BALL_XML.as_posix())
         constraints = [
             mjpl.JointLimitConstraint(model),
             mjpl.CollisionConstraint(model),

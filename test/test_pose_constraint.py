@@ -100,20 +100,22 @@ class TestPoseConstraint(unittest.TestCase):
         mujoco.mj_kinematics(model, data)
         constrained_pose = mjpl.site_pose(data, site_name)
         constrained_rpy = constrained_pose.rotation().as_rpy_radians()
-        self.assertLessEqual(constrained_rpy.roll, ee_init_rpy.roll + rotation_limit[1])
         self.assertGreaterEqual(
             constrained_rpy.roll, ee_init_rpy.roll + rotation_limit[0]
+        )
+        self.assertLessEqual(constrained_rpy.roll, ee_init_rpy.roll + rotation_limit[1])
+        self.assertGreaterEqual(
+            constrained_rpy.pitch, ee_init_rpy.pitch + rotation_limit[0]
         )
         self.assertLessEqual(
             constrained_rpy.pitch, ee_init_rpy.pitch + rotation_limit[1]
         )
-        self.assertGreaterEqual(
-            constrained_rpy.pitch, ee_init_rpy.pitch + rotation_limit[0]
-        )
 
         # Decreasing the pose constraint's q_step means trying to constrain a configuration
         # that's too far away from a previous configuration should fail.
-        pose_constraint.q_step = 1e-5
+        small_q_step = 1e-5
+        self.assertGreater(np.linalg.norm(q_constrained - q_init), small_q_step)
+        pose_constraint.q_step = small_q_step
         q_constrained = pose_constraint.apply(q_init, q_rand)
         self.assertIsNone(q_constrained)
 
