@@ -101,9 +101,7 @@ def main():
 
     print("Generating trajectory...")
     start = time.time()
-    trajectory = mjpl.generate_constrained_trajectory(
-        shortcut_waypoints, traj_generator, constraints
-    )
+    trajectory = traj_generator.generate_trajectory(shortcut_waypoints)
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
     # Actuator indices in data.ctrl that correspond to the joints in the trajectory.

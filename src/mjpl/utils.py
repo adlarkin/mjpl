@@ -86,7 +86,7 @@ def random_config(
     Args:
         model: MuJoCo model.
         q_init: Initial joint configuration. Used to set values for joints that are
-            not in `joints`.
+            not in `joints`, and also used as q_old when calling `Constraint.Apply`.
         joints: The joints to set random values for.
         seed: Seed used for random number generation.
         constraints: Constraints the randomly generated configuration must obey.
@@ -99,13 +99,8 @@ def random_config(
     rng = np.random.default_rng(seed=seed)
 
     q = q_init.copy()
-    q[q_idx] = rng.uniform(*model.jnt_range.T)[q_idx]
-
-    # TODO: revisit this. Here (and a few lines below) I am using q_init for q_old
-    # to obey API changes (I think that's actually ok) - if I stick with this,
-    # maybe make a note of it in docs above for the `q_init` arg?
-    q_constrained = apply_constraints(q_init, q, constraints)
-    while q_constrained is None:
+    while True:
         q[q_idx] = rng.uniform(*model.jnt_range.T)[q_idx]
         q_constrained = apply_constraints(q_init, q, constraints)
-    return q_constrained
+        if q_constrained is not None:
+            return q_constrained

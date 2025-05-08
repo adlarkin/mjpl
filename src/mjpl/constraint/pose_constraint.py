@@ -72,8 +72,6 @@ class PoseConstraint(Constraint):
         dx = self._displacement_from_constraint(q)
         return np.linalg.norm(dx) < self.tolerance
 
-    # TODO: make q_old np.ndarray | None?
-    # This means constraint interface would have to be updated
     def apply(self, q_old: np.ndarray, q: np.ndarray) -> np.ndarray | None:
         q_projected = q
         while True:
