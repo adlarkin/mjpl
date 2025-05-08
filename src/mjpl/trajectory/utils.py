@@ -40,6 +40,9 @@ def generate_constrained_trajectory(
                 # corresponds to the trajectory position that violates the constraints.
                 path_timestamps = _waypoint_timing(waypoints, traj)
                 trajectory_timestamp = (i + 1) * traj.dt
+                # TODO: pass in constraints here so that constraints can be applied
+                # to the intermediate waypoints? (this would do nothing for rejection
+                # constraints, but could do something for projection constraints)
                 _add_intermediate_waypoint(
                     waypoints, path_timestamps, trajectory_timestamp
                 )

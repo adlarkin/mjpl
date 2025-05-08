@@ -44,10 +44,15 @@ def main():
     home_keyframe = model.keyframe("home")
     q_init = home_keyframe.qpos.copy()
 
-    # From the initial state, generate a valid goal configuration.
-    data = mujoco.MjData(model)
-    mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
+    # Generate a valid goal pose that's derived from a valid joint configuration.
+    # The pose constraint only allows configurations w.r.t. some distance (q_step)
+    # from a previous configuration (in this case, q_init). Since we want to set a
+    # random configuration at any distance from q_init, temporarily set the pose
+    # constraint's q_step to infinity.
+    q_step = ee_pose_constraint.q_step
+    ee_pose_constraint.q_step = np.inf
     q_goal = mjpl.random_config(model, q_init, arm_joints, seed, constraints)
+    ee_pose_constraint.q_step = q_step
 
     # Set up the planner.
     planner = mjpl.RRT(
@@ -64,23 +69,18 @@ def main():
 
     print("Shortcutting...")
     start = time.time()
-    shortcut_waypoints = mjpl.shortcut(
-        waypoints,
-        constraints,
-        validation_dist=planner.epsilon,
-        max_attempts=len(waypoints),
-        seed=seed,
+    shortcut_waypoints = mjpl.smooth_path(
+        waypoints, constraints, planner.epsilon, seed=seed
     )
     print(f"Shortcutting took {(time.time() - start):.4f}s")
 
     # The trajectory limits used here are for demonstration purposes only.
     # In practice, consult your hardware spec sheet for this information.
     dof = len(waypoints[0])
-    traj_generator = mjpl.RuckigTrajectoryGenerator(
+    traj_generator = mjpl.ToppraTrajectoryGenerator(
         dt=model.opt.timestep,
-        max_velocity=np.ones(dof) * np.pi,
-        max_acceleration=np.ones(dof) * 0.5 * np.pi,
-        max_jerk=np.ones(dof),
+        max_velocity=np.ones(dof) * 0.5 * np.pi,
+        max_acceleration=np.ones(dof) * 0.25 * np.pi,
     )
 
     print("Generating trajectory...")

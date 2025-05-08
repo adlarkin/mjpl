@@ -58,10 +58,15 @@ def main():
         mjpl.CollisionConstraint(model, allowed_collisions),
     ]
 
-    # From the initial state, generate a valid goal pose that's derived from a
-    # valid joint configuration.
-    mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
+    # Generate a valid goal pose that's derived from a valid joint configuration.
+    # The pose constraint only allows configurations w.r.t. some distance (q_step)
+    # from a previous configuration (in this case, q_init). Since we want to set a
+    # random configuration at any distance from q_init, temporarily set the pose
+    # constraint's q_step to infinity.
+    q_step = ee_pose_constraint.q_step
+    ee_pose_constraint.q_step = np.inf
     data.qpos = mjpl.random_config(model, q_init, arm_joints, seed, constraints)
+    ee_pose_constraint.q_step = q_step
     mujoco.mj_kinematics(model, data)
     goal_pose = mjpl.site_pose(data, _PANDA_EE_SITE)
 

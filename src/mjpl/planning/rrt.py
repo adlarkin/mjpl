@@ -212,7 +212,6 @@ class RRT:
                 t_a,
                 self.epsilon,
                 self.constraints,
-                self.max_planning_time - (time.time() - start_time),
             )
             nn_b = t_b.nearest_neighbor(q_reached_a)
             q_reached_b = _constrained_extend(
@@ -221,7 +220,6 @@ class RRT:
                 t_b,
                 self.epsilon,
                 self.constraints,
-                self.max_planning_time - (time.time() - start_time),
             )
             if np.array_equal(q_reached_a, q_reached_b):
                 if swapped:

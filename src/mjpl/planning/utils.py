@@ -1,5 +1,3 @@
-import time
-
 import numpy as np
 
 from .. import utils
@@ -14,6 +12,7 @@ def smooth_path(
     eps: float = 0.05,
     num_tries: int = 100,
     seed: int | None = None,
+    sparse: bool = False,
 ) -> list[np.ndarray]:
     smoothed_path = waypoints
     rng = np.random.default_rng(seed=seed)
@@ -30,7 +29,7 @@ def smooth_path(
         node = Node(smoothed_path[start])
         tree = Tree(node)
         q_reached = _constrained_extend(
-            smoothed_path[end], node, tree, eps, constraints, np.inf
+            smoothed_path[end], node, tree, eps, constraints
         )
         if np.array_equal(q_reached, smoothed_path[end]):
             # Form a direct connection between the two waypoints if it shortens path
@@ -41,19 +40,18 @@ def smooth_path(
             shortcut_length = utils.path_length(shortcut_path_segment)
             original_length = utils.path_length(smoothed_path[start : end + 1])
             if shortcut_length < original_length:
+                # tree.get_path gives order from the specified node to the tree's root,
+                # so we must reverse it to get ordering starting from the root.
                 shortcut_path_segment.reverse()
-                smoothed_path = (
-                    smoothed_path[:start]
-                    + shortcut_path_segment[:-1]
-                    + smoothed_path[end:]
-                )
-                # TODO: use the code below instead? This would create a "sparse" path.
-                # The issue though is that generate_constrained_trajectory takes a long
-                # time (or soemtimes even times out) when the path is too sparse
-                #
-                # smoothed_path = smoothed_path[: start + 1] + smoothed_path[end:]
+                if sparse:
+                    smoothed_path = smoothed_path[: start + 1] + smoothed_path[end:]
+                else:
+                    smoothed_path = (
+                        smoothed_path[:start]
+                        + shortcut_path_segment[:-1]
+                        + smoothed_path[end:]
+                    )
 
-        # TODO: remove this if I don't make a "sparse" path (see TODO above)
         if len(smoothed_path) == 2:
             # The first and last waypoints can be directly connected.
             break
@@ -66,32 +64,32 @@ def _constrained_extend(
     tree: Tree,
     eps: float,
     constraints: list[Constraint],
-    max_time: float,
 ) -> np.ndarray:
     q = nearest_node.q
     q_old = nearest_node.q
     closest_node = nearest_node
 
-    start_time = time.time()
-    while time.time() - start_time < max_time:
+    while True:
         if np.array_equal(q_target, q):
             return q
-        # TODO: re-visit if this is needed? It seems like q and q_old are always
-        # the same at this point based on how the algorithm is written in the paper
-        if np.linalg.norm(q_target - q) > np.linalg.norm(q_old - q_target):
-            return q_old
+
         q = utils.step(q, q_target, eps)
         q = apply_constraints(q_old, q, constraints)
-        if q is not None:
-            closest_node = Node(q, closest_node)
-            # Applying constraints can result in redundant configurations.
-            if closest_node in tree:
-                return q
-            tree.add_node(closest_node)
-            q_old = q
-        else:
+
+        # Terminate if:
+        # - Applying constraints failed
+        # - The configuration is the same as q_old after applying constraints
+        # - Applying constraints gives a configuration that deviates from q_target
+        if (
+            q is None
+            or np.linalg.norm(q - q_old) < 1e-8
+            or np.linalg.norm(q_target - q) > np.linalg.norm(q_target - q_old)
+        ):
             return q_old
-    return q
+
+        closest_node = Node(q, closest_node)
+        tree.add_node(closest_node)
+        q_old = q
 
 
 def _combine_paths(
