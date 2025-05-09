@@ -97,6 +97,7 @@ def _constrained_extend(
     tree: Tree,
     eps: float,
     constraints: list[Constraint],
+    equality_threshold: float = 1e-8,
 ) -> np.ndarray:
     """Extend a tree towards a target configuration, subject to constraints.
 
@@ -108,6 +109,10 @@ def _constrained_extend(
         tree: The tree to extend towards `q_target`.
         eps: The maximum distance allowed between nodes in `tree`.
         constraints: The constraints nodes in `tree` must obey.
+        equality_threshold: Configuration distance threshold for determining whether or
+            not a constrained configuration is equivalent to its previous configuration.
+            Used as termination criteria for handling things like local minima in
+            constraint functions.
 
     Returns:
         The configuration that `tree` was able to reach.
@@ -129,7 +134,7 @@ def _constrained_extend(
         # - Applying constraints gives a configuration that deviates from q_target
         if (
             q is None
-            or np.linalg.norm(q - q_old) < 1e-8
+            or np.linalg.norm(q - q_old) < equality_threshold
             or np.linalg.norm(q_target - q) > np.linalg.norm(q_target - q_old)
         ):
             return q_old

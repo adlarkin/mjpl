@@ -110,18 +110,17 @@ class PoseConstraint(Constraint):
 
         d_C = np.zeros((6,))
         d_C[:3] = C_T_site.translation()
-        d_C[3] = rpy.roll
-        d_C[4] = rpy.pitch
-        d_C[5] = rpy.yaw
+        d_C[3:] = [rpy.roll, rpy.pitch, rpy.yaw]
+
+        c_min = self.C[:, 0]
+        c_max = self.C[:, 1]
+
+        over = d_C > c_max
+        under = d_C < c_min
 
         delta_X = np.zeros_like(d_C)
-        for i in range(delta_X.size):
-            c_min = self.C[i, 0]
-            c_max = self.C[i, 1]
-            if d_C[i] > c_max:
-                delta_X[i] = d_C[i] - c_max
-            elif d_C[i] < c_min:
-                delta_X[i] = d_C[i] - c_min
+        delta_X[over] = d_C[over] - c_max[over]
+        delta_X[under] = d_C[under] - c_min[under]
 
         return delta_X
 
@@ -144,24 +143,31 @@ class PoseConstraint(Constraint):
         jac = np.zeros((6, self.model.nv))
         mujoco.mj_jacSite(self.model, self.data, jac[:3], jac[3:], self.site_id)
 
+        # Apply linear transformation to get the RPY Jacobian.
         world_T_site = utils.site_pose(self.data, self.site)
         rpy = world_T_site.rotation().as_rpy_radians()
+        return _e_rpy(rpy) @ jac
 
-        c_p = np.cos(rpy.pitch)
-        c_y = np.cos(rpy.yaw)
-        s_p = np.sin(rpy.pitch)
-        s_y = np.sin(rpy.yaw)
 
-        # Define a linear transformation that converts angular velocities to RPY:
-        # - https://ieeexplore.ieee.org/document/4399305 (appendix)
-        # - https://personalrobotics.cs.washington.edu/publications/berenson2009cbirrt.pdf (section 4b)
-        E_rpy = np.eye(6)
-        E_rpy[3:6, 3:5] = np.array(
-            [
-                [c_y / c_p, s_y / c_p],
-                [-s_y, c_p],
-                [c_y * (s_p / c_p), s_y * (s_p / c_p)],
-            ]
-        )
+def _e_rpy(rpy: mink.lie.so3.RollPitchYaw):
+    """Linear transformation that converts angular velocity Jacobian to RPY Jacobian.
 
-        return E_rpy @ jac
+    Additional information:
+    - https://ieeexplore.ieee.org/document/4399305 (appendix)
+    - https://personalrobotics.cs.washington.edu/publications/berenson2009cbirrt.pdf (section 4b)
+    """
+    c_p = np.cos(rpy.pitch)
+    c_y = np.cos(rpy.yaw)
+    s_p = np.sin(rpy.pitch)
+    s_y = np.sin(rpy.yaw)
+
+    E_rpy = np.eye(6)
+    E_rpy[3:6, 3:5] = np.array(
+        [
+            [c_y / c_p, s_y / c_p],
+            [-s_y, c_p],
+            [c_y * (s_p / c_p), s_y * (s_p / c_p)],
+        ]
+    )
+
+    return E_rpy
