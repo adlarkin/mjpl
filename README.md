@@ -2,18 +2,19 @@
 
 MuJoCo motion planning library.
 
-> [!Note] This project is under active development.
+> [!Note]
+> This project is under active development.
 > APIs may change, and features are still a work in progress.
 
 Features:
 - Joint-space planning via bi-directional RRT, with support for constraints
 - Cartesian-space planning
-- [`Constraint` interface](./src/mjpl/constraint/constraint_interface.py), which allows for defining arbitrary constraints
-- [`IKSolver` interface](./src/mjpl/inverse_kinematics/ik_solver_interface.py), which can be used for planning to pose targets
-- Trajectory generation via a [`TrajectoryGenerator` interface](./src/mjpl/trajectory/trajectory_interface.py)
+- [Constraint interface](./src/mjpl/constraint/constraint_interface.py), which allows for defining arbitrary constraints
+- [IKSolver interface](./src/mjpl/inverse_kinematics/ik_solver_interface.py), which can be used for planning to pose targets
+- Trajectory generation via a [TrajectoryGenerator interface](./src/mjpl/trajectory/trajectory_interface.py)
 
 Limitations:
-- This library is designed for manipulator models that are composed of hinge/slide joints, and will not work with models that have ball/free joints (see #80 for more info).
+- This library is designed for manipulator models that are composed of hinge/slide joints, and will not work with models that have ball/free joints.
 
 ## Getting started
 
@@ -68,7 +69,7 @@ git commit --no-verify -m "your message"
 
 ## Acknowledgements:
 
-Thank you Sebastian Castro (@sea-bass) for the guidance and support that has been offered throughout the early stages of this project.
+Thank you Sebastian Castro for the guidance and support that has been offered throughout the early stages of this project.
 If you find this library useful or interesting, consider checking out Sebastian's [pyroboplan](https://github.com/sea-bass/pyroboplan), which offers similar features via [Pinnochio](https://github.com/stack-of-tasks/pinocchio)!
 
 Here is more information about the algorithms and third party libraries used in `mjpl`:
