@@ -62,12 +62,12 @@ def smooth_path(
         shortcut_length = path_length(shortcut_path_segment)
         original_length = path_length(smoothed_path[start : end + 1])
         if shortcut_length < original_length:
-            # tree.get_path gives order from the specified node to the tree's root,
-            # so we must reverse it to get ordering starting from the root.
-            shortcut_path_segment.reverse()
             if sparse:
                 smoothed_path = smoothed_path[: start + 1] + smoothed_path[end:]
             else:
+                # tree.get_path gives order from the specified node to the tree's root,
+                # so we must reverse it to get ordering starting from the root.
+                shortcut_path_segment.reverse()
                 smoothed_path = (
                     smoothed_path[:start]
                     + shortcut_path_segment[:-1]
@@ -158,7 +158,7 @@ def _step(start: np.ndarray, target: np.ndarray, max_step_dist: float) -> np.nda
     if max_step_dist <= 0.0:
         raise ValueError("`max_step_dist` must be > 0.0")
     if np.array_equal(start, target):
-        return start
+        return start.copy()
     direction = target - start
     magnitude = np.linalg.norm(direction)
     unit_vec = direction / magnitude

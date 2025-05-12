@@ -2,7 +2,6 @@ import unittest
 from pathlib import Path
 
 import mujoco
-import mujoco.viewer
 import numpy as np
 from robot_descriptions.loaders.mujoco import load_robot_description
 

@@ -75,7 +75,7 @@ class PoseConstraint(Constraint):
         return np.linalg.norm(dx) <= self.tolerance
 
     def apply(self, q_old: np.ndarray, q: np.ndarray) -> np.ndarray | None:
-        q_projected = q
+        q_projected = q.copy()
         while True:
             dx = self._displacement_from_constraint(q_projected)
             if np.linalg.norm(dx) <= self.tolerance:
