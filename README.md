@@ -2,23 +2,33 @@
 
 MuJoCo motion planning library.
 
-## Installation
+> [!Note] This project is under active development.
+> APIs may change, and features are still a work in progress.
 
-Clone this repository and run the following from the repository root (`venv` is recommended):
+Features:
+- Joint-space planning via bi-directional RRT, with support for constraints
+- Cartesian-space planning
+- [`Constraint` interface](./src/mjpl/constraint/constraint_interface.py), which allows for defining arbitrary constraints
+- [`IKSolver` interface](./src/mjpl/inverse_kinematics/ik_solver_interface.py), which can be used for planning to pose targets
+- Trajectory generation via a [`TrajectoryGenerator` interface](./src/mjpl/trajectory/trajectory_interface.py)
 
-```
-pip3 install -e .
-```
+Limitations:
+- This library is designed for manipulator models that are composed of hinge/slide joints, and will not work with models that have ball/free joints (see #80 for more info).
 
 ## Getting started
 
-See the [examples](./examples) folder.
+Install from `pypi`:
+```
+pip install mjpl
+```
+
+See the [examples](./examples) folder for example code!
 
 ## Development
 
-For local development, install the developer dependencies:
+For local development, clone the repository and install the developer dependencies:
 ```
-pip3 install -e ".[dev]"
+pip install -e ".[dev]"
 ```
 
 This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting.
@@ -56,8 +66,13 @@ To bypass installed pre-commit hooks on commit:
 git commit --no-verify -m "your message"
 ```
 
-## Other notes
+## Acknowledgements:
 
-This project is under active development.
-APIs may change, and features are still a work in progress.
-The [issues](https://github.com/adlarkin/mjpl/issues) labeled `enhancement` track upcoming features to be developed.
+Thank you Sebastian Castro (@sea-bass) for the guidance and support that has been offered throughout the early stages of this project.
+If you find this library useful or interesting, consider checking out Sebastian's [pyroboplan](https://github.com/sea-bass/pyroboplan), which offers similar features via [Pinnochio](https://github.com/stack-of-tasks/pinocchio)!
+
+Here is more information about the algorithms and third party libraries used in `mjpl`:
+- https://personalrobotics.cs.washington.edu/publications/berenson2009cbirrt.pdf
+- https://github.com/kevinzakka/mink
+- https://ruckig.com/
+- https://github.com/hungpham2511/toppra

@@ -7,7 +7,7 @@ from mink.lie.se3 import SE3
 from .. import utils
 from ..constraint.constraint_interface import Constraint
 from ..constraint.utils import obeys_constraints
-from ..inverse_kinematics.ik_solver import IKSolver
+from ..inverse_kinematics.ik_solver_interface import IKSolver
 from ..inverse_kinematics.mink_ik_solver import MinkIKSolver
 from .tree import Node, Tree
 from .utils import _combine_paths, _connect
