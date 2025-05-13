@@ -10,7 +10,7 @@ Features:
 - Joint-space planning via bi-directional RRT, with support for constraints
 - Cartesian-space planning
 - [Constraint interface](./src/mjpl/constraint/constraint_interface.py), which allows for defining arbitrary constraints
-- [IKSolver interface](./src/mjpl/inverse_kinematics/ik_solver_interface.py), which can be used for planning to pose targets
+- [IK Solver interface](./src/mjpl/inverse_kinematics/ik_solver_interface.py), which can be used for planning to pose targets
 - Trajectory generation via a [TrajectoryGenerator interface](./src/mjpl/trajectory/trajectory_interface.py)
 
 Limitations:
@@ -70,7 +70,7 @@ git commit --no-verify -m "your message"
 ## Acknowledgements:
 
 Thank you Sebastian Castro for the guidance and support that has been offered throughout the early stages of this project.
-If you find this library useful or interesting, consider checking out Sebastian's [pyroboplan](https://github.com/sea-bass/pyroboplan), which offers similar features via [Pinnochio](https://github.com/stack-of-tasks/pinocchio)!
+If you find this library useful or interesting, consider checking out Sebastian's [pyroboplan](https://github.com/sea-bass/pyroboplan), which offers similar features via [Pinocchio](https://github.com/stack-of-tasks/pinocchio)!
 
 Here is more information about the algorithms and third party libraries used in `mjpl`:
 - https://personalrobotics.cs.washington.edu/publications/berenson2009cbirrt.pdf
