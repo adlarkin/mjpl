@@ -45,16 +45,18 @@ class TestTrajectoryUtils(unittest.TestCase):
         # Using timestamps outside of the waypoint timing range should do nothing since
         # there's no corresponding segment in the waypoint list.
         waypoints_copy = self.waypoints.copy()
-        _add_intermediate_waypoint(waypoints_copy, times, -1)
+        self.assertFalse(_add_intermediate_waypoint(waypoints_copy, times, -1))
         self.assertListEqual(waypoints_copy, self.waypoints)
-        _add_intermediate_waypoint(waypoints_copy, times, 2)
+        self.assertFalse(_add_intermediate_waypoint(waypoints_copy, times, 2))
         self.assertListEqual(waypoints_copy, self.waypoints)
 
         # Using a timestamp within a waypoint segment should result in an intermediate
         # waypoint added to that segment.
         waypoint_copy = self.waypoints.copy()
-        _add_intermediate_waypoint(
-            waypoint_copy, times, self.splx[1] + ((self.splx[2] - self.splx[1]) / 3)
+        self.assertTrue(
+            _add_intermediate_waypoint(
+                waypoint_copy, times, self.splx[1] + ((self.splx[2] - self.splx[1]) / 3)
+            )
         )
         self.assertEqual(len(waypoint_copy), len(self.waypoints) + 1)
         np.testing.assert_equal(waypoint_copy[0], self.waypoints[0])
@@ -70,7 +72,7 @@ class TestTrajectoryUtils(unittest.TestCase):
 
         # Edge case: timestamp corresponds to the start of the waypoints.
         waypoint_copy = self.waypoints.copy()
-        _add_intermediate_waypoint(waypoint_copy, times, times[0])
+        self.assertTrue(_add_intermediate_waypoint(waypoint_copy, times, times[0]))
         self.assertEqual(len(waypoint_copy), len(self.waypoints) + 1)
         np.testing.assert_equal(waypoint_copy[0], self.waypoints[0])
         np.testing.assert_allclose(
@@ -85,7 +87,7 @@ class TestTrajectoryUtils(unittest.TestCase):
 
         # Edge case: timestamp corresponds to the end of the waypoints.
         waypoint_copy = self.waypoints.copy()
-        _add_intermediate_waypoint(waypoint_copy, times, times[-1])
+        self.assertTrue(_add_intermediate_waypoint(waypoint_copy, times, times[-1]))
         self.assertEqual(len(waypoint_copy), len(self.waypoints) + 1)
         np.testing.assert_equal(waypoint_copy[0], self.waypoints[0])
         np.testing.assert_equal(waypoint_copy[1], self.waypoints[1])
@@ -101,7 +103,7 @@ class TestTrajectoryUtils(unittest.TestCase):
         # Edge case: timestamp corresponds to an existing waypoint that's not the
         # start or end of the waypoint list.
         waypoint_copy = self.waypoints.copy()
-        _add_intermediate_waypoint(waypoint_copy, times, times[1])
+        self.assertTrue(_add_intermediate_waypoint(waypoint_copy, times, times[1]))
         self.assertEqual(len(waypoint_copy), len(self.waypoints) + 1)
         np.testing.assert_equal(waypoint_copy[0], self.waypoints[0])
         np.testing.assert_allclose(

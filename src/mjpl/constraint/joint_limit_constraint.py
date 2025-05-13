@@ -19,5 +19,5 @@ class JointLimitConstraint(Constraint):
     def valid_config(self, q: np.ndarray) -> bool:
         return np.all((q >= self.lower) & (q <= self.upper))
 
-    def apply(self, q: np.ndarray) -> np.ndarray | None:
+    def apply(self, q_old: np.ndarray, q: np.ndarray) -> np.ndarray | None:
         return q if self.valid_config(q) else None
