@@ -1,3 +1,4 @@
+import sys
 import time
 from pathlib import Path
 
@@ -14,7 +15,8 @@ _PANDA_XML = _HERE / "models" / "franka_emika_panda" / "scene_with_obstacles.xml
 _PANDA_EE_SITE = "ee_site"
 
 
-def main():
+# Return whether or not the example was successful. This is used in CI.
+def main() -> bool:
     visualize, seed = ex_utils.parse_args(
         description="Compute and follow a trajectory to a goal pose that enforces a "
         "pose constraint on the arm's end-effector."
@@ -81,7 +83,7 @@ def main():
     waypoints = planner.plan_to_pose(q_init, goal_pose, _PANDA_EE_SITE)
     if not waypoints:
         print("Planning failed")
-        return
+        return False
     print(f"Planning took {(time.time() - start):.4f}s")
 
     print("Shortcutting...")
@@ -102,9 +104,7 @@ def main():
 
     print("Generating trajectory...")
     start = time.time()
-    trajectory = mjpl.generate_constrained_trajectory(
-        shortcut_waypoints, traj_generator, constraints
-    )
+    trajectory = traj_generator.generate_trajectory(shortcut_waypoints)
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
     # Actuator indices in data.ctrl that correspond to the joints in the trajectory.
@@ -168,7 +168,7 @@ def main():
             for q_actual in q_t:
                 start_time = time.time()
                 if not viewer.is_running():
-                    return
+                    return True
                 data.qpos = q_actual
                 mujoco.mj_kinematics(model, data)
                 viewer.sync()
@@ -176,6 +176,10 @@ def main():
                 if time_until_next_step > 0:
                     time.sleep(time_until_next_step)
 
+    return True
+
 
 if __name__ == "__main__":
-    main()
+    success = main()
+    if not success:
+        sys.exit(1)

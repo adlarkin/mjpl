@@ -1,3 +1,4 @@
+import sys
 import time
 from pathlib import Path
 
@@ -25,7 +26,8 @@ def circle_waypoints(
     return np.stack((x, y), axis=1)
 
 
-def main():
+# Return whether or not the example was successful. This is used in CI.
+def main() -> bool:
     visualize, seed = ex_utils.parse_args(
         description="Compute and follow a trajectory along a cartesian path."
     )
@@ -66,7 +68,7 @@ def main():
     waypoints = mjpl.cartesian_plan(q_init, poses, _UR5_EE_SITE, solver)
     if not waypoints:
         print("Planning failed")
-        return
+        return False
     print(f"Planning took {(time.time() - start):.4f}s")
 
     # The trajectory limits used here are for demonstration purposes only.
@@ -137,7 +139,7 @@ def main():
             for q_actual in q_t:
                 start_time = time.time()
                 if not viewer.is_running():
-                    return
+                    return True
                 data.qpos = q_actual
                 mujoco.mj_kinematics(model, data)
                 viewer.sync()
@@ -145,6 +147,10 @@ def main():
                 if time_until_next_step > 0:
                     time.sleep(time_until_next_step)
 
+    return True
+
 
 if __name__ == "__main__":
-    main()
+    success = main()
+    if not success:
+        sys.exit(1)

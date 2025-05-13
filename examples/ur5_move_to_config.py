@@ -1,3 +1,4 @@
+import sys
 import time
 from pathlib import Path
 
@@ -14,7 +15,8 @@ _UR5_XML = _HERE / "models" / "universal_robots_ur5e" / "scene.xml"
 _UR5_EE_SITE = "attachment_site"
 
 
-def main():
+# Return whether or not the example was successful. This is used in CI.
+def main() -> bool:
     visualize, seed = ex_utils.parse_args(
         description="Compute and follow a trajectory to a target configuration."
     )
@@ -47,7 +49,7 @@ def main():
     waypoints = planner.plan_to_config(q_init, q_goal)
     if not waypoints:
         print("Planning failed")
-        return
+        return False
     print(f"Planning took {(time.time() - start):.4f}s")
 
     print("Shortcutting...")
@@ -140,7 +142,7 @@ def main():
             for q_actual in q_t:
                 start_time = time.time()
                 if not viewer.is_running():
-                    return
+                    return True
                 data.qpos = q_actual
                 mujoco.mj_kinematics(model, data)
                 viewer.sync()
@@ -148,6 +150,10 @@ def main():
                 if time_until_next_step > 0:
                     time.sleep(time_until_next_step)
 
+    return True
+
 
 if __name__ == "__main__":
-    main()
+    success = main()
+    if not success:
+        sys.exit(1)

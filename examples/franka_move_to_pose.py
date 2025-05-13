@@ -15,7 +15,8 @@ _PANDA_XML = _HERE / "models" / "franka_emika_panda" / "scene_with_obstacles.xml
 _PANDA_EE_SITE = "ee_site"
 
 
-def main():
+# Return whether or not the example was successful. This is used in CI.
+def main() -> bool:
     visualize, seed = ex_utils.parse_args(
         description="Compute and follow a trajectory to a goal pose."
     )
@@ -82,9 +83,7 @@ def main():
 
     print("Generating trajectory...")
     start = time.time()
-    trajectory = mjpl.generate_constrained_trajectory(
-        shortcut_waypoints, traj_generator, constraints
-    )
+    trajectory = traj_generator.generate_trajectory(shortcut_waypoints)
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
     # Actuator indices in data.ctrl that correspond to the joints in the trajectory.
@@ -148,7 +147,7 @@ def main():
             for q_actual in q_t:
                 start_time = time.time()
                 if not viewer.is_running():
-                    return
+                    return True
                 data.qpos = q_actual
                 mujoco.mj_kinematics(model, data)
                 viewer.sync()

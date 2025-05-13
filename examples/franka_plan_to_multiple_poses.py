@@ -1,3 +1,4 @@
+import sys
 import time
 from pathlib import Path
 
@@ -16,7 +17,8 @@ _PANDA_EE_SITE = "ee_site"
 _NUM_GOALS = 5
 
 
-def main():
+# Return whether or not the example was successful. This is used in CI.
+def main() -> bool:
     visualize, seed = ex_utils.parse_args(
         description="Compute and follow a trajectory to a pose from a list of candidate goal poses."
     )
@@ -66,7 +68,7 @@ def main():
     waypoints = planner.plan_to_poses(q_init, goal_poses, _PANDA_EE_SITE)
     if not waypoints:
         print("Planning failed")
-        return
+        return False
     print(f"Planning took {(time.time() - start):.4f}s")
 
     print("Shortcutting...")
@@ -155,7 +157,7 @@ def main():
             for q_actual in q_t:
                 start_time = time.time()
                 if not viewer.is_running():
-                    return
+                    return True
                 data.qpos = q_actual
                 mujoco.mj_kinematics(model, data)
                 viewer.sync()
@@ -163,6 +165,10 @@ def main():
                 if time_until_next_step > 0:
                     time.sleep(time_until_next_step)
 
+    return True
+
 
 if __name__ == "__main__":
-    main()
+    success = main()
+    if not success:
+        sys.exit(1)

@@ -46,7 +46,7 @@ jobs:
             # Ruckig community version uses a cloud API for intermediate waypoints,
             # which may cause flakes in CI.
             "python examples/ur5_move_to_config.py -s 3 -no-viz"
-            "python examples/franka_move_to_pose.py -s 4 -no-viz"
+            "python examples/franka_move_to_pose.py -s 18 -no-viz"
             "python examples/franka_plan_to_multiple_poses.py -s 5 -no-viz"
             "python examples/ur5_cartesian_move.py -s 2 -no-viz"
             "python examples/franka_constrained_move_to_pose.py -s 17 -no-viz"
