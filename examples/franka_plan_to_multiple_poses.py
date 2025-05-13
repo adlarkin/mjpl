@@ -25,6 +25,8 @@ def main() -> bool:
 
     model = mujoco.MjModel.from_xml_path(_PANDA_XML.as_posix())
 
+    # Joints to use during planning. The finger joints are excluded, which means that
+    # during planning, the fingers on the gripper should remain "fixed".
     arm_joints = [
         "joint1",
         "joint2",
@@ -95,23 +97,13 @@ def main() -> bool:
     )
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
-    # Actuator indices in data.ctrl that correspond to the joints in the trajectory.
-    actuators = [
-        "actuator1",
-        "actuator2",
-        "actuator3",
-        "actuator4",
-        "actuator5",
-        "actuator6",
-        "actuator7",
-    ]
-    actuator_ids = [model.actuator(act).id for act in actuators]
-
     # Follow the trajectory via position control, starting from the initial state.
+    # Send position commands to the arm actuators since planning was done for the arm
+    # joints (ignore the last actuator, which corresponds to the gripper fingers).
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
     q_t = [q_init]
     for q_ref in trajectory.positions:
-        data.ctrl[actuator_ids] = q_ref[q_idx]
+        data.ctrl[:-1] = q_ref[q_idx]
         mujoco.mj_step(model, data)
         q_t.append(data.qpos.copy())
 

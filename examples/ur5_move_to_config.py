@@ -76,22 +76,11 @@ def main() -> bool:
     )
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
-    # Actuator indices in data.ctrl that correspond to the joints in the trajectory.
-    actuators = [
-        "shoulder_pan",
-        "shoulder_lift",
-        "elbow",
-        "wrist_1",
-        "wrist_2",
-        "wrist_3",
-    ]
-    actuator_ids = [model.actuator(act).id for act in actuators]
-
     # Follow the trajectory via position control, starting from the initial state.
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
     q_t = [q_init]
     for q_ref in trajectory.positions:
-        data.ctrl[actuator_ids] = q_ref
+        data.ctrl = q_ref
         mujoco.mj_step(model, data)
         q_t.append(data.qpos.copy())
 

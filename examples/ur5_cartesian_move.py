@@ -35,9 +35,6 @@ def main() -> bool:
     model = mujoco.MjModel.from_xml_path(_UR5_XML.as_posix())
     data = mujoco.MjData(model)
 
-    arm_joints = mjpl.all_joints(model)
-    q_idx = mjpl.qpos_idx(model, arm_joints)
-
     # Let the "home" keyframe in the MJCF be the initial state.
     home_keyframe = model.keyframe("home")
     q_init = home_keyframe.qpos.copy()
@@ -57,7 +54,7 @@ def main() -> bool:
 
     solver = mjpl.MinkIKSolver(
         model=model,
-        joints=arm_joints,
+        joints=mjpl.all_joints(model),
         constraints=[mjpl.CollisionConstraint(model)],
         seed=seed,
         max_attempts=5,
@@ -85,22 +82,11 @@ def main() -> bool:
     trajectory = traj_generator.generate_trajectory(waypoints)
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
-    # Actuator indices in data.ctrl that correspond to the joints in the trajectory.
-    actuators = [
-        "shoulder_pan",
-        "shoulder_lift",
-        "elbow",
-        "wrist_1",
-        "wrist_2",
-        "wrist_3",
-    ]
-    actuator_ids = [model.actuator(act).id for act in actuators]
-
     # Follow the trajectory via position control, starting from the initial state.
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
     q_t = [q_init]
     for q_ref in trajectory.positions:
-        data.ctrl[actuator_ids] = q_ref
+        data.ctrl = q_ref
         mujoco.mj_step(model, data)
         q_t.append(data.qpos.copy())
 
@@ -128,7 +114,7 @@ def main() -> bool:
             # Visualize the trajectory. The trajectory is of high resolution,
             # so plotting every other timestep should be sufficient.
             for q_ref in trajectory.positions[::2]:
-                data.qpos[q_idx] = q_ref
+                data.qpos = q_ref
                 mujoco.mj_kinematics(model, data)
                 pos = data.site(_UR5_EE_SITE).xpos
                 viz.add_sphere(
