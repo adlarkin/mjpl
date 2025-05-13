@@ -173,7 +173,7 @@ class TestCollisionRuleset(unittest.TestCase):
         self.assertFalse(cr.obeys_ruleset(geom_collision_matrix))
 
     def test_no_valid_collisions(self):
-        cr = CollisionRuleset()
+        cr = CollisionRuleset(self.model)
 
         no_collisions = np.empty((0, 2))
         self.assertTrue(cr.obeys_ruleset(no_collisions))
@@ -186,10 +186,7 @@ class TestCollisionRuleset(unittest.TestCase):
         self.assertFalse(cr.obeys_ruleset(geom_collision_matrix))
 
     def test_invalid_args(self):
-        with self.assertRaisesRegex(ValueError, "must be defined"):
-            CollisionRuleset(model=None, allowed_collision_bodies=[("body1", "body2")])
-
-        cr = CollisionRuleset()
+        cr = CollisionRuleset(self.model)
         with self.assertRaisesRegex(ValueError, "nx2"):
             cr.obeys_ruleset(np.zeros((1, 3)))
             cr.obeys_ruleset(np.zeros((1, 2, 1)))

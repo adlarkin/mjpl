@@ -74,6 +74,9 @@ def main() -> bool:
     trajectory = mjpl.generate_constrained_trajectory(
         shortcut_waypoints, traj_generator, constraints
     )
+    if trajectory is None:
+        print("Trajectory generation failed.")
+        return False
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
     # Follow the trajectory via position control, starting from the initial state.
@@ -86,11 +89,10 @@ def main() -> bool:
 
     if visualize:
         with mujoco.viewer.launch_passive(
-            model=model,
-            data=data,
-            show_left_ui=False,
-            show_right_ui=False,
+            model=model, data=data, show_left_ui=False, show_right_ui=False
         ) as viewer:
+            assert viewer.user_scn is not None
+
             # Update the viewer's orientation to capture the scene.
             viewer.cam.lookat = [0, 0, 0.35]
             viewer.cam.distance = 2.5
@@ -124,7 +126,10 @@ def main() -> bool:
                 mujoco.mj_kinematics(model, data)
                 pos = data.site(_UR5_EE_SITE).xpos
                 viz.add_sphere(
-                    viewer.user_scn, pos, radius=0.004, rgba=[0.2, 0.6, 0.2, 0.2]
+                    viewer.user_scn,
+                    pos,
+                    radius=0.004,
+                    rgba=np.array([0.2, 0.6, 0.2, 0.2]),
                 )
 
             # Replay the robot following the trajectory.

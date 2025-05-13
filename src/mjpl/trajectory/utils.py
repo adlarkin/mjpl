@@ -9,7 +9,7 @@ def generate_constrained_trajectory(
     waypoints: list[np.ndarray],
     generator: TrajectoryGenerator,
     constraints: list[Constraint],
-) -> Trajectory:
+) -> Trajectory | None:
     """Generate a trajectory that follows waypoints and obeys constraints.
 
     This assumes that straight-line connections between adjacent waypoints obey the
@@ -30,10 +30,13 @@ def generate_constrained_trajectory(
         constraints: The constraints the trajectory must obey.
 
     Returns:
-        A trajectory that follows `waypoints` without violating `constraints`.
+        A trajectory that follows `waypoints` without violating `constraints`, or None
+        if a trajectory cannot be generated.
     """
     while True:
         traj = generator.generate_trajectory(waypoints)
+        if traj is None:
+            return None
         for i in range(len(traj.positions)):
             if not obeys_constraints(traj.positions[i], constraints):
                 # Add an intermediate waypoint to the section of the path that
@@ -44,11 +47,12 @@ def generate_constrained_trajectory(
                     waypoints, path_timestamps, trajectory_timestamp, constraints
                 ):
                     break
-                raise RuntimeError(
+                print(
                     "Unable to add an intermediate waypoint to the path that is being "
                     "used for trajectory generation. This is most likely because the "
                     "intermediate waypoint cannot obey the constraints."
                 )
+                return None
         else:
             return traj
 

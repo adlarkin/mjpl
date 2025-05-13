@@ -12,8 +12,8 @@ def _interpolate_poses(
     Args:
         pose_from: The interpolation start pose.
         pose_to: The interpolation end pose.
-        lin_threshold: Maximum linear distance allowed between adjacent poses.
-        ori_threshold: Maximum orientation distance allowed between adjacent poses.
+        lin_threshold: Maximum linear distance (in meters) allowed between adjacent poses.
+        ori_threshold: Maximum orientation distance (in radians) allowed between adjacent poses.
 
     Returns:
         A list of poses starting at `pose_from` and ending at `pose_to` that are
@@ -53,11 +53,11 @@ def cartesian_plan(
         poses: The Cartesian path. These poses should be in the world frame.
         site: The site (i.e., frame) that should follow the Cartesian path.
         solver: Solver used to compute IK for `poses` and `site`.
-        lin_threshold: The maximum linear distance allowed between adjacent
-            poses in `poses`. Pose interpolation will occur if this threshold
+        lin_threshold: The maximum linear distance (in meters) allowed between
+            adjacent poses in `poses`. Pose interpolation will occur if this threshold
             is exceeded.
-        ori_threshold: The maximum orientation distance allowed between adjacent
-            poses in `poses`. Pose interpolation will occur if this threshold
+        ori_threshold: The maximum orientation distance (in radians) allowed between
+            adjacent poses in `poses`. Pose interpolation will occur if this threshold
             is exceeded.
 
     Returns:

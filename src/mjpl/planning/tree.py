@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -8,7 +10,7 @@ class Node:
     """Node object which can be used in a tree."""
 
     q: np.ndarray
-    parent: "Node | None" = None
+    parent: Node | None = None
 
     def __hash__(self):
         """Hash based only on q to ensure uniqueness per tree."""

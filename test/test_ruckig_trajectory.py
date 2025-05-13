@@ -30,6 +30,7 @@ class TestRuckigTrajectoryGenerator(unittest.TestCase):
         ]
 
         t = traj_generator.generate_trajectory(waypoints)
+        self.assertIsNotNone(t)
         self.assertEqual(t.dt, dt)
         np.testing.assert_equal(t.q_init, waypoints[0])
 
