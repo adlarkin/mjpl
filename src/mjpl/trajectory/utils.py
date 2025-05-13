@@ -1,7 +1,7 @@
 import numpy as np
 
 from ..constraint.constraint_interface import Constraint
-from ..constraint.utils import obeys_constraints
+from ..constraint.utils import apply_constraints, obeys_constraints
 from .trajectory_interface import Trajectory, TrajectoryGenerator
 
 
@@ -40,10 +40,15 @@ def generate_constrained_trajectory(
                 # corresponds to the trajectory position that violates the constraints.
                 path_timestamps = _waypoint_timing(waypoints, traj)
                 trajectory_timestamp = (i + 1) * traj.dt
-                _add_intermediate_waypoint(
-                    waypoints, path_timestamps, trajectory_timestamp
+                if _add_intermediate_waypoint(
+                    waypoints, path_timestamps, trajectory_timestamp, constraints
+                ):
+                    break
+                raise RuntimeError(
+                    "Unable to add an intermediate waypoint to the path that is being "
+                    "used for trajectory generation. This is most likely because the "
+                    "intermediate waypoint cannot obey the constraints."
                 )
-                break
         else:
             return traj
 
@@ -77,9 +82,12 @@ def _waypoint_timing(
 
 
 def _add_intermediate_waypoint(
-    waypoints: list[np.ndarray], timing: list[float], timestamp: float
-) -> None:
-    """Insert an intermediate waypoint into a segment that contains a timestamp.
+    waypoints: list[np.ndarray],
+    timing: list[float],
+    timestamp: float,
+    constraints: list[Constraint] = [],
+) -> bool:
+    """Insert a constrained waypoint into a waypoint segment that contains a timestamp.
 
     Args:
         waypoints: The waypoints that will have an intermediate waypoint added to it.
@@ -87,11 +95,23 @@ def _add_intermediate_waypoint(
         timestamp: The timestamp that defines the segment of `waypoints` that needs to
             have an intermediate waypoint added. If no segments in `waypoints` contain
             this timestamp, no waypoint is added to `waypoints`.
+        constraints: The constraints the intermediate waypoint must obey.
+
+    Returns:
+        True if a constrained waypoint was added to `waypoints`. False otherwise.
     """
     if len(waypoints) != len(timing):
         raise ValueError("`waypoints` and `timing` must be the same length.")
+
     for i in range(len(waypoints) - 1):
         if timing[i] <= timestamp <= timing[i + 1]:
             intermediate_waypoint = (waypoints[i] + waypoints[i + 1]) / 2
-            waypoints.insert(i + 1, intermediate_waypoint)
-            return
+            constrained_waypoint = apply_constraints(
+                intermediate_waypoint, intermediate_waypoint, constraints
+            )
+            if constrained_waypoint is None:
+                return False
+            waypoints.insert(i + 1, constrained_waypoint)
+            return True
+
+    return False

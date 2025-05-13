@@ -71,12 +71,8 @@ def main():
 
     print("Shortcutting...")
     start = time.time()
-    shortcut_waypoints = mjpl.shortcut(
-        waypoints,
-        constraints,
-        validation_dist=planner.epsilon,
-        max_attempts=len(waypoints),
-        seed=seed,
+    shortcut_waypoints = mjpl.smooth_path(
+        waypoints, constraints, eps=planner.epsilon, seed=seed, sparse=True
     )
     print(f"Shortcutting took {(time.time() - start):.4f}s")
 

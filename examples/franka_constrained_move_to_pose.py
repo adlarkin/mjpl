@@ -16,7 +16,8 @@ _PANDA_EE_SITE = "ee_site"
 
 def main():
     visualize, seed = ex_utils.parse_args(
-        description="Compute and follow a trajectory to a goal pose."
+        description="Compute and follow a trajectory to a goal pose that enforces a "
+        "pose constraint on the arm's end-effector."
     )
 
     model = mujoco.MjModel.from_xml_path(_PANDA_XML.as_posix())
@@ -36,17 +37,37 @@ def main():
     home_keyframe = model.keyframe("home")
     q_init = home_keyframe.qpos.copy()
 
+    # Constrain the end effector's pose to only rotate a limited amount about the
+    # x and y axis of the end effector's initial pose. This has the effect of keeping
+    # the gripper pointed "down".
+    data = mujoco.MjData(model)
+    data.qpos = q_init
+    mujoco.mj_kinematics(model, data)
+    ee_init_pose = mjpl.site_pose(data, _PANDA_EE_SITE)
+    ee_pose_constraint = mjpl.PoseConstraint(
+        model,
+        _PANDA_EE_SITE,
+        ee_init_pose,
+        roll=(-0.1, 0.1),
+        pitch=(-0.1, 0.1),
+    )
+
     allowed_collisions = [("left_finger", "right_finger")]
     constraints = [
+        ee_pose_constraint,
         mjpl.JointLimitConstraint(model),
         mjpl.CollisionConstraint(model, allowed_collisions),
     ]
 
-    # From the initial state, generate a valid goal pose that's derived from a
-    # valid joint configuration.
-    data = mujoco.MjData(model)
-    mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
+    # Generate a goal pose that's derived from a valid joint configuration.
+    # The pose constraint only allows configurations w.r.t. some distance (q_step)
+    # from a previous configuration (in this case, q_init). Since we want to set a
+    # random configuration at any distance from q_init, temporarily set the pose
+    # constraint's q_step to infinity.
+    q_step = ee_pose_constraint.q_step
+    ee_pose_constraint.q_step = np.inf
     data.qpos = mjpl.random_config(model, q_init, arm_joints, seed, constraints)
+    ee_pose_constraint.q_step = q_step
     mujoco.mj_kinematics(model, data)
     goal_pose = mjpl.site_pose(data, _PANDA_EE_SITE)
 
