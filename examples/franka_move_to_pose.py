@@ -1,3 +1,4 @@
+import sys
 import time
 from pathlib import Path
 
@@ -60,7 +61,7 @@ def main():
     waypoints = planner.plan_to_pose(q_init, goal_pose, _PANDA_EE_SITE)
     if not waypoints:
         print("Planning failed")
-        return
+        return False
     print(f"Planning took {(time.time() - start):.4f}s")
 
     print("Shortcutting...")
@@ -155,6 +156,10 @@ def main():
                 if time_until_next_step > 0:
                     time.sleep(time_until_next_step)
 
+    return True
+
 
 if __name__ == "__main__":
-    main()
+    success = main()
+    if not success:
+        sys.exit(1)
