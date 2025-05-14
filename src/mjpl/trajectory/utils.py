@@ -47,11 +47,8 @@ def generate_constrained_trajectory(
                     waypoints, path_timestamps, trajectory_timestamp, constraints
                 ):
                     break
-                print(
-                    "Unable to add an intermediate waypoint to the path that is being "
-                    "used for trajectory generation. This is most likely because the "
-                    "intermediate waypoint cannot obey the constraints."
-                )
+                # Adding an intermediate waypoint failed. This is probably because the
+                # intermediate waypoint cannot obey the constraints.
                 return None
         else:
             return traj

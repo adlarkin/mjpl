@@ -65,7 +65,7 @@ def cartesian_plan(
         starting from `q_init`. If a path cannot be found, an empty list is returned.
     """
     interpolated_poses = [poses[0]]
-    for i in range(0, len(poses) - 1):
+    for i in range(len(poses) - 1):
         batch = _interpolate_poses(poses[i], poses[i + 1], lin_threshold, ori_threshold)
         interpolated_poses.extend(batch[1:])
 
@@ -73,7 +73,6 @@ def cartesian_plan(
     for p in interpolated_poses:
         q = solver.solve_ik(p, site, waypoints[-1])
         if q is None:
-            print(f"Unable to find a joint configuration for pose {p}")
             return []
         waypoints.append(q)
     return waypoints

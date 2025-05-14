@@ -90,10 +90,7 @@ class PoseConstraint(Constraint):
             if violates_limits or extends_too_far:
                 return None
 
-    def _displacement_from_constraint(
-        self,
-        q: np.ndarray,
-    ) -> np.ndarray:
+    def _displacement_from_constraint(self, q: np.ndarray) -> np.ndarray:
         """Compute the displacement between a configuration and the pose constraints.
 
         Args:
