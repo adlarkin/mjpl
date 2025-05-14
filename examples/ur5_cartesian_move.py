@@ -1,3 +1,4 @@
+import sys
 import time
 from pathlib import Path
 
@@ -25,16 +26,14 @@ def circle_waypoints(
     return np.stack((x, y), axis=1)
 
 
-def main():
+# Return whether or not the example was successful. This is used in CI.
+def main() -> bool:
     visualize, seed = ex_utils.parse_args(
         description="Compute and follow a trajectory along a cartesian path."
     )
 
     model = mujoco.MjModel.from_xml_path(_UR5_XML.as_posix())
     data = mujoco.MjData(model)
-
-    arm_joints = mjpl.all_joints(model)
-    q_idx = mjpl.qpos_idx(model, arm_joints)
 
     # Let the "home" keyframe in the MJCF be the initial state.
     home_keyframe = model.keyframe("home")
@@ -55,7 +54,7 @@ def main():
 
     solver = mjpl.MinkIKSolver(
         model=model,
-        joints=arm_joints,
+        joints=mjpl.all_joints(model),
         constraints=[mjpl.CollisionConstraint(model)],
         seed=seed,
         max_attempts=5,
@@ -66,7 +65,7 @@ def main():
     waypoints = mjpl.cartesian_plan(q_init, poses, _UR5_EE_SITE, solver)
     if not waypoints:
         print("Planning failed")
-        return
+        return False
     print(f"Planning took {(time.time() - start):.4f}s")
 
     # The trajectory limits used here are for demonstration purposes only.
@@ -81,24 +80,16 @@ def main():
     print("Generating trajectory...")
     start = time.time()
     trajectory = traj_generator.generate_trajectory(waypoints)
+    if trajectory is None:
+        print("Trajectory generation failed.")
+        return False
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
-
-    # Actuator indices in data.ctrl that correspond to the joints in the trajectory.
-    actuators = [
-        "shoulder_pan",
-        "shoulder_lift",
-        "elbow",
-        "wrist_1",
-        "wrist_2",
-        "wrist_3",
-    ]
-    actuator_ids = [model.actuator(act).id for act in actuators]
 
     # Follow the trajectory via position control, starting from the initial state.
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
     q_t = [q_init]
     for q_ref in trajectory.positions:
-        data.ctrl[actuator_ids] = q_ref
+        data.ctrl = q_ref
         mujoco.mj_step(model, data)
         q_t.append(data.qpos.copy())
 
@@ -106,6 +97,8 @@ def main():
         with mujoco.viewer.launch_passive(
             model=model, data=data, show_left_ui=False, show_right_ui=False
         ) as viewer:
+            assert viewer.user_scn is not None
+
             # Update the viewer's orientation to capture the scene.
             viewer.cam.lookat = [-0.1, 0, 0.35]
             viewer.cam.distance = 1.5
@@ -120,24 +113,27 @@ def main():
                     viewer.user_scn,
                     p.translation(),
                     radius=0.004,
-                    rgba=[0.6, 0.2, 0.2, 0.7],
+                    rgba=np.array([0.6, 0.2, 0.2, 0.7]),
                 )
 
             # Visualize the trajectory. The trajectory is of high resolution,
             # so plotting every other timestep should be sufficient.
             for q_ref in trajectory.positions[::2]:
-                data.qpos[q_idx] = q_ref
+                data.qpos = q_ref
                 mujoco.mj_kinematics(model, data)
                 pos = data.site(_UR5_EE_SITE).xpos
                 viz.add_sphere(
-                    viewer.user_scn, pos, radius=0.002, rgba=[0.2, 0.6, 0.2, 0.2]
+                    viewer.user_scn,
+                    pos,
+                    radius=0.002,
+                    rgba=np.array([0.2, 0.6, 0.2, 0.2]),
                 )
 
             # Replay the robot following the trajectory.
             for q_actual in q_t:
                 start_time = time.time()
                 if not viewer.is_running():
-                    return
+                    return True
                 data.qpos = q_actual
                 mujoco.mj_kinematics(model, data)
                 viewer.sync()
@@ -145,6 +141,10 @@ def main():
                 if time_until_next_step > 0:
                     time.sleep(time_until_next_step)
 
+    return True
+
 
 if __name__ == "__main__":
-    main()
+    success = main()
+    if not success:
+        sys.exit(1)

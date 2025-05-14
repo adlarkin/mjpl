@@ -1,3 +1,4 @@
+import sys
 import time
 from pathlib import Path
 
@@ -14,7 +15,8 @@ _PANDA_XML = _HERE / "models" / "franka_emika_panda" / "scene_with_obstacles.xml
 _PANDA_EE_SITE = "ee_site"
 
 
-def main():
+# Return whether or not the example was successful. This is used in CI.
+def main() -> bool:
     visualize, seed = ex_utils.parse_args(
         description="Compute and follow a trajectory to a goal pose that enforces a "
         "pose constraint on the arm's end-effector."
@@ -22,6 +24,8 @@ def main():
 
     model = mujoco.MjModel.from_xml_path(_PANDA_XML.as_posix())
 
+    # Joints to use during planning. The finger joints are excluded, which means that
+    # during planning, the fingers on the gripper should remain "fixed".
     arm_joints = [
         "joint1",
         "joint2",
@@ -81,7 +85,7 @@ def main():
     waypoints = planner.plan_to_pose(q_init, goal_pose, _PANDA_EE_SITE)
     if not waypoints:
         print("Planning failed")
-        return
+        return False
     print(f"Planning took {(time.time() - start):.4f}s")
 
     print("Shortcutting...")
@@ -102,28 +106,19 @@ def main():
 
     print("Generating trajectory...")
     start = time.time()
-    trajectory = mjpl.generate_constrained_trajectory(
-        shortcut_waypoints, traj_generator, constraints
-    )
+    trajectory = traj_generator.generate_trajectory(shortcut_waypoints)
+    if trajectory is None:
+        print("Trajectory generation failed.")
+        return False
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
 
-    # Actuator indices in data.ctrl that correspond to the joints in the trajectory.
-    actuators = [
-        "actuator1",
-        "actuator2",
-        "actuator3",
-        "actuator4",
-        "actuator5",
-        "actuator6",
-        "actuator7",
-    ]
-    actuator_ids = [model.actuator(act).id for act in actuators]
-
     # Follow the trajectory via position control, starting from the initial state.
+    # Send position commands to the arm actuators since planning was done for the arm
+    # joints (ignore the last actuator, which corresponds to the gripper fingers).
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
     q_t = [q_init]
     for q_ref in trajectory.positions:
-        data.ctrl[actuator_ids] = q_ref[q_idx]
+        data.ctrl[:-1] = q_ref[q_idx]
         mujoco.mj_step(model, data)
         q_t.append(data.qpos.copy())
 
@@ -131,6 +126,8 @@ def main():
         with mujoco.viewer.launch_passive(
             model=model, data=data, show_left_ui=False, show_right_ui=False
         ) as viewer:
+            assert viewer.user_scn is not None
+
             # Update the viewer's orientation to capture the scene.
             viewer.cam.lookat = [0, 0, 0.35]
             viewer.cam.distance = 2.5
@@ -161,14 +158,17 @@ def main():
                 mujoco.mj_kinematics(model, data)
                 pos = data.site(_PANDA_EE_SITE).xpos
                 viz.add_sphere(
-                    viewer.user_scn, pos, radius=0.004, rgba=[0.2, 0.6, 0.2, 0.2]
+                    viewer.user_scn,
+                    pos,
+                    radius=0.004,
+                    rgba=np.array([0.2, 0.6, 0.2, 0.2]),
                 )
 
             # Replay the robot following the trajectory.
             for q_actual in q_t:
                 start_time = time.time()
                 if not viewer.is_running():
-                    return
+                    return True
                 data.qpos = q_actual
                 mujoco.mj_kinematics(model, data)
                 viewer.sync()
@@ -176,6 +176,10 @@ def main():
                 if time_until_next_step > 0:
                     time.sleep(time_until_next_step)
 
+    return True
+
 
 if __name__ == "__main__":
-    main()
+    success = main()
+    if not success:
+        sys.exit(1)

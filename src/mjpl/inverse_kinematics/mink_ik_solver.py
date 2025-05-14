@@ -1,6 +1,7 @@
 import mink
 import mujoco
 import numpy as np
+from mink import SE3
 
 from .. import utils
 from ..constraint.constraint_interface import Constraint
@@ -21,7 +22,7 @@ class MinkIKSolver(IKSolver):
         seed: int | None = None,
         max_attempts: int = 1,
         iterations: int = 500,
-        solver: str = "daqp",
+        qp_solver: str = "daqp",
     ):
         """Constructor.
 
@@ -31,13 +32,13 @@ class MinkIKSolver(IKSolver):
                 joints will be randomized when generating initial states for new solve
                 attempts.
             constraints: The constraints to enforce on IK solutions.
-            pos_tolerance: Allowed position error.
-            ori_tolerance: Allowed orientation error.
+            pos_tolerance: Allowed position error (meters).
+            ori_tolerance: Allowed orientation error (radians).
             seed: Seed used for generating random samples in the case of retries
                 (see `max_attempts`).
             max_attempts: Maximum number of solve attempts.
             iterations: Maximum iterations to run the solver for, per attempt.
-            solver: Solver to use, which comes from the qpsolvers package:
+            qp_solver: QP Solver to use, which comes from the qpsolvers package:
                 https://github.com/qpsolvers/qpsolvers
         """
         if not joints:
@@ -54,7 +55,7 @@ class MinkIKSolver(IKSolver):
         self.seed = seed
         self.max_attempts = max_attempts
         self.iterations = iterations
-        self.solver = solver
+        self.qp_solver = qp_solver
 
         # If needed, create a damping task to make sure joints that are not in
         # self.joints are held fixed while solving IK.
@@ -67,7 +68,7 @@ class MinkIKSolver(IKSolver):
             self.damping_task = mink.DampingTask(model, cost)
 
     def solve_ik(
-        self, pose: mink.lie.SE3, site: str, q_init_guess: np.ndarray | None
+        self, pose: SE3, site: str, q_init_guess: np.ndarray | None
     ) -> np.ndarray | None:
         end_effector_task = mink.FrameTask(
             frame_name=site,
@@ -100,7 +101,7 @@ class MinkIKSolver(IKSolver):
                     configuration,
                     tasks,
                     self.model.opt.timestep,
-                    solver=self.solver,
+                    solver=self.qp_solver,
                     damping=1e-3,
                     limits=limits,
                 )
