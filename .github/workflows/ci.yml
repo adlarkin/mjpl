@@ -51,7 +51,7 @@ jobs:
             "python examples/ur5_cartesian_move.py -s 2 -no-viz"
             "python examples/franka_constrained_move_to_pose.py -s 17 -no-viz"
           )
-          # Run all scripts. If any of the scripts fail, report a failure in CI
+          # Run all scripts. If any of the scripts fail, report a failure in CI.
           failed=0
           for cmd in "${scripts[@]}"; do
             echo -e "\nRunning: $cmd" # -e to enable interpretation of \n

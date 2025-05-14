@@ -1,6 +1,7 @@
 import mink
 import mujoco
 import numpy as np
+from mink import SE3, SO3
 
 from .constraint.constraint_interface import Constraint
 from .constraint.utils import apply_constraints
@@ -56,7 +57,7 @@ def qvel_idx(model: mujoco.MjModel, joints: list[str]) -> list[int]:
     return idx
 
 
-def site_pose(data: mujoco.MjData, site_name: str) -> mink.SE3:
+def site_pose(data: mujoco.MjData, site_name: str) -> SE3:
     """Get the pose of a site in the world frame.
 
     Args:
@@ -68,8 +69,8 @@ def site_pose(data: mujoco.MjData, site_name: str) -> mink.SE3:
     """
     position = data.site(site_name).xpos.copy()
     rotation = data.site(site_name).xmat.copy()
-    return mink.SE3.from_rotation_and_translation(
-        mink.SO3.from_matrix(rotation.reshape(3, 3)),
+    return SE3.from_rotation_and_translation(
+        SO3.from_matrix(rotation.reshape(3, 3)),
         position,
     )
 

@@ -35,7 +35,7 @@ class RuckigTrajectoryGenerator(TrajectoryGenerator):
         self.min_acceleration = min_acceleration or -max_acceleration
         self.max_jerk = max_jerk
 
-    def generate_trajectory(self, waypoints: list[np.ndarray]) -> Trajectory:
+    def generate_trajectory(self, waypoints: list[np.ndarray]) -> Trajectory | None:
         dof = waypoints[0].size
         otg = Ruckig(dof, self.dt, len(waypoints))
         inp = InputParameter(dof)
@@ -74,6 +74,6 @@ class RuckigTrajectoryGenerator(TrajectoryGenerator):
             accelerations.append(np.array(out.new_acceleration))
             out.pass_to_input(inp)
         if res != Result.Finished:
-            raise RuntimeError("Trajectory generation failed.")
+            return None
 
         return Trajectory(self.dt, waypoints[0], positions, velocities, accelerations)

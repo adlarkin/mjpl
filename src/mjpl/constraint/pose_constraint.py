@@ -1,6 +1,7 @@
-import mink
 import mujoco
 import numpy as np
+from mink import SE3
+from mink.lie.so3 import RollPitchYaw
 
 from .. import utils
 from .constraint_interface import Constraint
@@ -18,7 +19,7 @@ class PoseConstraint(Constraint):
         self,
         model: mujoco.MjModel,
         site: str,
-        reference_frame: mink.SE3,
+        reference_frame: SE3,
         x_translation: tuple[float, float] = (-np.inf, np.inf),
         y_translation: tuple[float, float] = (-np.inf, np.inf),
         z_translation: tuple[float, float] = (-np.inf, np.inf),
@@ -89,10 +90,7 @@ class PoseConstraint(Constraint):
             if violates_limits or extends_too_far:
                 return None
 
-    def _displacement_from_constraint(
-        self,
-        q: np.ndarray,
-    ) -> np.ndarray:
+    def _displacement_from_constraint(self, q: np.ndarray) -> np.ndarray:
         """Compute the displacement between a configuration and the pose constraints.
 
         Args:
@@ -149,7 +147,7 @@ class PoseConstraint(Constraint):
         return _e_rpy(rpy) @ jac
 
 
-def _e_rpy(rpy: mink.lie.so3.RollPitchYaw):
+def _e_rpy(rpy: RollPitchYaw):
     """Linear transformation that converts angular velocity Jacobian to RPY Jacobian.
 
     Additional information:

@@ -14,14 +14,9 @@ from .utils import _combine_paths, _constrained_extend
 
 
 class RRT:
-    """Bi-directional RRT, with support for constraints.
+    """CBiRRT: Bi-directional RRT, with support for constraints.
 
-    This implementation runs CONNECT on both trees. The original algorithm runs CONNECT
-    on one tree and EXTEND on the other, swapping trees every iteration.
-
-    References:
-    - https://www.cs.cmu.edu/afs/cs/academic/class/15494-s14/readings/kuffner_icra2000.pdf
-    - https://personalrobotics.cs.washington.edu/publications/berenson2009cbirrt.pdf
+    Reference: https://personalrobotics.cs.washington.edu/publications/berenson2009cbirrt.pdf
     """
 
     def __init__(
@@ -134,7 +129,6 @@ class RRT:
         ]
         valid_solutions = [q for q in potential_solutions if q is not None]
         if not valid_solutions:
-            print("Unable to find at least one configuration from the target poses.")
             return []
         return self.plan_to_configs(q_init, valid_solutions)
 

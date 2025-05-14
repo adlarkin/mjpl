@@ -41,22 +41,16 @@ class CollisionRuleset:
 
     def __init__(
         self,
-        model: mujoco.MjModel | None = None,
+        model: mujoco.MjModel,
         allowed_collision_bodies: list[tuple[str, str]] = [],
     ) -> None:
         """Constructor.
 
         Args:
-            model: MuJoCo model. If no bodies are allowed to be in collision, this
-                can be set to None.
+            model: MuJoCo model.
             allowed_collision_bodies: List of body pairs that are allowed to be in
                 collision. An empty list means no bodies are allowed to be in collision.
         """
-        if allowed_collision_bodies and model is None:
-            raise ValueError(
-                "`model` must be defined if `allowed_collision_bodies` is not empty."
-            )
-
         self.model = model
         self.allowed_collisions: np.ndarray | None = None
         if allowed_collision_bodies:
@@ -94,9 +88,8 @@ class CollisionRuleset:
             return False
 
         # Map geometry IDs to their respective body IDs, and then check if all body
-        # collisions are part of the allowed collision matrix.
-        # Sort since collisions between bodies a and b can be represented as
-        # (a,b) or (b,a).
+        # collisions are part of the allowed collision matrix. Sort since collisions
+        # between bodies a and b can be represented as (a,b) or (b,a).
         collision_bodies = np.sort(self.model.geom_bodyid[collision_geometries], axis=1)
         matches = (collision_bodies[:, None, :] == self.allowed_collisions).all(axis=2)
         return np.all(matches.any(axis=1))
