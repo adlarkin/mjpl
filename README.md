@@ -18,12 +18,12 @@ Limitations:
 
 ## Getting started
 
-Install from `pypi`:
+`mjpl` can be installed with `pip`:
 ```
 pip install mjpl
 ```
 
-See the [examples](./examples) folder for example code!
+See the [examples](./examples) folder.
 
 ## Development
 
@@ -71,9 +71,3 @@ git commit --no-verify -m "your message"
 
 Thank you Sebastian Castro for the guidance and support that has been offered throughout the early stages of this project.
 If you find this library useful or interesting, consider checking out Sebastian's [pyroboplan](https://github.com/sea-bass/pyroboplan), which offers similar features via [Pinocchio](https://github.com/stack-of-tasks/pinocchio)!
-
-Here is more information about the algorithms and third party libraries used in `mjpl`:
-- https://personalrobotics.cs.washington.edu/publications/berenson2009cbirrt.pdf
-- https://github.com/kevinzakka/mink
-- https://ruckig.com/
-- https://github.com/hungpham2511/toppra
