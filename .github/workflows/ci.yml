@@ -36,7 +36,7 @@ jobs:
         run: ruff format --diff .
 
       - name: Run tests
-        run: python -m unittest -v
+        run: coverage run --source=src -m unittest -v
 
       - name: "Coveralls"
         run: coveralls
