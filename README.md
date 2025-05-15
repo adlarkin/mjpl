@@ -11,7 +11,7 @@ Features:
 - Cartesian-space planning
 - [Constraint interface](./src/mjpl/constraint/constraint_interface.py), which allows for defining arbitrary constraints
 - [IK Solver interface](./src/mjpl/inverse_kinematics/ik_solver_interface.py), which can be used for planning to pose targets
-- Trajectory generation via a [TrajectoryGenerator interface](./src/mjpl/trajectory/trajectory_interface.py)
+- Trajectory generation via a [Trajectory Generator interface](./src/mjpl/trajectory/trajectory_interface.py)
 
 Limitations:
 - This library is designed for manipulator models that are composed of hinge/slide joints, and will not work with models that have ball/free joints.
