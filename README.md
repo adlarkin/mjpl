@@ -16,14 +16,11 @@ Features:
 Limitations:
 - This library is designed for manipulator models that are composed of hinge/slide joints, and will not work with models that have ball/free joints.
 
-## Getting started
+## Installation
 
-`mjpl` can be installed with `pip`:
 ```
 pip install mjpl
 ```
-
-See the [examples](./examples) folder.
 
 ## Development
 
