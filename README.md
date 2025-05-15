@@ -1,7 +1,9 @@
 # mjpl
 
-[![Coverage Status](https://coveralls.io/repos/github/adlarkin/mjpl/badge.svg?branch=main)](https://coveralls.io/github/adlarkin/mjpl?branch=main)
+[![Build](https://img.shields.io/github/actions/workflow/status/adlarkin/mjpl/ci.yml)](https://github.com/adlarkin/mjpl/actions)
+[![Coverage Status](https://coveralls.io/repos/github/adlarkin/mjpl/badge.svg)](https://coveralls.io/github/adlarkin/mjpl?branch=main)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/adlarkin/mjpl/main.svg)](https://results.pre-commit.ci/latest/github/adlarkin/mjpl/main)
+[![PyPI - Version](https://img.shields.io/pypi/v/mjpl)](https://pypi.org/project/mjpl/)
 
 MuJoCo motion planning library.
 
@@ -12,9 +14,7 @@ MuJoCo motion planning library.
 Features:
 - Joint-space planning via bi-directional RRT, with support for constraints
 - Cartesian-space planning
-- [Constraint interface](./src/mjpl/constraint/constraint_interface.py), which allows for defining arbitrary constraints
-- [IK Solver interface](./src/mjpl/inverse_kinematics/ik_solver_interface.py), which can be used for planning to pose targets
-- Trajectory generation via a [Trajectory Generator interface](./src/mjpl/trajectory/trajectory_interface.py)
+- Interfaces for constraints, inverse kinematics, and trajectory generation
 
 Limitations:
 - This library is designed for manipulator models that are composed of hinge/slide joints, and will not work with models that have ball/free joints.
