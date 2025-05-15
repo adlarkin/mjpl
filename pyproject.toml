@@ -70,3 +70,8 @@ ignore = [
   # Line too long.
   "E501"
 ]
+
+[tool.coverage.report]
+omit = [
+  "*visualization.py",
+]
