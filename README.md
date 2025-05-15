@@ -1,5 +1,7 @@
 # mjpl
 
+[![Coverage Status](https://coveralls.io/repos/github/adlarkin/mjpl/badge.svg?branch=main)](https://coveralls.io/github/adlarkin/mjpl?branch=main)
+
 MuJoCo motion planning library.
 
 > [!Note]
