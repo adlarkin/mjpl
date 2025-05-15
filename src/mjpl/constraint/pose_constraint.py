@@ -1,7 +1,6 @@
 import mujoco
 import numpy as np
-from mink import SE3
-from mink.lie.so3 import RollPitchYaw
+from mink import SE3, SO3
 
 from .. import utils
 from .constraint_interface import Constraint
@@ -82,6 +81,9 @@ class PoseConstraint(Constraint):
             if np.linalg.norm(dx) <= self.tolerance:
                 return q_projected
             J = self._get_jacobian(q_projected)
+            """
+            q_err = J.T @ np.linalg.inv((J @ J.T) + (1e-4 * np.eye(6))) @ dx
+            """
             # Use pseudo-inverse in case J is singular.
             q_err = J.T @ np.linalg.pinv(J @ J.T) @ dx
             q_projected = q_projected - q_err
@@ -91,13 +93,15 @@ class PoseConstraint(Constraint):
                 return None
 
     def _displacement_from_constraint(self, q: np.ndarray) -> np.ndarray:
-        """Compute the displacement between a configuration and the pose constraints.
+        """Compute a configuration's displacement from the pose constraints.
 
         Args:
             q: The configuration.
 
         Returns:
-            A 6D displacement vector: {x, y, z, r, p, y}.
+            A 6D displacement vector where the first three elements are the
+            translation error (x,y,z) and last three elements are the rotation error
+            (rotation vector)
         """
         self.data.qpos = q
         mujoco.mj_kinematics(self.model, self.data)
@@ -120,16 +124,27 @@ class PoseConstraint(Constraint):
         delta_X[over] = d_C[over] - c_max[over]
         delta_X[under] = d_C[under] - c_min[under]
 
+        # Convert RPY error to rotation vector so that the error vector is a twist
+        # in SE3 (i.e., orientation error is a rotation vector), which can be used
+        # with the standard 6xn geometric Jacobian.
+        rotvec = SO3.from_rpy_radians(*delta_X[3:]).log()
+
+        # Clamp the rotation vector to handle wrapping/discontinuities for large RPY error.
+        max_angle = np.pi
+        if np.linalg.norm(rotvec) > max_angle:
+            rotvec *= max_angle / np.linalg.norm(rotvec)
+        delta_X[3:] = rotvec
+
         return delta_X
 
     def _get_jacobian(self, q: np.ndarray) -> np.ndarray:
-        """Get the RPY Jacobian of the site.
+        """Get the Jacobian of the site.
 
         Args:
             q: The configuration.
 
         Returns:
-            The RPY Jacobian.
+            The Jacobian.
         """
         # Get the Jacobian with respect to the site.
         # mj_kinematics updates frame transforms, and mj_comPos updates jacobians:
@@ -141,31 +156,4 @@ class PoseConstraint(Constraint):
         jac = np.zeros((6, self.model.nv))
         mujoco.mj_jacSite(self.model, self.data, jac[:3], jac[3:], self.site_id)
 
-        # Apply linear transformation to get the RPY Jacobian.
-        world_T_site = utils.site_pose(self.data, self.site)
-        rpy = world_T_site.rotation().as_rpy_radians()
-        return _e_rpy(rpy) @ jac
-
-
-def _e_rpy(rpy: RollPitchYaw):
-    """Linear transformation that converts angular velocity Jacobian to RPY Jacobian.
-
-    Additional information:
-    - https://ieeexplore.ieee.org/document/4399305 (appendix)
-    - https://personalrobotics.cs.washington.edu/publications/berenson2009cbirrt.pdf (section 4b)
-    """
-    c_p = np.cos(rpy.pitch)
-    c_y = np.cos(rpy.yaw)
-    s_p = np.sin(rpy.pitch)
-    s_y = np.sin(rpy.yaw)
-
-    E_rpy = np.eye(6)
-    E_rpy[3:6, 3:5] = np.array(
-        [
-            [c_y / c_p, s_y / c_p],
-            [-s_y, c_p],
-            [c_y * (s_p / c_p), s_y * (s_p / c_p)],
-        ]
-    )
-
-    return E_rpy
+        return jac
