@@ -1,28 +1,46 @@
 """mjpl: MuJoCo motion planning library."""
 
-from .cartesian_planner import cartesian_plan
-from .collision_ruleset import CollisionRuleset
+from .constraint import (
+    CollisionConstraint,
+    JointLimitConstraint,
+    PoseConstraint,
+    apply_constraints,
+    obeys_constraints,
+)
 from .inverse_kinematics import MinkIKSolver
-from .joint_group import JointGroup
-from .rrt import RRT, RRTOptions
+from .planning.cartesian_planner import cartesian_plan
+from .planning.rrt import RRT
+from .planning.utils import path_length, smooth_path
 from .trajectory import (
     RuckigTrajectoryGenerator,
     ToppraTrajectoryGenerator,
-    generate_collision_free_trajectory,
+    generate_constrained_trajectory,
 )
-from .utils import random_valid_config, shortcut, site_pose
+from .utils import (
+    all_joints,
+    qpos_idx,
+    qvel_idx,
+    random_config,
+    site_pose,
+)
 
 __all__ = (
-    "CollisionRuleset",
+    "CollisionConstraint",
+    "JointLimitConstraint",
     "MinkIKSolver",
-    "JointGroup",
+    "PoseConstraint",
     "RRT",
-    "RRTOptions",
     "RuckigTrajectoryGenerator",
     "ToppraTrajectoryGenerator",
+    "all_joints",
+    "apply_constraints",
     "cartesian_plan",
-    "generate_collision_free_trajectory",
-    "random_valid_config",
+    "generate_constrained_trajectory",
+    "obeys_constraints",
+    "path_length",
+    "qpos_idx",
+    "qvel_idx",
+    "random_config",
     "site_pose",
-    "shortcut",
+    "smooth_path",
 )

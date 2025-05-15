@@ -27,27 +27,25 @@ if __name__ == "__main__":
     # NOTE: modify these parameters as needed for your benchmarking needs.
     model = mujoco.MjModel.from_xml_path(_PANDA_XML.as_posix())
     planning_joints = [
-        model.joint("joint1").id,
-        model.joint("joint2").id,
-        model.joint("joint3").id,
-        model.joint("joint4").id,
-        model.joint("joint5").id,
-        model.joint("joint6").id,
-        model.joint("joint7").id,
+        "joint1",
+        "joint2",
+        "joint3",
+        "joint4",
+        "joint5",
+        "joint6",
+        "joint7",
     ]
-    allowed_collisions = np.array(
-        [
-            [model.body("left_finger").id, model.body("right_finger").id],
-        ]
-    )
+    allowed_collisions = [("left_finger", "right_finger")]
     max_planning_time = 10
     epsilon = 0.05
     seed = 42
     goal_biasing_probability = 0.1
     number_of_attempts = 15
 
-    arm_jg = mjpl.JointGroup(model, planning_joints)
-    cr = mjpl.CollisionRuleset(model, allowed_collisions)
+    constraints = [
+        mjpl.JointLimitConstraint(model),
+        mjpl.CollisionConstraint(model),
+    ]
 
     # Plan number_of_attempts times and record benchmarks.
     successful_planning_times = []
@@ -58,27 +56,27 @@ if __name__ == "__main__":
 
         # From the initial state, generate a goal pose.
         data = mujoco.MjData(model)
-        mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
-        rng = np.random.default_rng(seed=seed)
-        q_goal = mjpl.random_valid_config(rng, arm_jg, data, cr)
-        arm_jg.fk(q_goal, data)
+        data.qpos = mjpl.random_config(
+            model, q_init, planning_joints, seed, constraints
+        )
+        mujoco.mj_kinematics(model, data)
         goal_pose = mjpl.site_pose(data, _PANDA_EE_SITE)
 
-        planner_options = mjpl.RRTOptions(
-            jg=arm_jg,
-            cr=cr,
+        planner = mjpl.RRT(
+            model,
+            planning_joints,
+            constraints,
             max_planning_time=max_planning_time,
             epsilon=epsilon,
             seed=seed,
             goal_biasing_probability=goal_biasing_probability,
         )
-        planner = mjpl.RRT(planner_options)
 
         print(f"Attempt {i}...")
         start_time = time.time()
-        path = planner.plan_to_pose(q_init, goal_pose, _PANDA_EE_SITE)
+        waypoints = planner.plan_to_pose(q_init, goal_pose, _PANDA_EE_SITE)
         elapsed_time = time.time() - start_time
-        if path:
+        if waypoints:
             successful_planning_times.append(elapsed_time)
     print()
 

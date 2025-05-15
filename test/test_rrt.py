@@ -5,234 +5,178 @@ import mujoco
 import numpy as np
 
 import mjpl
-from mjpl.tree import Node, Tree
 
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
-_BALL_XML = _MODEL_DIR / "ball.xml"
+_ONE_DOF_BALL_XML = _MODEL_DIR / "one_dof_ball.xml"
+_TWO_DOF_BALL_XML = _MODEL_DIR / "two_dof_ball.xml"
 
 
 class TestRRT(unittest.TestCase):
-    def load_ball_with_obstacle_model(self):
-        model = mujoco.MjModel.from_xml_path(_BALL_XML.as_posix())
+    def test_run_rrt(self):
+        model = mujoco.MjModel.from_xml_path(_ONE_DOF_BALL_XML.as_posix())
+        constraints = [
+            mjpl.JointLimitConstraint(model),
+            mjpl.CollisionConstraint(model),
+        ]
+        epsilon = 0.1
 
-        self.obstacle = model.geom("wall_obstacle")
+        q_init = np.array([-0.2])
+        q_goal = np.array([0.35])
 
-        planning_joints = [model.joint("ball_slide_x").id]
-        jg = mjpl.JointGroup(model, planning_joints)
+        planner = mjpl.RRT(
+            model,
+            mjpl.all_joints(model),
+            constraints,
+            max_planning_time=5.0,
+            epsilon=epsilon,
+            seed=42,
+        )
+        waypoints = planner.plan_to_config(q_init, q_goal)
+        self.assertGreater(len(waypoints), 2)
 
-        cr = mjpl.CollisionRuleset(model)
+        # The waypoints should start at q_init and end at q_goal.
+        np.testing.assert_equal(waypoints[0], q_init)
+        np.testing.assert_equal(waypoints[-1], q_goal)
 
-        options = mjpl.RRTOptions(
-            jg=jg,
-            cr=cr,
+        # Subsequent waypoints should be no further than epsilon apart.
+        for i in range(1, len(waypoints)):
+            self.assertLessEqual(
+                np.linalg.norm(waypoints[i] - waypoints[i - 1]),
+                epsilon,
+            )
+
+        # The waypoints should obey constraints.
+        for wp in waypoints:
+            self.assertTrue(mjpl.obeys_constraints(wp, constraints))
+
+    def test_run_rrt_subset_joints(self):
+        model = mujoco.MjModel.from_xml_path(_TWO_DOF_BALL_XML.as_posix())
+        constraints = [
+            mjpl.JointLimitConstraint(model),
+            mjpl.CollisionConstraint(model),
+        ]
+        epsilon = 0.1
+
+        q_init = np.array([0.0, 0.0])
+        q_goal = np.array([0.3, 0.0])
+        planning_joints = ["ball_slide_x"]
+
+        planner = mjpl.RRT(
+            model,
+            planning_joints,
+            constraints,
+            max_planning_time=5.0,
+            epsilon=epsilon,
+            seed=42,
+        )
+        waypoints = planner.plan_to_config(q_init, q_goal)
+        self.assertGreater(len(waypoints), 2)
+
+        # The waypoints should start at q_init and end at q_goal.
+        np.testing.assert_equal(waypoints[0], q_init)
+        np.testing.assert_equal(waypoints[-1], q_goal)
+
+        # Subsequent waypoints should be no further than epsilon apart.
+        for i in range(1, len(waypoints)):
+            self.assertLessEqual(
+                np.linalg.norm(waypoints[i] - waypoints[i - 1]),
+                epsilon,
+            )
+
+        # The waypoints should obey constraints.
+        for wp in waypoints:
+            self.assertTrue(mjpl.obeys_constraints(wp, constraints))
+
+    def test_trivial_rrt(self):
+        model = mujoco.MjModel.from_xml_path(_ONE_DOF_BALL_XML.as_posix())
+        constraints = [
+            mjpl.JointLimitConstraint(model),
+            mjpl.CollisionConstraint(model),
+        ]
+        epsilon = 0.1
+
+        q_init = np.array([0.0])
+        q_goal = np.array([0.05])
+
+        # Plan to a goal that is immediately reachable.
+        planner = mjpl.RRT(
+            model,
+            mjpl.all_joints(model),
+            constraints,
+            max_planning_time=5.0,
+            epsilon=epsilon,
+            seed=42,
+        )
+        waypoints = planner.plan_to_config(q_init, q_goal)
+        self.assertEqual(len(waypoints), 2)
+        np.testing.assert_equal(waypoints[0], q_init)
+        np.testing.assert_equal(waypoints[1], q_goal)
+
+        # The waypoints should obey constraints.
+        self.assertTrue(mjpl.obeys_constraints(waypoints[0], constraints))
+        self.assertTrue(mjpl.obeys_constraints(waypoints[1], constraints))
+
+    def test_trivial_rrt_subset_joints(self):
+        model = mujoco.MjModel.from_xml_path(_TWO_DOF_BALL_XML.as_posix())
+        constraints = [
+            mjpl.JointLimitConstraint(model),
+            mjpl.CollisionConstraint(model),
+        ]
+        epsilon = 0.1
+
+        q_init = np.array([0.0, 0.0])
+        q_goal = np.array([0.05, 0.0])
+        planning_joints = ["ball_slide_x"]
+
+        # Plan to a goal that is immediately reachable.
+        planner = mjpl.RRT(
+            model,
+            planning_joints,
+            constraints,
+            max_planning_time=5.0,
+            epsilon=epsilon,
+            seed=42,
+        )
+        waypoints = planner.plan_to_config(q_init, q_goal)
+        self.assertEqual(len(waypoints), 2)
+        np.testing.assert_equal(waypoints[0], q_init)
+        np.testing.assert_equal(waypoints[1], q_goal)
+
+        # The waypoints should obey constraints.
+        self.assertTrue(mjpl.obeys_constraints(waypoints[0], constraints))
+        self.assertTrue(mjpl.obeys_constraints(waypoints[1], constraints))
+
+    def test_invalid_args(self):
+        model = mujoco.MjModel.from_xml_path(_ONE_DOF_BALL_XML.as_posix())
+        joints = mjpl.all_joints(model)
+
+        with self.assertRaisesRegex(ValueError, "max_planning_time"):
+            mjpl.RRT(model, joints, [], max_planning_time=0.0)
+            mjpl.RRT(model, joints, [], max_planning_time=-1.0)
+        with self.assertRaisesRegex(ValueError, "epsilon"):
+            mjpl.RRT(model, joints, [], epsilon=0.0)
+            mjpl.RRT(model, joints, [], epsilon=-1.0)
+        with self.assertRaisesRegex(ValueError, "goal_biasing_probability"):
+            mjpl.RRT(model, joints, [], goal_biasing_probability=-1.0)
+            mjpl.RRT(model, joints, [], goal_biasing_probability=2.0)
+        with self.assertRaisesRegex(ValueError, "planning_joints"):
+            mjpl.RRT(model, [], [])
+
+        model = mujoco.MjModel.from_xml_path(_TWO_DOF_BALL_XML.as_posix())
+        joints = ["ball_slide_y"]
+        planner = mjpl.RRT(
+            model,
+            ["ball_slide_y"],
+            [],
             max_planning_time=5.0,
             epsilon=0.1,
             seed=42,
         )
-
-        # Initial joint configuration.
-        # We're testing with a simple model: a ball that can slide along the x-axis.
-        # So there's only one value in data.qpos (the ball's x position)
-        self.q_init = np.array([-0.1])
-
-        self.planner = mjpl.RRT(options)
-
-    def test_extend(self):
-        self.load_ball_with_obstacle_model()
-
-        tree = Tree(Node(self.q_init))
-
-        q_goal = np.array([0.5])
-        expected_q_extended = np.array([0.0])
-        extended_node = self.planner._extend(q_goal, tree)
-        self.assertIsNotNone(extended_node)
-        self.assertEqual(len(tree.nodes), 2)
-        self.assertAlmostEqual(extended_node.q, expected_q_extended, places=9)
-
-        # Check the path starting from the extended node.
-        # This implicitly checks the extended node's parent.
-        expected_path = [
-            expected_q_extended,
-            self.q_init,
-        ]
-        path = [n.q for n in tree.get_path(extended_node)]
-        self.assertEqual(len(path), len(expected_path))
-        for i in range(len(path)):
-            self.assertAlmostEqual(path[i][0], expected_path[i][0], places=9)
-
-        # extending towards a q that is already in the tree should do nothing
-        existing_nodes = tree.nodes.copy()
-        same_extended_node = self.planner._extend(extended_node.q, tree)
-        self.assertIsNotNone(same_extended_node)
-        self.assertSetEqual(tree.nodes, existing_nodes)
-        # The assertSetEqual above runs the equality operator on all elements of the set.
-        # Since node equality is defined as having the same q, we should take the check a
-        # step further to ensure that same_extended_node and extended_node are the same object.
-        self.assertIs(same_extended_node, extended_node)
-
-        # Test extend where the "nearest node" is already given
-        root_node = Node(np.array([0.0]))
-        tree = Tree(root_node)
-        tree.add_node(Node(np.array([2.0]), root_node))
-        extended_node = self.planner._extend(np.array([3.0]), tree, root_node)
-        self.assertIsNotNone(extended_node)
-        self.assertIs(extended_node.parent, root_node)
-        self.assertAlmostEqual(extended_node.q[0], 0.1, places=9)
-
-    def test_connect(self):
-        self.load_ball_with_obstacle_model()
-
-        tree = Tree(Node(self.q_init))
-
-        q_goal = np.array([0.15])
-        goal_node = self.planner._connect(q_goal, tree)
-
-        expected_qs_in_tree = [
-            self.q_init,
-            np.array([0.0]),
-            np.array([0.1]),
-            q_goal,
-        ]
-        for q_tree in expected_qs_in_tree:
-            n = tree.nearest_neighbor(q_tree)
-            self.assertAlmostEqual(n.q[0], q_tree[0], places=9)
-
-        # Check the path from the last connected node.
-        # This implicitly checks each connected node's parent.
-        expected_path = expected_qs_in_tree[::-1]
-        path = [n.q for n in tree.get_path(goal_node)]
-        self.assertEqual(len(path), len(expected_path))
-        for i in range(len(path)):
-            self.assertAlmostEqual(path[i][0], expected_path[i][0], places=9)
-
-        # connecting towards a q that is already in the tree should do nothing
-        existing_nodes = tree.nodes.copy()
-        same_connected_node = self.planner._connect(goal_node.q, tree)
-        self.assertSetEqual(tree.nodes, existing_nodes)
-        # The assertSetEqual above runs the equality operator on all elements of the set.
-        # Since node equality is defined as having the same q, we should take the check a
-        # step further to ensure that same_extended_node and extended_node are the same object.
-        self.assertIs(same_connected_node, goal_node)
-
-    def test_connect_max_distance(self):
-        self.load_ball_with_obstacle_model()
-
-        tree = Tree(Node(self.q_init))
-        q_goal = np.array([0.15])
-
-        # Run one connect operation to a max distance.
-        goal_node = self.planner._connect(
-            q_goal, tree, eps=0.05, max_connection_distance=0.075
-        )
-
-        expected_qs_in_tree = [
-            self.q_init,
-            np.array([-0.05]),  # Moves one "eps"
-            np.array([-0.025]),  # Moves to max connection distance
-        ]
-        for q_tree in expected_qs_in_tree:
-            n = tree.nearest_neighbor(q_tree)
-            self.assertAlmostEqual(n.q[0], q_tree[0], places=9)
-
-        # Run a second and third connect which should still not get to the goal.
-        for _ in range(2):
-            goal_node = self.planner._connect(
-                q_goal, tree, eps=0.05, max_connection_distance=0.075
-            )
-
-        expected_qs_in_tree.extend(
-            [
-                np.array([0.025]),  # Moves one "eps"
-                np.array([0.05]),  # Moves to max connection distance
-                np.array([0.1]),  # Moves one more "eps"
-                np.array([0.125]),  # Moves to max connection distance
-            ]
-        )
-        for q_tree in expected_qs_in_tree:
-            n = tree.nearest_neighbor(q_tree)
-            self.assertAlmostEqual(n.q[0], q_tree[0], places=9)
-
-        # The final connect should finally reach the goal!
-        goal_node = self.planner._connect(
-            q_goal, tree, eps=0.05, max_connection_distance=0.075
-        )
-        self.assertAlmostEqual(goal_node.q[0], q_goal[0], places=9)
-
-    def test_extend_and_connect_into_obstacle(self):
-        self.load_ball_with_obstacle_model()
-
-        tree = Tree(Node(self.q_init))
-
-        # Try to connect to the maximum joint value for the ball.
-        # There is an obstacle in the way, so the final connection should be just before
-        # where the obstacle lies.
-        q_goal = np.array([1.0])
-        connected_node = self.planner._connect(q_goal, tree)
-        obstacle_min_x = self.obstacle.pos[0] - self.obstacle.size[0]
-        self.assertLess(connected_node.q[0], obstacle_min_x)
-
-        # Try to extend towards the goal.
-        # This should not work since the extension is in collision.
-        existing_nodes = tree.nodes.copy()
-        extended_node = self.planner._extend(q_goal, tree)
-        self.assertIsNone(extended_node)
-        self.assertSetEqual(tree.nodes, existing_nodes)
-
-    def test_combine_paths(self):
-        self.load_ball_with_obstacle_model()
-
-        q_new = np.array([0.15])
-
-        start_tree = Tree(Node(self.q_init))
-        connected_node_a = self.planner._connect(q_new, start_tree)
-
-        goal_tree = Tree(Node(np.array([0.5])))
-        connected_node_b = self.planner._connect(q_new, goal_tree)
-
-        path = self.planner._combine_paths(
-            start_tree, connected_node_a, goal_tree, connected_node_b
-        )
-        expected_path = [
-            self.q_init,
-            np.array([0.0]),
-            np.array([0.1]),
-            np.array([0.15]),
-            np.array([0.2]),
-            np.array([0.3]),
-            np.array([0.4]),
-            np.array([0.5]),
-        ]
-        self.assertEqual(len(path), len(expected_path))
-        for i in range(len(path)):
-            self.assertAlmostEqual(path[i][0], expected_path[i][0], places=9)
-
-    def test_run_rrt(self):
-        self.load_ball_with_obstacle_model()
-
-        q_goal = np.array([0.35])
-        path = self.planner.plan_to_config(self.q_init, q_goal)
-        self.assertGreater(len(path), 2)
-
-        # The path should start at q_init and end at q_goal
-        np.testing.assert_equal(path[0], self.q_init)
-        np.testing.assert_equal(path[-1], q_goal)
-
-        for i in range(1, len(path)):
-            self.assertLessEqual(
-                mjpl.utils.configuration_distance(path[i - 1], path[i]),
-                self.planner.options.epsilon,
-            )
-
-    def test_trivial_rrt(self):
-        self.load_ball_with_obstacle_model()
-
-        # If we plan to a goal that is directly reachable, the planner should make the direct connection and exit
-        q_goal = np.array([-0.05])
-        path = self.planner.plan_to_config(self.q_init, q_goal)
-        self.assertEqual(len(path), 2)
-        np.testing.assert_equal(path[0], self.q_init)
-        np.testing.assert_equal(path[1], q_goal)
+        with self.assertRaisesRegex(
+            ValueError, "values for joints outside of the planner's planning joints"
+        ):
+            planner.plan_to_config(np.array([0.0, 0.0]), np.array([0.1, 0.0]))
 
 
 if __name__ == "__main__":

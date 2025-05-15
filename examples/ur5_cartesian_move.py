@@ -1,3 +1,4 @@
+import sys
 import time
 from pathlib import Path
 
@@ -25,26 +26,14 @@ def circle_waypoints(
     return np.stack((x, y), axis=1)
 
 
-def main():
+# Return whether or not the example was successful. This is used in CI.
+def main() -> bool:
     visualize, seed = ex_utils.parse_args(
         description="Compute and follow a trajectory along a cartesian path."
     )
 
     model = mujoco.MjModel.from_xml_path(_UR5_XML.as_posix())
     data = mujoco.MjData(model)
-
-    arm_joints = [
-        "shoulder_pan_joint",
-        "shoulder_lift_joint",
-        "elbow_joint",
-        "wrist_1_joint",
-        "wrist_2_joint",
-        "wrist_3_joint",
-    ]
-    arm_joint_ids = [model.joint(joint).id for joint in arm_joints]
-    arm_jg = mjpl.JointGroup(model, arm_joint_ids)
-
-    cr = mjpl.CollisionRuleset(model)
 
     # Let the "home" keyframe in the MJCF be the initial state.
     home_keyframe = model.keyframe("home")
@@ -65,27 +54,23 @@ def main():
 
     solver = mjpl.MinkIKSolver(
         model=model,
-        jg=arm_jg,
-        cr=cr,
+        joints=mjpl.all_joints(model),
+        constraints=[mjpl.CollisionConstraint(model)],
         seed=seed,
         max_attempts=5,
     )
 
     print("Planning...")
     start = time.time()
-    path = mjpl.cartesian_plan(q_init, poses, _UR5_EE_SITE, solver)
-    if not path:
+    waypoints = mjpl.cartesian_plan(q_init, poses, _UR5_EE_SITE, solver)
+    if not waypoints:
         print("Planning failed")
-        return
+        return False
     print(f"Planning took {(time.time() - start):.4f}s")
-
-    # Cartesian plan gives full world configuration.
-    # We only need the joints in the JointGroup for trajectory generation.
-    path_jg = [q[arm_jg.qpos_addrs] for q in path]
 
     # The trajectory limits used here are for demonstration purposes only.
     # In practice, consult your hardware spec sheet for this information.
-    dof = len(arm_joints)
+    dof = len(waypoints[0])
     traj_generator = mjpl.ToppraTrajectoryGenerator(
         dt=model.opt.timestep,
         max_velocity=np.ones(dof) * 0.5 * np.pi,
@@ -94,25 +79,17 @@ def main():
 
     print("Generating trajectory...")
     start = time.time()
-    trajectory = traj_generator.generate_trajectory(path_jg)
+    trajectory = traj_generator.generate_trajectory(waypoints)
+    if trajectory is None:
+        print("Trajectory generation failed.")
+        return False
     print(f"Trajectory generation took {(time.time() - start):.4f}s")
-
-    # Actuator indices in data.ctrl that correspond to the joints in the trajectory.
-    actuators = [
-        "shoulder_pan",
-        "shoulder_lift",
-        "elbow",
-        "wrist_1",
-        "wrist_2",
-        "wrist_3",
-    ]
-    actuator_ids = [model.actuator(act).id for act in actuators]
 
     # Follow the trajectory via position control, starting from the initial state.
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
     q_t = [q_init]
     for q_ref in trajectory.positions:
-        data.ctrl[actuator_ids] = q_ref
+        data.ctrl = q_ref
         mujoco.mj_step(model, data)
         q_t.append(data.qpos.copy())
 
@@ -120,6 +97,8 @@ def main():
         with mujoco.viewer.launch_passive(
             model=model, data=data, show_left_ui=False, show_right_ui=False
         ) as viewer:
+            assert viewer.user_scn is not None
+
             # Update the viewer's orientation to capture the scene.
             viewer.cam.lookat = [-0.1, 0, 0.35]
             viewer.cam.distance = 1.5
@@ -134,23 +113,27 @@ def main():
                     viewer.user_scn,
                     p.translation(),
                     radius=0.004,
-                    rgba=[0.6, 0.2, 0.2, 0.7],
+                    rgba=np.array([0.6, 0.2, 0.2, 0.7]),
                 )
 
             # Visualize the trajectory. The trajectory is of high resolution,
             # so plotting every other timestep should be sufficient.
             for q_ref in trajectory.positions[::2]:
-                arm_jg.fk(q_ref, data)
+                data.qpos = q_ref
+                mujoco.mj_kinematics(model, data)
                 pos = data.site(_UR5_EE_SITE).xpos
                 viz.add_sphere(
-                    viewer.user_scn, pos, radius=0.002, rgba=[0.2, 0.6, 0.2, 0.2]
+                    viewer.user_scn,
+                    pos,
+                    radius=0.002,
+                    rgba=np.array([0.2, 0.6, 0.2, 0.2]),
                 )
 
             # Replay the robot following the trajectory.
             for q_actual in q_t:
                 start_time = time.time()
                 if not viewer.is_running():
-                    return
+                    return True
                 data.qpos = q_actual
                 mujoco.mj_kinematics(model, data)
                 viewer.sync()
@@ -158,6 +141,10 @@ def main():
                 if time_until_next_step > 0:
                     time.sleep(time_until_next_step)
 
+    return True
+
 
 if __name__ == "__main__":
-    main()
+    success = main()
+    if not success:
+        sys.exit(1)

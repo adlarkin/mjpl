@@ -14,6 +14,8 @@ class Trajectory:
 
     # The timestep between each position, velocity, and acceleration snapshot.
     dt: float
+    # Initial configuration (at t = 0).
+    q_init: np.ndarray
     # Position snapshots at increments of dt, ranging from t = [dt, t_f].
     positions: list[np.ndarray]
     # Velocity snapshots at increments of dt, ranging from t = [dt, t_f]
@@ -26,13 +28,14 @@ class TrajectoryGenerator(ABC):
     """Abstract base class for generating trajectories."""
 
     @abstractmethod
-    def generate_trajectory(self, path: list[np.ndarray]) -> Trajectory:
+    def generate_trajectory(self, waypoints: list[np.ndarray]) -> Trajectory | None:
         """Generate a trajectory.
 
         Args:
-            path: A sequence of waypoints the trajectory should follow.
+            waypoints: The waypoints for the trajectory to follow.
 
         Returns:
-            A trajectory that follows `path`.
+            A trajectory that follows `waypoints`, or None if a trajectory cannot be
+            generated.
         """
         pass

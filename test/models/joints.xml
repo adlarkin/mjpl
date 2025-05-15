@@ -1,0 +1,22 @@
+<mujoco model="Model with a variety of joints">
+  <worldbody>
+    <body>
+      <geom size="1"/>
+      <joint name="slide_joint" type="slide"/>
+    </body>
+
+    <body>
+      <geom size="1"/>
+      <freejoint name="free_joint"/>
+      <body>
+        <geom size="1"/>
+        <joint name="hinge_joint" type="hinge"/>
+      </body>
+    </body>
+
+    <body>
+      <geom size="1"/>
+      <joint name="ball_joint" type="ball"/>
+    </body>
+  </worldbody>
+</mujoco>

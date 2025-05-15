@@ -1,24 +1,34 @@
 # mjpl
 
+[![Coverage Status](https://coveralls.io/repos/github/adlarkin/mjpl/badge.svg?branch=main)](https://coveralls.io/github/adlarkin/mjpl?branch=main)
+
 MuJoCo motion planning library.
+
+> [!Note]
+> This project is under active development.
+> APIs may change, and features are still a work in progress.
+
+Features:
+- Joint-space planning via bi-directional RRT, with support for constraints
+- Cartesian-space planning
+- [Constraint interface](./src/mjpl/constraint/constraint_interface.py), which allows for defining arbitrary constraints
+- [IK Solver interface](./src/mjpl/inverse_kinematics/ik_solver_interface.py), which can be used for planning to pose targets
+- Trajectory generation via a [Trajectory Generator interface](./src/mjpl/trajectory/trajectory_interface.py)
+
+Limitations:
+- This library is designed for manipulator models that are composed of hinge/slide joints, and will not work with models that have ball/free joints.
 
 ## Installation
 
-Clone this repository and run the following from the repository root (`venv` is recommended):
-
 ```
-pip3 install -e .
+pip install mjpl
 ```
-
-## Getting started
-
-See the [examples](./examples) folder.
 
 ## Development
 
-For local development, install the developer dependencies:
+For local development, clone the repository and install the developer dependencies:
 ```
-pip3 install -e ".[dev]"
+pip install -e ".[dev]"
 ```
 
 This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting.
@@ -56,8 +66,7 @@ To bypass installed pre-commit hooks on commit:
 git commit --no-verify -m "your message"
 ```
 
-## Other notes
+## Acknowledgements:
 
-This project is under active development.
-APIs may change, and features are still a work in progress.
-The [issues](https://github.com/adlarkin/mjpl/issues) labeled `enhancement` track upcoming features to be developed.
+Thank you Sebastian Castro for the guidance and support that has been offered throughout the early stages of this project.
+If you find this library useful or interesting, consider checking out Sebastian's [pyroboplan](https://github.com/sea-bass/pyroboplan), which offers similar features via [Pinocchio](https://github.com/stack-of-tasks/pinocchio)!

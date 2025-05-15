@@ -40,20 +40,21 @@ class ToppraTrajectoryGenerator(TrajectoryGenerator):
             acceleration_limits
         )
 
-    def generate_trajectory(self, path: list[np.ndarray]) -> Trajectory:
+    def generate_trajectory(self, waypoints: list[np.ndarray]) -> Trajectory | None:
         instance = ta.algorithm.TOPPRA(
             constraint_list=[self.velocity_constraint, self.acceleration_constraint],
-            path=ta.SplineInterpolator(np.linspace(0, 1, len(path)), path),
+            path=ta.SplineInterpolator(np.linspace(0, 1, len(waypoints)), waypoints),
             parametrizer="ParametrizeConstAccel",
         )
         trajectory = instance.compute_trajectory()
         if trajectory is None:
-            raise ValueError("Trajectory generation failed.")
+            return None
         t = np.arange(self.dt, trajectory.duration, self.dt)
         if not np.isclose(t[-1], trajectory.duration, rtol=0.0, atol=1e-8):
             t = np.append(t, trajectory.duration)
         return Trajectory(
             self.dt,
+            waypoints[0],
             [position for position in trajectory(t)],
             [velocity for velocity in trajectory(t, order=1)],
             [acceleration for acceleration in trajectory(t, order=2)],
