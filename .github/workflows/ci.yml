@@ -38,6 +38,11 @@ jobs:
       - name: Run tests
         run: python -m unittest -v
 
+      - name: "Coveralls"
+        run: coveralls
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run example scripts
         run: |
           scripts=(
