@@ -1,7 +1,7 @@
 import numpy as np
 from mink.lie import SE3
 
-from ..inverse_kinematics.ik_solver import IKSolver
+from ..inverse_kinematics.ik_solver_interface import IKSolver
 
 
 def _interpolate_poses(
