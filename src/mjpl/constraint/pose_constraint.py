@@ -27,6 +27,7 @@ class PoseConstraint(Constraint):
         yaw: tuple[float, float] = (-np.inf, np.inf),
         tolerance: float = 0.001,
         q_step: float = 0.05,
+        damping: float = 0.0001,
     ) -> None:
         """
         Constructor.
@@ -46,6 +47,8 @@ class PoseConstraint(Constraint):
                 pose constraints.
             q_step: The maximum distance (in configuration space) the constrained
                 configuration can be from another configuration.
+            damping: Damping term for underlying pseudoinverse computation. This
+                increases numerical stability near singularities.
         """
         if tolerance < 0.0:
             raise ValueError("`tolerance` must be >= 0.")
@@ -67,6 +70,7 @@ class PoseConstraint(Constraint):
         self.data = mujoco.MjData(model)
         self.joint_limit_constraint = JointLimitConstraint(model)
         self.site_id = model.site(site).id
+        self.diag = damping * np.eye(6)
 
     def valid_config(self, q: np.ndarray) -> bool:
         if not self.joint_limit_constraint.valid_config(q):
@@ -81,12 +85,9 @@ class PoseConstraint(Constraint):
             if np.linalg.norm(dx) <= self.tolerance:
                 return q_projected
             J = self._get_jacobian(q_projected)
-            """
-            q_err = J.T @ np.linalg.inv((J @ J.T) + (1e-4 * np.eye(6))) @ dx
-            """
-            # Use pseudo-inverse in case J is singular.
-            q_err = J.T @ np.linalg.pinv(J @ J.T) @ dx
-            q_projected = q_projected - q_err
+            # Solve system of equations: J @ dq = dx.
+            dq = J.T @ np.linalg.solve(J @ J.T + self.diag, dx)
+            q_projected -= dq
             violates_limits = not self.joint_limit_constraint.valid_config(q_projected)
             extends_too_far = np.linalg.norm(q_projected - q_old) > (2 * self.q_step)
             if violates_limits or extends_too_far:
@@ -127,13 +128,7 @@ class PoseConstraint(Constraint):
         # Convert RPY error to rotation vector so that the error vector is a twist
         # in SE3 (i.e., orientation error is a rotation vector), which can be used
         # with the standard 6xn geometric Jacobian.
-        rotvec = SO3.from_rpy_radians(*delta_X[3:]).log()
-
-        # Clamp the rotation vector to handle wrapping/discontinuities for large RPY error.
-        max_angle = np.pi
-        if np.linalg.norm(rotvec) > max_angle:
-            rotvec *= max_angle / np.linalg.norm(rotvec)
-        delta_X[3:] = rotvec
+        delta_X[3:] = SO3.from_rpy_radians(*delta_X[3:]).log()
 
         return delta_X
 
