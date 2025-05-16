@@ -40,6 +40,7 @@ classifiers = [
 
 [project.optional-dependencies]
 test = [
+  "coveralls",
   "robot_descriptions",
   "scipy",
 ]
@@ -68,4 +69,9 @@ select = [
 ignore = [
   # Line too long.
   "E501"
+]
+
+[tool.coverage.report]
+omit = [
+  "*visualization.py",
 ]

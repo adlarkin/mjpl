@@ -6,7 +6,7 @@ from mink import SE3
 from .. import utils
 from ..constraint.constraint_interface import Constraint
 from ..constraint.utils import obeys_constraints
-from .ik_solver import IKSolver
+from .ik_solver_interface import IKSolver
 
 
 class MinkIKSolver(IKSolver):
