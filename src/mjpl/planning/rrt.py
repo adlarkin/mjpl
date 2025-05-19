@@ -171,12 +171,13 @@ class RRT:
                 return [q_init, q]
 
         start_tree = Tree(Node(q_init))
-        # To support multiple goals, the root of the goal tree is a sink node
-        # (i.e., a node with an empty numpy array) and all goal configs are
-        # children of this sink node.
-        sink_node = Node(np.array([]))
+        # To support multiple goals, the root of the goal tree is a sink node and all
+        # goal configurations are children of this sink node. Setting the sink node to a
+        # configuration with all values being infinity emulates exclusion from nearest
+        # neighbor search in the tree, since the distance to this node is infinity.
+        sink_node = Node(np.ones_like(q_init) * np.inf)
         goal_nodes = [Node(q, sink_node) for q in q_goals]
-        goal_tree = Tree(sink_node, is_sink=True)
+        goal_tree = Tree(sink_node)
         for n in goal_nodes:
             goal_tree.add_node(n)
 
@@ -212,12 +213,14 @@ class RRT:
                 self.constraints,
             )
             if np.array_equal(q_reached_a, q_reached_b):
-                return _combine_paths(
+                waypoints = _combine_paths(
                     start_tree,
                     start_tree.nearest_neighbor(q_reached_a),
                     goal_tree,
                     goal_tree.nearest_neighbor(q_reached_a),
                 )
+                # Ignore the last value which corresponds to the goal tree's sink node.
+                return waypoints[:-1]
 
             # Swap trees.
             tree_a, tree_b = tree_b, tree_a
