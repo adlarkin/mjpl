@@ -13,7 +13,7 @@ class IKSolver(ABC):
         pose: SE3,
         site: str,
         q_init_guess: np.ndarray | None,
-    ) -> np.ndarray | None:
+    ) -> list[np.ndarray]:
         """Solve IK.
 
         Args:
@@ -22,7 +22,7 @@ class IKSolver(ABC):
             q_init_guess: Initial guess for the joint configuration.
 
         Returns:
-            The joint configuration that satisfies the target pose within the
-            allowed tolerances, or None if IK was unable to be solved.
+            A list of joint configurations that satisfy the target pose, or an empty
+            list if IK was unable to be solved.
         """
         pass

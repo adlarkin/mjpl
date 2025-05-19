@@ -71,8 +71,10 @@ def cartesian_plan(
 
     waypoints = [q_init]
     for p in interpolated_poses:
-        q = solver.solve_ik(p, site, waypoints[-1])
-        if q is None:
+        configs = solver.solve_ik(p, site, waypoints[-1])
+        if not configs:
             return []
-        waypoints.append(q)
+        # Use the configuration that's closest to the previous waypoint.
+        # TODO: enforce constraints? (need to update API if so)
+        waypoints.append(min(configs, key=lambda q: np.linalg.norm(q - waypoints[-1])))
     return waypoints

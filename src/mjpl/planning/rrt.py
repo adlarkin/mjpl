@@ -124,13 +124,14 @@ class RRT:
                 seed=self.seed,
                 max_attempts=5,
             )
-        potential_solutions = [
-            solver.solve_ik(p, site, q_init_guess=q_init) for p in poses
-        ]
-        valid_solutions = [q for q in potential_solutions if q is not None]
-        if not valid_solutions:
+        # TODO: enforce constraints on solutions? It's not guaranteed the IK solver
+        # will check for this
+        solutions = []
+        for p in poses:
+            solutions.extend(solver.solve_ik(p, site, q_init_guess=q_init))
+        if not solutions:
             return []
-        return self.plan_to_configs(q_init, valid_solutions)
+        return self.plan_to_configs(q_init, solutions)
 
     def plan_to_configs(
         self, q_init: np.ndarray, q_goals: list[np.ndarray]

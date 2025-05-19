@@ -39,21 +39,22 @@ class TestMinkIKSolver(unittest.TestCase):
         )
 
         # Solve IK (test both with/without an initial guess config)
-        ik_solutions = [
+        ik_solutions = []
+
+        ik_solutions.extend(
             solver.solve_ik(
                 pose=target_pose,
                 site=site_name,
                 q_init_guess=q_init,
-            ),
+            ))
+        ik_solutions.extend(
             solver.solve_ik(
                 pose=target_pose,
                 site=site_name,
                 q_init_guess=None,
-            ),
-        ]
-        self.assertIsNotNone(ik_solutions[0])
+            ))
+        self.assertEqual(len(ik_solutions), 2)
         self.assertTrue(mjpl.obeys_constraints(ik_solutions[0], constraints))
-        self.assertIsNotNone(ik_solutions[1])
         self.assertTrue(mjpl.obeys_constraints(ik_solutions[1], constraints))
 
         # Confirm that the IK solution gives a site pose within the specified error.
@@ -96,9 +97,9 @@ class TestMinkIKSolver(unittest.TestCase):
             seed=12345,
             max_attempts=5,
         )
-        solution = solver.solve_ik(target_pose, site_name, q_init)
-        self.assertIsNotNone(solution)
-        self.assertTrue(mjpl.obeys_constraints(solution, constraints))
+        solutions = solver.solve_ik(target_pose, site_name, q_init)
+        self.assertEqual(len(solutions), 1)
+        self.assertTrue(mjpl.obeys_constraints(solutions[0], constraints))
 
         # Check that only the specified subset of joints were modified in order to solve IK.
         fixed_idx = [
@@ -107,7 +108,7 @@ class TestMinkIKSolver(unittest.TestCase):
             if i not in mjpl.qpos_idx(model, modifiable_joints)
         ]
         np.testing.assert_allclose(
-            solution[fixed_idx], q_init[fixed_idx], rtol=0, atol=1e-12
+            solutions[0][fixed_idx], q_init[fixed_idx], rtol=0, atol=1e-12
         )
 
     def test_invalid_args(self):
