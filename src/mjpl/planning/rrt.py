@@ -172,9 +172,9 @@ class RRT:
 
         start_tree = Tree(Node(q_init))
         # To support multiple goals, the root of the goal tree is a sink node and all
-        # goal configs are children of this sink node. Setting the sink node to a
-        # configuration of infinity emulates exclusion from nearest neighbor search in
-        # the tree, since the distance to the sink node's configuration is infinity.
+        # goal configurations are children of this sink node. Setting the sink node to a
+        # configuration with all values being infinity emulates exclusion from nearest
+        # neighbor search in the tree, since the distance to this node is infinity.
         sink_node = Node(np.ones_like(q_init) * np.inf)
         goal_nodes = [Node(q, sink_node) for q in q_goals]
         goal_tree = Tree(sink_node)
@@ -219,8 +219,7 @@ class RRT:
                     goal_tree,
                     goal_tree.nearest_neighbor(q_reached_a),
                 )
-                # Ignore the last value (infinity) which corresponds to  the sink node
-                # in the goal tree).
+                # Ignore the last value which corresponds to the goal tree's sink node.
                 return waypoints[:-1]
 
             # Swap trees.

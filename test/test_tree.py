@@ -17,6 +17,9 @@ class TestNode(unittest.TestCase):
         self.assertNotEqual(b, c)
         self.assertEqual(c, d)
 
+        # Properly handle non-Node types.
+        self.assertNotEqual(a, 5)
+
 
 class TestTree(unittest.TestCase):
     def build_tree(self) -> Tree:
