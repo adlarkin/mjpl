@@ -46,13 +46,15 @@ class TestMinkIKSolver(unittest.TestCase):
                 pose=target_pose,
                 site=site_name,
                 q_init_guess=q_init,
-            ))
+            )
+        )
         ik_solutions.extend(
             solver.solve_ik(
                 pose=target_pose,
                 site=site_name,
                 q_init_guess=None,
-            ))
+            )
+        )
         self.assertEqual(len(ik_solutions), 2)
         self.assertTrue(mjpl.obeys_constraints(ik_solutions[0], constraints))
         self.assertTrue(mjpl.obeys_constraints(ik_solutions[1], constraints))
