@@ -1,6 +1,8 @@
 import numpy as np
 from mink.lie import SE3
 
+from ..constraint.constraint_interface import Constraint
+from ..constraint.utils import obeys_constraints
 from ..inverse_kinematics.ik_solver_interface import IKSolver
 
 
@@ -43,6 +45,7 @@ def cartesian_plan(
     poses: list[SE3],
     site: str,
     solver: IKSolver,
+    constraints: list[Constraint],
     lin_threshold: float = 0.01,
     ori_threshold: float = 0.1,
 ) -> list[np.ndarray]:
@@ -53,6 +56,7 @@ def cartesian_plan(
         poses: The Cartesian path. These poses should be in the world frame.
         site: The site (i.e., frame) that should follow the Cartesian path.
         solver: Solver used to compute IK for `poses` and `site`.
+        constraints: The constraints configurations in the Cartesian path must obey.
         lin_threshold: The maximum linear distance (in meters) allowed between
             adjacent poses in `poses`. Pose interpolation will occur if this threshold
             is exceeded.
@@ -71,8 +75,13 @@ def cartesian_plan(
 
     waypoints = [q_init]
     for p in interpolated_poses:
-        q = solver.solve_ik(p, site, waypoints[-1])
-        if q is None:
+        configs = [
+            q
+            for q in solver.solve_ik(p, site, q_init_guess=waypoints[-1])
+            if obeys_constraints(q, constraints)
+        ]
+        if not configs:
             return []
-        waypoints.append(q)
+        # Use the configuration that's closest to the previous waypoint.
+        waypoints.append(min(configs, key=lambda q: np.linalg.norm(q - waypoints[-1])))
     return waypoints

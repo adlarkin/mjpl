@@ -116,21 +116,20 @@ class RRT:
             that satisfies a pose in `poses`. If a path cannot be found, an empty
             list is returned.
         """
-        if solver is None:
-            solver = MinkIKSolver(
-                model=self.model,
-                joints=self.planning_joints,
-                constraints=self.constraints,
-                seed=self.seed,
-                max_attempts=5,
-            )
-        potential_solutions = [
-            solver.solve_ik(p, site, q_init_guess=q_init) for p in poses
+        _solver = solver or MinkIKSolver(
+            model=self.model,
+            joints=self.planning_joints,
+            constraints=self.constraints,
+            seed=self.seed,
+            max_attempts=5,
+        )
+        configs = [
+            q
+            for p in poses
+            for q in _solver.solve_ik(p, site, q_init_guess=q_init)
+            if obeys_constraints(q, self.constraints)
         ]
-        valid_solutions = [q for q in potential_solutions if q is not None]
-        if not valid_solutions:
-            return []
-        return self.plan_to_configs(q_init, valid_solutions)
+        return [] if not configs else self.plan_to_configs(q_init, configs)
 
     def plan_to_configs(
         self, q_init: np.ndarray, q_goals: list[np.ndarray]

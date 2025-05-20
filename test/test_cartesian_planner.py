@@ -145,15 +145,24 @@ class TestCartesianPlanner(unittest.TestCase):
         )
 
         # Plan a Cartesian path.
+        constraints = [
+            mjpl.JointLimitConstraint(model),
+            mjpl.CollisionConstraint(model),
+        ]
         waypoints = mjpl.cartesian_plan(
             q_init,
             poses,
             site,
             solver,
+            constraints,
             lin_threshold=0.01,
             ori_threshold=0.1,
         )
         self.assertEqual(len(waypoints), 4)
+
+        # The Cartesian path should obey constraints.
+        for wp in waypoints:
+            self.assertTrue(mjpl.obeys_constraints(wp, constraints))
 
         # The first element in the path should match the initial configuration.
         np.testing.assert_equal(waypoints[0], q_init)
@@ -163,21 +172,23 @@ class TestCartesianPlanner(unittest.TestCase):
         data.qpos = waypoints[1]
         mujoco.mj_kinematics(model, data)
         actual_site_pose = mjpl.site_pose(data, site)
-        err = poses[0].minus(actual_site_pose)
+        err = next_ee_pose.minus(actual_site_pose)
         self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
         self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
 
-        # An interpolated pose should have been added to the Cartesian path
+        # An interpolated pose should have been added to the Cartesian path.
         data.qpos = waypoints[2]
         mujoco.mj_kinematics(model, data)
         actual_site_pose = mjpl.site_pose(data, site)
         err = interpolated_pose.minus(actual_site_pose)
         self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
         self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
+
+        # The Cartesian path should end at the last pose.
         data.qpos = waypoints[3]
         mujoco.mj_kinematics(model, data)
         actual_site_pose = mjpl.site_pose(data, site)
-        err = poses[1].minus(actual_site_pose)
+        err = final_ee_pose.minus(actual_site_pose)
         self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
         self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
 

@@ -69,7 +69,7 @@ class MinkIKSolver(IKSolver):
 
     def solve_ik(
         self, pose: SE3, site: str, q_init_guess: np.ndarray | None
-    ) -> np.ndarray | None:
+    ) -> list[np.ndarray]:
         end_effector_task = mink.FrameTask(
             frame_name=site,
             frame_type="site",
@@ -95,7 +95,7 @@ class MinkIKSolver(IKSolver):
                 ori_achieved = np.linalg.norm(err[3:]) <= self.ori_tolerance
                 if pos_achieved and ori_achieved:
                     if obeys_constraints(configuration.q, self.constraints):
-                        return configuration.q
+                        return [configuration.q]
                     break
                 vel = mink.solve_ik(
                     configuration,
@@ -113,4 +113,4 @@ class MinkIKSolver(IKSolver):
                 self.model, configuration.q, self.joints, _seed, self.constraints
             )
             configuration.update(next_guess)
-        return None
+        return []

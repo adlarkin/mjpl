@@ -35,12 +35,17 @@ def main() -> bool:
     model = mujoco.MjModel.from_xml_path(_UR5_XML.as_posix())
     data = mujoco.MjData(model)
 
+    constraints = [
+        mjpl.JointLimitConstraint(model),
+        mjpl.CollisionConstraint(model),
+    ]
+
     # Let the "home" keyframe in the MJCF be the initial state.
     home_keyframe = model.keyframe("home")
     q_init = home_keyframe.qpos.copy()
 
     # Define a cartesian path that corresponds to the EE moving in a circle
-    # in the xy plane, centered about the initial EE pose
+    # in the xy plane, centered about the initial EE pose.
     mujoco.mj_resetDataKeyframe(model, data, home_keyframe.id)
     mujoco.mj_kinematics(model, data)
     initial_ee_pose = mjpl.site_pose(data, _UR5_EE_SITE)
@@ -62,7 +67,7 @@ def main() -> bool:
 
     print("Planning...")
     start = time.time()
-    waypoints = mjpl.cartesian_plan(q_init, poses, _UR5_EE_SITE, solver)
+    waypoints = mjpl.cartesian_plan(q_init, poses, _UR5_EE_SITE, solver, constraints)
     if not waypoints:
         print("Planning failed")
         return False
