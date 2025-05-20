@@ -40,7 +40,6 @@ class TestMinkIKSolver(unittest.TestCase):
 
         # Solve IK (test both with/without an initial guess config)
         ik_solutions = []
-
         ik_solutions.extend(
             solver.solve_ik(
                 pose=target_pose,

@@ -22,7 +22,7 @@ class IKSolver(ABC):
             q_init_guess: Initial guess for the joint configuration.
 
         Returns:
-            A list of joint configurations that satisfy the target pose, or an empty
-            list if IK was unable to be solved.
+            A list of joint configurations that satisfy the target pose. An empty list
+            is returned if IK was unable to be solved.
         """
         pass
