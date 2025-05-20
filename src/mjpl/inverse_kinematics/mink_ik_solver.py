@@ -23,6 +23,7 @@ class MinkIKSolver(IKSolver):
         max_attempts: int = 1,
         iterations: int = 500,
         qp_solver: str = "daqp",
+        tasks: list[mink.Task] = [],
     ):
         """Constructor.
 
@@ -40,6 +41,7 @@ class MinkIKSolver(IKSolver):
             iterations: Maximum iterations to run the solver for, per attempt.
             qp_solver: QP Solver to use, which comes from the qpsolvers package:
                 https://github.com/qpsolvers/qpsolvers
+            tasks: Additional tasks that must be satisfied when solving IK.
         """
         if not joints:
             raise ValueError("`joints` cannot be empty.")
@@ -57,15 +59,15 @@ class MinkIKSolver(IKSolver):
         self.iterations = iterations
         self.qp_solver = qp_solver
 
+        self.tasks = tasks
         # If needed, create a damping task to make sure joints that are not in
         # self.joints are held fixed while solving IK.
-        self.damping_task: mink.DampingTask | None = None
         all_joints = utils.all_joints(model)
         if set(joints) != set(all_joints):
             fixed_joints = [j for j in all_joints if j not in joints]
             cost = np.zeros((model.nv,))
             cost[utils.qvel_idx(model, fixed_joints)] = 1e9
-            self.damping_task = mink.DampingTask(model, cost)
+            self.tasks.append(mink.DampingTask(model, cost))
 
     def solve_ik(
         self, pose: SE3, site: str, q_init_guess: np.ndarray | None
@@ -79,9 +81,7 @@ class MinkIKSolver(IKSolver):
         )
         end_effector_task.set_target(pose)
 
-        tasks = [end_effector_task]
-        if self.damping_task is not None:
-            tasks.append(self.damping_task)
+        tasks = self.tasks + [end_effector_task]
 
         limits = [mink.ConfigurationLimit(self.model)]
 
