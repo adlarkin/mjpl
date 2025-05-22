@@ -192,6 +192,20 @@ class TestCartesianPlanner(unittest.TestCase):
         self.assertLessEqual(np.linalg.norm(err[:3]), pos_tolerance)
         self.assertLessEqual(np.linalg.norm(err[3:]), ori_tolerance)
 
+    def test_invalid_args(self):
+        model = load_robot_description("ur5e_mj_description")
+        q_init = model.keyframe("home").qpos
+        site = "attachment_site"
+        solver = mjpl.MinkIKSolver(model, mjpl.all_joints(model))
+
+        with self.assertRaisesRegex(ValueError, "site"):
+            mjpl.cartesian_plan(q_init, [], "", solver, [])
+
+        constraint = mjpl.CollisionConstraint(model)
+        with self.assertRaisesRegex(ValueError, "collision_interval_check"):
+            mjpl.cartesian_plan(q_init, [], site, solver, [], (0.0, constraint))
+            mjpl.cartesian_plan(q_init, [], site, solver, [], (-1.0, constraint))
+
 
 if __name__ == "__main__":
     unittest.main()

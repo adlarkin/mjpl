@@ -181,6 +181,25 @@ class TestPlanningUtils(unittest.TestCase):
         for wp in smoothed_waypoints:
             self.assertTrue(mjpl.obeys_constraints(wp, constraints))
 
+    def test_smooth_path_invalid_args(self):
+        with self.assertRaisesRegex(ValueError, "waypoints"):
+            mjpl.smooth_path([], [])
+
+        model = mujoco.MjModel.from_xml_path(_ONE_DOF_BALL_XML.as_posix())
+        constraint = mjpl.CollisionConstraint(model)
+        waypoints = [np.zeros((6,)), np.ones((6,))]
+        with self.assertRaisesRegex(ValueError, "collision_interval_check"):
+            mjpl.smooth_path(waypoints, [], collision_interval_check=(0.0, constraint))
+            mjpl.smooth_path(waypoints, [], collision_interval_check=(-1.0, constraint))
+
+        with self.assertRaisesRegex(ValueError, "eps"):
+            mjpl.smooth_path(waypoints, [], eps=0.0)
+            mjpl.smooth_path(waypoints, [], eps=-1.0)
+
+        with self.assertRaisesRegex(ValueError, "num_tries"):
+            mjpl.smooth_path(waypoints, [], num_tries=0)
+            mjpl.smooth_path(waypoints, [], num_tries=-1)
+
     def test_path_length(self):
         waypoints = [
             np.array([0.0, 0.0, 0.0]),

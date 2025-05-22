@@ -41,6 +41,12 @@ def smooth_path(
     Returns:
         A smoothed path based on `waypoints` that obeys `constraints`.
     """
+    if not waypoints:
+        raise ValueError("`waypoints` cannot be empty.")
+    if collision_interval_check is not None and collision_interval_check[0] <= 0:
+        raise ValueError(
+            "If `collision_interval_check` is defined, the check distance must be > 0."
+        )
     if eps <= 0.0:
         raise ValueError("`eps` must be > 0.")
     if num_tries <= 0:

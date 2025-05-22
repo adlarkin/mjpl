@@ -54,11 +54,11 @@ class RRT:
             raise ValueError(
                 "If `collision_interval_check` is defined, the check distance must be > 0."
             )
-        if max_planning_time <= 0:
+        if max_planning_time <= 0.0:
             raise ValueError("`max_planning_time` must be > 0")
-        if epsilon <= 0:
-            raise ValueError("`epsilon` must be > 0.0")
-        if goal_biasing_probability < 0 or goal_biasing_probability > 1:
+        if epsilon <= 0.0:
+            raise ValueError("`epsilon` must be > 0")
+        if goal_biasing_probability < 0.0 or goal_biasing_probability > 1.0:
             raise ValueError("`goal_biasing_probability` must be within [0, 1].")
 
         self.model = model
