@@ -7,7 +7,12 @@ from robot_descriptions.loaders.mujoco import load_robot_description
 
 import mjpl
 from mjpl.planning.tree import Node, Tree
-from mjpl.planning.utils import _combine_paths, _constrained_extend, _step
+from mjpl.planning.utils import (
+    _combine_paths,
+    _constrained_extend,
+    _step,
+    _valid_collision_interval,
+)
 
 _HERE = Path(__file__).parent
 _MODEL_DIR = _HERE / "models"
@@ -236,6 +241,35 @@ class TestPlanningUtils(unittest.TestCase):
         np.testing.assert_array_less(q_reached, obstacle_min_x)
         np.testing.assert_array_less(q_reached, q_goal)
 
+    def test_constrained_extend_with_collision_invertal_check(self):
+        model = mujoco.MjModel.from_xml_path(_ONE_DOF_BALL_XML.as_posix())
+        constraints = [
+            mjpl.JointLimitConstraint(model),
+            collision_constraint := mjpl.CollisionConstraint(model),
+        ]
+
+        q_init = np.array([0.8])
+        q_goal = np.array([1.0])
+        self.assertTrue(mjpl.obeys_constraints(q_init, constraints))
+        self.assertTrue(mjpl.obeys_constraints(q_goal, constraints))
+
+        # Test a constrained extend between two configurations that obey the planning
+        # constraints, but violate the collision interval check.
+        # If the collision interval step distance is large enough, the interval should
+        # "skip over" the obstacle and succeed.
+        tree = Tree(Node(q_init))
+        q_reached = _constrained_extend(
+            q_goal, tree, np.inf, constraints, (np.inf, collision_constraint)
+        )
+        np.testing.assert_equal(q_reached, q_goal)
+        # If the collision interval step distance is small, the interval should
+        # intersect with the obstacle and fail.
+        tree = Tree(Node(q_init))
+        q_reached = _constrained_extend(
+            q_goal, tree, np.inf, constraints, (0.1, collision_constraint)
+        )
+        np.testing.assert_equal(q_reached, q_init)
+
     def test_constrained_extend_towards_existing_config(self):
         model = mujoco.MjModel.from_xml_path(_ONE_DOF_BALL_XML.as_posix())
         constraints = [
@@ -269,6 +303,28 @@ class TestPlanningUtils(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "`max_step_dist` must be > 0.0"):
             _step(start, target, max_step_dist=0.0)
             _step(start, target, max_step_dist=-1.0)
+
+    def test_valid_collision_interval(self):
+        model = mujoco.MjModel.from_xml_path(_ONE_DOF_BALL_XML.as_posix())
+        constraint = mjpl.CollisionConstraint(model)
+
+        # Interval that passes through an obstacle.
+        start = np.array([0.8])
+        end = np.array([1.0])
+
+        # The collision violation should be detected with a step size that intersects
+        # with the obstacle.
+        self.assertFalse(_valid_collision_interval(start, end, 0.1, constraint))
+
+        # The collision violation should NOT be detected with a step size that skips
+        # the obstacle.
+        self.assertTrue(_valid_collision_interval(start, end, 0.5, constraint))
+
+        # Interval that does not pass through an obstacle.
+        start = np.array([0.0])
+        end = np.array([0.2])
+        self.assertTrue(_valid_collision_interval(start, end, 0.01, constraint))
+        self.assertTrue(_valid_collision_interval(start, end, 0.5, constraint))
 
     def test_combine_paths(self):
         root_start = Node(np.array([0.0]))

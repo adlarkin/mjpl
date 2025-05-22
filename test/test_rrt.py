@@ -162,6 +162,19 @@ class TestRRT(unittest.TestCase):
             mjpl.RRT(model, joints, [], goal_biasing_probability=2.0)
         with self.assertRaisesRegex(ValueError, "planning_joints"):
             mjpl.RRT(model, [], [])
+        with self.assertRaisesRegex(ValueError, "collision_interval_check"):
+            mjpl.RRT(
+                model,
+                joints,
+                [],
+                collision_interval_check=(0.0, mjpl.CollisionConstraint(model)),
+            )
+            mjpl.RRT(
+                model,
+                joints,
+                [],
+                collision_interval_check=(-1.0, mjpl.CollisionConstraint(model)),
+            )
 
         model = mujoco.MjModel.from_xml_path(_TWO_DOF_BALL_XML.as_posix())
         joints = ["ball_slide_y"]
