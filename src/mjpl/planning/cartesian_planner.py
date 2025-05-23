@@ -91,8 +91,11 @@ def cartesian_plan(
             if obeys_constraints(q, constraints)
             and (
                 not collision_interval_check
+                # Include endpoints in interval collision checks since:
+                # 1. Interpolated poses may have been added
+                # 2. It is not guaranteed that IK solutions account for constraints
                 or _valid_collision_interval(
-                    waypoints[-1], q, *collision_interval_check
+                    waypoints[-1], q, *collision_interval_check, include_endpoints=True
                 )
             )
         ]
