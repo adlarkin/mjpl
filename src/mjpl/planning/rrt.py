@@ -50,10 +50,6 @@ class RRT:
         """
         if not planning_joints:
             raise ValueError("`planning_joints` cannot be empty.")
-        if collision_interval_check is not None and collision_interval_check[0] <= 0:
-            raise ValueError(
-                "If `collision_interval_check` is defined, the check distance must be > 0."
-            )
         if max_planning_time <= 0.0:
             raise ValueError("`max_planning_time` must be > 0")
         if epsilon <= 0.0:

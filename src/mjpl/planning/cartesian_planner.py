@@ -77,10 +77,6 @@ def cartesian_plan(
     """
     if not site:
         raise ValueError("`site` must be defined.")
-    if collision_interval_check is not None and collision_interval_check[0] <= 0:
-        raise ValueError(
-            "If `collision_interval_check` is defined, the check distance must be > 0."
-        )
 
     interpolated_poses = [poses[0]]
     for i in range(len(poses) - 1):

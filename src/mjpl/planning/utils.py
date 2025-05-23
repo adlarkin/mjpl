@@ -43,10 +43,6 @@ def smooth_path(
     """
     if not waypoints:
         raise ValueError("`waypoints` cannot be empty.")
-    if collision_interval_check is not None and collision_interval_check[0] <= 0:
-        raise ValueError(
-            "If `collision_interval_check` is defined, the check distance must be > 0."
-        )
     if eps <= 0.0:
         raise ValueError("`eps` must be > 0.")
     if num_tries <= 0:
@@ -197,6 +193,9 @@ def _valid_collision_interval(
     step_dist: float,
     constraint: CollisionConstraint,
 ) -> bool:
+    if step_dist <= 0.0:
+        raise ValueError("`step_dist` must be > 0")
+
     curr = start
     while not np.array_equal(curr, end):
         if not constraint.valid_config(curr):

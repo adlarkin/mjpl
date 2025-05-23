@@ -185,12 +185,7 @@ class TestPlanningUtils(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "waypoints"):
             mjpl.smooth_path([], [])
 
-        model = mujoco.MjModel.from_xml_path(_ONE_DOF_BALL_XML.as_posix())
-        constraint = mjpl.CollisionConstraint(model)
         waypoints = [np.zeros((6,)), np.ones((6,))]
-        with self.assertRaisesRegex(ValueError, "collision_interval_check"):
-            mjpl.smooth_path(waypoints, [], collision_interval_check=(0.0, constraint))
-            mjpl.smooth_path(waypoints, [], collision_interval_check=(-1.0, constraint))
 
         with self.assertRaisesRegex(ValueError, "eps"):
             mjpl.smooth_path(waypoints, [], eps=0.0)
@@ -344,6 +339,10 @@ class TestPlanningUtils(unittest.TestCase):
         end = np.array([0.2])
         self.assertTrue(_valid_collision_interval(start, end, 0.01, constraint))
         self.assertTrue(_valid_collision_interval(start, end, 0.5, constraint))
+
+        with self.assertRaisesRegex(ValueError, "step_dist"):
+            _valid_collision_interval(start, end, 0.0, constraint)
+            _valid_collision_interval(start, end, -1.0, constraint)
 
     def test_combine_paths(self):
         root_start = Node(np.array([0.0]))
