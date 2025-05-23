@@ -269,14 +269,14 @@ class TestPlanningUtils(unittest.TestCase):
 
         # Test a constrained extend between two configurations that obey the planning
         # constraints, but violate the collision interval check.
-        # If the collision interval step distance is large enough, the interval should
-        # "skip over" the obstacle and succeed.
+        # If the collision interval step distance is large enough, the interval check
+        # should "skip over" the obstacle and succeed.
         tree = Tree(Node(q_init))
         q_reached = _constrained_extend(
             q_goal, tree, np.inf, constraints, (np.inf, collision_constraint)
         )
         np.testing.assert_equal(q_reached, q_goal)
-        # If the collision interval step distance is small, the interval should
+        # If the collision interval step distance is small, the interval check should
         # intersect with the obstacle and fail.
         tree = Tree(Node(q_init))
         q_reached = _constrained_extend(

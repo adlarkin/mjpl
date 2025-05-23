@@ -46,16 +46,16 @@ class RRT:
             seed: Seed used for the underlying sampler in the planner.
                 `None` means the algorithm is nondeterministc.
             goal_biasing_probability: Probability of sampling a goal state during planning.
-                This must be a value between [0, 1].
+                This must be a value between [0.0, 1.0].
         """
         if not planning_joints:
             raise ValueError("`planning_joints` cannot be empty.")
         if max_planning_time <= 0.0:
-            raise ValueError("`max_planning_time` must be > 0")
+            raise ValueError("`max_planning_time` must be > 0.0")
         if epsilon <= 0.0:
-            raise ValueError("`epsilon` must be > 0")
+            raise ValueError("`epsilon` must be > 0.0")
         if goal_biasing_probability < 0.0 or goal_biasing_probability > 1.0:
-            raise ValueError("`goal_biasing_probability` must be within [0, 1].")
+            raise ValueError("`goal_biasing_probability` must be within [0.0, 1.0].")
 
         self.model = model
         self.planning_joints = planning_joints

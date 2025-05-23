@@ -154,9 +154,7 @@ def _constrained_extend(
             or np.linalg.norm(q_target - q) > np.linalg.norm(q_target - q_old)
             or (
                 collision_interval_check is not None
-                and not _valid_collision_interval(
-                    q, q_old, collision_interval_check[0], collision_interval_check[1]
-                )
+                and not _valid_collision_interval(q, q_old, *collision_interval_check)
             )
         ):
             return q_old

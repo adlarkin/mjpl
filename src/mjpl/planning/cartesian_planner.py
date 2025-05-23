@@ -92,10 +92,7 @@ def cartesian_plan(
             and (
                 not collision_interval_check
                 or _valid_collision_interval(
-                    waypoints[-1],
-                    q,
-                    collision_interval_check[0],
-                    collision_interval_check[1],
+                    waypoints[-1], q, *collision_interval_check
                 )
             )
         ]
