@@ -1,5 +1,6 @@
 import numpy as np
 
+from ..constraint.collision_constraint import CollisionConstraint
 from ..constraint.constraint_interface import Constraint
 from ..constraint.utils import apply_constraints
 from .tree import Node, Tree
@@ -8,6 +9,7 @@ from .tree import Node, Tree
 def smooth_path(
     waypoints: list[np.ndarray],
     constraints: list[Constraint],
+    collision_interval_check: tuple[float, CollisionConstraint] | None = None,
     eps: float = 0.05,
     num_tries: int = 100,
     seed: int | None = None,
@@ -21,6 +23,10 @@ def smooth_path(
     Args:
         waypoints: The waypoints that form the path to be smoothed.
         constraints: The constraints the smoothed path must obey.
+        collision_interval_check: A tuple that defines the step distance and
+            CollisionConstraint that are used to check if the interval between two
+            configurations obeys the CollisionConstraint. Interval checking is disabled
+            if this is None.
         eps: The step size that is used for checking constraints when attempting to
             smooth `waypoints`. If `sparse` is False, this is the maximum distance
             between waypoints that are added to the smoothed path.
@@ -35,6 +41,8 @@ def smooth_path(
     Returns:
         A smoothed path based on `waypoints` that obeys `constraints`.
     """
+    if not waypoints:
+        raise ValueError("`waypoints` cannot be empty.")
     if eps <= 0.0:
         raise ValueError("`eps` must be > 0.")
     if num_tries <= 0:
@@ -50,7 +58,9 @@ def smooth_path(
         # See if the randomly selected waypoints can be connected without violating
         # constraints.
         tree = Tree(Node(smoothed_path[start]))
-        q_reached = _constrained_extend(smoothed_path[end], tree, eps, constraints)
+        q_reached = _constrained_extend(
+            smoothed_path[end], tree, eps, constraints, collision_interval_check
+        )
         if not np.array_equal(q_reached, smoothed_path[end]):
             continue
 
@@ -97,6 +107,7 @@ def _constrained_extend(
     tree: Tree,
     eps: float,
     constraints: list[Constraint],
+    collision_interval_check: tuple[float, CollisionConstraint] | None = None,
     equality_threshold: float = 1e-8,
 ) -> np.ndarray:
     """Extend a tree towards a target configuration, subject to constraints.
@@ -109,6 +120,10 @@ def _constrained_extend(
         tree: The tree to extend towards `q_target`.
         eps: The maximum distance allowed between nodes in `tree`.
         constraints: The constraints nodes in `tree` must obey.
+        collision_interval_check: A tuple that defines the step distance and
+            CollisionConstraint that are used to check if the interval between two
+            configurations obeys the CollisionConstraint. Interval checking is disabled
+            if this is None.
         equality_threshold: Configuration distance threshold for determining whether or
             not a constrained configuration is equivalent to its previous configuration.
             Used as termination criteria for handling things like local minima in
@@ -132,10 +147,15 @@ def _constrained_extend(
         # - Applying constraints failed
         # - The configuration is the same as q_old after applying constraints
         # - Applying constraints gives a configuration that deviates from q_target
+        # - The interval between q_old and the configuration violates collisions
         if (
             q is None
             or np.linalg.norm(q - q_old) < equality_threshold
             or np.linalg.norm(q_target - q) > np.linalg.norm(q_target - q_old)
+            or (
+                collision_interval_check is not None
+                and not _valid_collision_interval(q_old, q, *collision_interval_check)
+            )
         ):
             return q_old
 
@@ -163,6 +183,37 @@ def _step(start: np.ndarray, target: np.ndarray, max_step_dist: float) -> np.nda
     magnitude = np.linalg.norm(direction)
     unit_vec = direction / magnitude
     return start + (unit_vec * min(max_step_dist, magnitude))
+
+
+def _valid_collision_interval(
+    start: np.ndarray,
+    end: np.ndarray,
+    step_dist: float,
+    constraint: CollisionConstraint,
+) -> bool:
+    """Check if configurations at a discrete step over an interval (excluding the
+    start/end points) obey a CollisionConstraint.
+
+    Args:
+        start: The configuration that marks the start of the interval.
+        end: The configuration that marks the end of the interval.
+        step_dist: The distance to step towards `end` from `start`.
+        constraint: The CollisionConstraint that configurations in the interval must obey.
+
+    Returns:
+        True if the configurations between `start` and `end` obey `constraint`.
+        False otherwise.
+    """
+    if step_dist <= 0.0:
+        raise ValueError("`step_dist` must be > 0")
+
+    waypoints = [start]
+    while not np.array_equal(waypoints[-1], end):
+        waypoints.append(_step(waypoints[-1], end, step_dist))
+    # Ignore the start/end of the interval (only check intermediate configurations).
+    waypoints = waypoints[1:-1]
+
+    return all(constraint.valid_config(wp) for wp in waypoints)
 
 
 def _combine_paths(

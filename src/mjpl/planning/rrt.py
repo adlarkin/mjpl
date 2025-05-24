@@ -5,6 +5,7 @@ import numpy as np
 from mink.lie.se3 import SE3
 
 from .. import utils
+from ..constraint.collision_constraint import CollisionConstraint
 from ..constraint.constraint_interface import Constraint
 from ..constraint.utils import obeys_constraints
 from ..inverse_kinematics.ik_solver_interface import IKSolver
@@ -24,6 +25,7 @@ class RRT:
         model: mujoco.MjModel,
         planning_joints: list[str],
         constraints: list[Constraint],
+        collision_interval_check: tuple[float, CollisionConstraint] | None = None,
         max_planning_time: float = 10.0,
         epsilon: float = 0.05,
         seed: int | None = None,
@@ -35,6 +37,10 @@ class RRT:
             model: MuJoCo model.
             planning_joints: The joints that are sampled during planning.
             constraints: The constraints the sampled configurations must obey.
+            collision_interval_check: A tuple that defines the step distance and
+                CollisionConstraint that are used to check if the interval between two
+                configurations obeys the CollisionConstraint. Interval checking is
+                disabled if this is None.
             max_planning_time: Maximum planning time, in seconds.
             epsilon: The maximum distance allowed between nodes in the tree.
             seed: Seed used for the underlying sampler in the planner.
@@ -54,6 +60,7 @@ class RRT:
         self.model = model
         self.planning_joints = planning_joints
         self.constraints = constraints
+        self.collision_interval_check = collision_interval_check
         self.max_planning_time = max_planning_time
         self.epsilon = epsilon
         self.seed = seed
@@ -204,12 +211,14 @@ class RRT:
                 tree_a,
                 self.epsilon,
                 self.constraints,
+                self.collision_interval_check,
             )
             q_reached_b = _constrained_extend(
                 q_reached_a,
                 tree_b,
                 self.epsilon,
                 self.constraints,
+                self.collision_interval_check,
             )
             if np.array_equal(q_reached_a, q_reached_b):
                 waypoints = _combine_paths(

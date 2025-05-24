@@ -1,9 +1,11 @@
 import numpy as np
 from mink.lie import SE3
 
+from ..constraint.collision_constraint import CollisionConstraint
 from ..constraint.constraint_interface import Constraint
 from ..constraint.utils import obeys_constraints
 from ..inverse_kinematics.ik_solver_interface import IKSolver
+from .utils import _valid_collision_interval
 
 
 def _interpolate_poses(
@@ -46,6 +48,7 @@ def cartesian_plan(
     site: str,
     solver: IKSolver,
     constraints: list[Constraint],
+    collision_interval_check: tuple[float, CollisionConstraint] | None = None,
     lin_threshold: float = 0.01,
     ori_threshold: float = 0.1,
 ) -> list[np.ndarray]:
@@ -57,6 +60,10 @@ def cartesian_plan(
         site: The site (i.e., frame) that should follow the Cartesian path.
         solver: Solver used to compute IK for `poses` and `site`.
         constraints: The constraints configurations in the Cartesian path must obey.
+        collision_interval_check: A tuple that defines the step distance and
+            CollisionConstraint that are used to check if the interval between two
+            configurations obeys the CollisionConstraint. Interval checking is disabled
+            if this is None.
         lin_threshold: The maximum linear distance (in meters) allowed between
             adjacent poses in `poses`. Pose interpolation will occur if this threshold
             is exceeded.
@@ -68,6 +75,9 @@ def cartesian_plan(
         A list of waypoints that adhere to a Cartesian path defined by `poses`,
         starting from `q_init`. If a path cannot be found, an empty list is returned.
     """
+    if not site:
+        raise ValueError("`site` must be defined.")
+
     interpolated_poses = [poses[0]]
     for i in range(len(poses) - 1):
         batch = _interpolate_poses(poses[i], poses[i + 1], lin_threshold, ori_threshold)
@@ -79,6 +89,12 @@ def cartesian_plan(
             q
             for q in solver.solve_ik(p, site, q_init_guess=waypoints[-1])
             if obeys_constraints(q, constraints)
+            and (
+                not collision_interval_check
+                or _valid_collision_interval(
+                    waypoints[-1], q, *collision_interval_check
+                )
+            )
         ]
         if not configs:
             return []
