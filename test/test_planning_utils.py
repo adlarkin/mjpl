@@ -263,7 +263,7 @@ class TestPlanningUtils(unittest.TestCase):
         ]
 
         q_init = np.array([0.8])
-        q_goal = np.array([1.0])
+        q_goal = np.array([1.8])
         self.assertTrue(mjpl.obeys_constraints(q_init, constraints))
         self.assertTrue(mjpl.obeys_constraints(q_goal, constraints))
 
@@ -273,7 +273,7 @@ class TestPlanningUtils(unittest.TestCase):
         # should "skip over" the obstacle and succeed.
         tree = Tree(Node(q_init))
         q_reached = _constrained_extend(
-            q_goal, tree, np.inf, constraints, (np.inf, collision_constraint)
+            q_goal, tree, np.inf, constraints, (0.3, collision_constraint)
         )
         np.testing.assert_equal(q_reached, q_goal)
         # If the collision interval step distance is small, the interval check should
