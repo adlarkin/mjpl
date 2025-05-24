@@ -48,15 +48,6 @@ def smooth_path(
     if num_tries <= 0:
         raise ValueError("`num_tries` must be > 0.")
 
-    # Assume waypoints don't violate the CollisionConstraint since they come from a
-    # pre-defined path. This means the endpoints of all intervals can be ignored in
-    # interval collision checks.
-    _collision_interval_check = (
-        None
-        if collision_interval_check is None
-        else (collision_interval_check[0], collision_interval_check[1], False)
-    )
-
     smoothed_path = waypoints
     rng = np.random.default_rng(seed=seed)
     for _ in range(num_tries):
@@ -68,7 +59,7 @@ def smooth_path(
         # constraints.
         tree = Tree(Node(smoothed_path[start]))
         q_reached = _constrained_extend(
-            smoothed_path[end], tree, eps, constraints, _collision_interval_check
+            smoothed_path[end], tree, eps, constraints, collision_interval_check
         )
         if not np.array_equal(q_reached, smoothed_path[end]):
             continue
@@ -116,7 +107,7 @@ def _constrained_extend(
     tree: Tree,
     eps: float,
     constraints: list[Constraint],
-    collision_interval_check: tuple[float, CollisionConstraint, bool] | None = None,
+    collision_interval_check: tuple[float, CollisionConstraint] | None = None,
     equality_threshold: float = 1e-8,
 ) -> np.ndarray:
     """Extend a tree towards a target configuration, subject to constraints.
@@ -129,10 +120,10 @@ def _constrained_extend(
         tree: The tree to extend towards `q_target`.
         eps: The maximum distance allowed between nodes in `tree`.
         constraints: The constraints nodes in `tree` must obey.
-        collision_interval_check: A tuple that defines the step distance,
-            CollisionConstraint, and whether or not endpoints are included when checking
-            if the interval between two configurations obeys the CollisionConstraint.
-            Interval checking is disabled if this is None.
+        collision_interval_check: A tuple that defines the step distance and
+            CollisionConstraint that are used to check if the interval between two
+            configurations obeys the CollisionConstraint. Interval checking is disabled
+            if this is None.
         equality_threshold: Configuration distance threshold for determining whether or
             not a constrained configuration is equivalent to its previous configuration.
             Used as termination criteria for handling things like local minima in
@@ -199,19 +190,19 @@ def _valid_collision_interval(
     end: np.ndarray,
     step_dist: float,
     constraint: CollisionConstraint,
-    include_endpoints: bool,
 ) -> bool:
-    """Check if configurations at a discrete step over an interval obey a CollisionConstraint.
+    """Check if configurations at a discrete step over an interval (excluding the
+    start/end points) obey a CollisionConstraint.
 
     Args:
         start: The configuration that marks the start of the interval.
         end: The configuration that marks the end of the interval.
         step_dist: The distance to step towards `end` from `start`.
         constraint: The CollisionConstraint that configurations in the interval must obey.
-        include_endpoints: Whether or not `start` and `end` should be included in the check.
 
     Returns:
-        True if the configurations over the interval obey `constraint`. False otherwise.
+        True if the configurations between `start` and `end` obey `constraint`.
+        False otherwise.
     """
     if step_dist <= 0.0:
         raise ValueError("`step_dist` must be > 0")
@@ -219,8 +210,8 @@ def _valid_collision_interval(
     waypoints = [start]
     while not np.array_equal(waypoints[-1], end):
         waypoints.append(_step(waypoints[-1], end, step_dist))
-    if not include_endpoints:
-        waypoints = waypoints[1:-1]
+    # Ignore the start/end of the interval (only check intermediate configurations).
+    waypoints = waypoints[1:-1]
 
     return all(constraint.valid_config(wp) for wp in waypoints)
 

@@ -60,13 +60,7 @@ class RRT:
         self.model = model
         self.planning_joints = planning_joints
         self.constraints = constraints
-        # The RRT algorithm applies constraints to each new sampled configuration. This
-        # means the endpoints of all intervals can be ignored in interval collision checks.
-        self.collision_interval_check = (
-            None
-            if collision_interval_check is None
-            else (collision_interval_check[0], collision_interval_check[1], False)
-        )
+        self.collision_interval_check = collision_interval_check
         self.max_planning_time = max_planning_time
         self.epsilon = epsilon
         self.seed = seed

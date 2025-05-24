@@ -273,14 +273,14 @@ class TestPlanningUtils(unittest.TestCase):
         # should "skip over" the obstacle and succeed.
         tree = Tree(Node(q_init))
         q_reached = _constrained_extend(
-            q_goal, tree, np.inf, constraints, (np.inf, collision_constraint, False)
+            q_goal, tree, np.inf, constraints, (np.inf, collision_constraint)
         )
         np.testing.assert_equal(q_reached, q_goal)
         # If the collision interval step distance is small, the interval check should
         # intersect with the obstacle and fail.
         tree = Tree(Node(q_init))
         q_reached = _constrained_extend(
-            q_goal, tree, np.inf, constraints, (0.1, collision_constraint, False)
+            q_goal, tree, np.inf, constraints, (0.1, collision_constraint)
         )
         np.testing.assert_equal(q_reached, q_init)
 
@@ -322,51 +322,26 @@ class TestPlanningUtils(unittest.TestCase):
         model = mujoco.MjModel.from_xml_path(_ONE_DOF_BALL_XML.as_posix())
         constraint = mjpl.CollisionConstraint(model)
 
-        # Interval with valid endpoints that passes through an obstacle.
+        # Interval that passes through an obstacle.
         start = np.array([0.8])
-        end = np.array([1.0])
-        self.assertTrue(constraint.valid_config(start))
-        self.assertTrue(constraint.valid_config(end))
+        end = np.array([1.5])
 
         # The collision violation should be detected with a step size that intersects
         # with the obstacle.
-        self.assertFalse(_valid_collision_interval(start, end, 0.1, constraint, True))
-        self.assertFalse(_valid_collision_interval(start, end, 0.1, constraint, False))
+        self.assertFalse(_valid_collision_interval(start, end, 0.1, constraint))
 
         # The collision violation should NOT be detected with a step size that skips
         # the obstacle.
-        self.assertTrue(_valid_collision_interval(start, end, 0.5, constraint, True))
-        self.assertTrue(_valid_collision_interval(start, end, 0.5, constraint, False))
+        self.assertTrue(_valid_collision_interval(start, end, 0.2, constraint))
 
-        # Interval with valid endpoints that does not pass through an obstacle.
+        # Interval that does not pass through an obstacle.
         start = np.array([0.0])
         end = np.array([0.2])
-        self.assertTrue(constraint.valid_config(start))
-        self.assertTrue(constraint.valid_config(end))
-        self.assertTrue(_valid_collision_interval(start, end, 0.01, constraint, True))
-        self.assertTrue(_valid_collision_interval(start, end, 0.01, constraint, False))
-        self.assertTrue(_valid_collision_interval(start, end, 0.5, constraint, True))
-        self.assertTrue(_valid_collision_interval(start, end, 0.5, constraint, False))
-
-        # Interval with invalid start point.
-        start = np.array([0.85])
-        end = np.array([1.5])
-        self.assertFalse(constraint.valid_config(start))
-        self.assertTrue(constraint.valid_config(end))
-        self.assertFalse(_valid_collision_interval(start, end, 0.15, constraint, True))
-        self.assertTrue(_valid_collision_interval(start, end, 0.15, constraint, False))
-
-        # Interval with invalid last point.
-        start = np.array([0.5])
-        end = np.array([0.85])
-        self.assertTrue(constraint.valid_config(start))
-        self.assertFalse(constraint.valid_config(end))
-        self.assertFalse(_valid_collision_interval(start, end, 0.2, constraint, True))
-        self.assertTrue(_valid_collision_interval(start, end, 0.2, constraint, False))
+        self.assertTrue(_valid_collision_interval(start, end, 0.01, constraint))
 
         with self.assertRaisesRegex(ValueError, "step_dist"):
-            _valid_collision_interval(start, end, 0.0, constraint, True)
-            _valid_collision_interval(start, end, -1.0, constraint, True)
+            _valid_collision_interval(start, end, 0.0, constraint)
+            _valid_collision_interval(start, end, -1.0, constraint)
 
     def test_combine_paths(self):
         root_start = Node(np.array([0.0]))

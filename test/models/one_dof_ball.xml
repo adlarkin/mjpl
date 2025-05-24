@@ -4,7 +4,7 @@
     <geom type="plane" size="2 2 0.1" rgba=".75 .75 .75 1"/>
 
     <body name="ball" pos="0 0 1">
-      <joint name="ball_slide_x" type="slide" axis="1 0 0" range="-1 1"/>
+      <joint name="ball_slide_x" type="slide" axis="1 0 0" range="-2 2"/>
       <geom type="sphere" size="0.01" rgba="0 1 0 1"/>
     </body>
 
