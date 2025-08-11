@@ -55,18 +55,17 @@ def main() -> bool:
     print("Shortcutting...")
     start = time.time()
     shortcut_waypoints = mjpl.smooth_path(
-        waypoints, constraints, eps=planner.epsilon, seed=seed, sparse=True
+        waypoints, constraints, eps=planner.epsilon, seed=seed
     )
     print(f"Shortcutting took {(time.time() - start):.4f}s")
 
     # The trajectory limits used here are for demonstration purposes only.
     # In practice, consult your hardware spec sheet for this information.
     dof = len(waypoints[0])
-    traj_generator = mjpl.RuckigTrajectoryGenerator(
+    traj_generator = mjpl.DrakeTrajectoryGenerator(
         dt=model.opt.timestep,
-        max_velocity=np.ones(dof) * np.pi,
-        max_acceleration=np.ones(dof) * 0.5 * np.pi,
-        max_jerk=np.ones(dof),
+        joint_limits=(model.jnt_range[:, 0], model.jnt_range[:, 1]),
+        velocity_limits=(-np.ones(dof) * 0.25 * np.pi, np.ones(dof) * 0.25 * np.pi),
     )
 
     print("Generating trajectory...")

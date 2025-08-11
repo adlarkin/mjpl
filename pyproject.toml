@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "mjpl"
 version = "0.0.1"
 dependencies = [
+  "drake",
   # 0.0.8 for daqp and matrix Lie group interpolation:
   # https://github.com/kevinzakka/mink/releases/tag/v0.0.8
   "mink >= 0.0.8",

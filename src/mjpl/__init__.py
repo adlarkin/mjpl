@@ -12,6 +12,7 @@ from .planning.cartesian_planner import cartesian_plan
 from .planning.rrt import RRT
 from .planning.utils import path_length, smooth_path
 from .trajectory import (
+    DrakeTrajectoryGenerator,
     RuckigTrajectoryGenerator,
     ToppraTrajectoryGenerator,
     generate_constrained_trajectory,
@@ -26,6 +27,7 @@ from .utils import (
 
 __all__ = (
     "CollisionConstraint",
+    "DrakeTrajectoryGenerator",
     "JointLimitConstraint",
     "MinkIKSolver",
     "PoseConstraint",
